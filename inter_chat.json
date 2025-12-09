@@ -1,0 +1,24 @@
+{
+    "known_users": {
+        "158.170.12.114": {
+            "nick": "Omar",
+            "status": "Trabajando",
+            "t": 1765289988.7856975
+        }
+    },
+    "nick": "neymar",
+    "status": "En l\u00ednea",
+    "visible": true,
+    "log_on": false,
+    "auto_dl": true,
+    "trusted_nets": {
+        "158.170.12.1_LAN": {
+            "trusted": true,
+            "last_seen": 1765289978.3490696,
+            "name": "158.170.12.1_LAN"
+        }
+    },
+    "trusted_peers": [
+        "158.170.12.114"
+    ]
+}
