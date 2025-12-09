@@ -55,18 +55,6 @@ NoDisplay=false
 X-GNOME-Autostart-enabled=true
 ```
 
-**IMPORTANTE**: Reemplazar `USUARIO` por tu nombre de usuario real.
-
-Para saber tu usuario:
-```bash
-echo $USER
-```
-
-Ejemplo: Si tu usuario es "jose", la línea sería:
-```
-Exec=/home/jose/autostart_ghostwhisper.sh
-```
-
 ### 4. Probar la Configuración
 ```bash
 # Probar el script
