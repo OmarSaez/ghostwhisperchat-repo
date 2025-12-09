@@ -15,36 +15,69 @@ sudo apt install ghostwhisperchat
 
 ## AUTOLEVANTADO
 
+### 1. Crear Script de Inicio
 ```bash
 nano ~/autostart_ghostwhisper.sh
 ```
 
-**Contenido del archivo:**
-
+Pegar este contenido:
 ```bash
-sleep 5
+#!/bin/bash
+# Esperar a que el escritorio cargue
+sleep 8
+
+# Abrir GhostWhisperChat en terminal
 x-terminal-emulator -e "/usr/bin/ghostwhisperchat"
-#Control o + enter + control x
 ```
 
+Guardar: `Ctrl + O`, `Enter`, `Ctrl + X`
+
+### 2. Dar Permisos de Ejecución
 ```bash
 chmod +x ~/autostart_ghostwhisper.sh
 ```
 
+### 3. Crear Archivo de Auto-inicio
 ```bash
 mkdir -p ~/.config/autostart
 nano ~/.config/autostart/ghostwhisper.desktop
 ```
 
-**Contenido del archivo:**
-
-```
+Pegar este contenido:
+```ini
 [Desktop Entry]
 Type=Application
-Name=GhostWhisperChat Terminal
-Exec=/home/kali/autostart_ghostwhisper.sh
+Name=GhostWhisperChat
+Comment=Abre GhostWhisperChat al iniciar sesión
+Exec=/home/USUARIO/autostart_ghostwhisper.sh
 Hidden=false
 NoDisplay=false
 X-GNOME-Autostart-enabled=true
 ```
 
+**IMPORTANTE**: Reemplazar `USUARIO` por tu nombre de usuario real.
+
+Para saber tu usuario:
+```bash
+echo $USER
+```
+
+Ejemplo: Si tu usuario es "jose", la línea sería:
+```
+Exec=/home/jose/autostart_ghostwhisper.sh
+```
+
+### 4. Probar la Configuración
+```bash
+# Probar el script
+~/autostart_ghostwhisper.sh
+
+# Verificar que se crearon los archivos
+ls -la ~/autostart_ghostwhisper.sh
+ls -la ~/.config/autostart/ghostwhisper.desktop
+```
+
+### 5. Reiniciar para Verificar
+```bash
+sudo reboot
+```
