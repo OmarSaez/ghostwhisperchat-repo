@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-APP_VER_NUM = 32.4
-APP_VER_TAG = "Quiet"
+APP_VER_NUM = 32.7
+APP_VER_TAG = "Desktop DL"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 import socket, threading, subprocess, sys, os, time, platform, atexit, difflib, shutil, datetime, json, uuid, re, unicodedata, signal, re, ctypes
@@ -12,7 +12,31 @@ except ImportError: pass
 TCP_PORT, UDP_PORT = 44494, 44495
 IPC_PORT = 5000
 BUFFER, SEP, LOG_FILE, CONFIG_FILE = 4096, "<SEPARATOR>", "cyberdei_history.log", "cyberdei_config.json"
-DL_DIR = "CyberDEI_Recibidos"
+BUFFER, SEP, LOG_FILE, CONFIG_FILE = 4096, "<SEPARATOR>", "cyberdei_history.log", "cyberdei_config.json"
+
+# Detectar Escritorio
+def get_desktop_path():
+    if platform.system() == "Linux":
+        try:
+            return subprocess.check_output(["xdg-user-dir", "DESKTOP"]).decode().strip()
+        except: pass
+    elif platform.system() == "Windows":
+        try:
+            return os.path.join(os.environ['USERPROFILE'], 'Desktop')
+        except: pass
+    
+    # Fallback
+    home = os.path.expanduser("~")
+    for d in ["Desktop", "Escritorio"]:
+        p = os.path.join(home, d)
+        if os.path.exists(p): return p
+    return home
+
+DL_ROOT = get_desktop_path()
+DL_DIR = os.path.join(DL_ROOT, "GhostWhisper_Recibidos")
+if not os.path.exists(DL_DIR):
+    try: os.makedirs(DL_DIR)
+    except: pass
 TIMERS = {'PRIV': 30, 'GROUP': 60, 'MANUAL': 300, 'INVITE': 15}
 
 # --- ESTADO PROCESOS ---
@@ -351,7 +375,7 @@ def show_help():
     cmds = [
         ("--chatgrupal ID CLAVE", "Unirse/Crear sala."), 
         ("--invite (Nick1, Nick2...)", "Invitar gente al grupo actual."),
-        ("--chatpersonal (Nick y/o IP)", "Buscar usuario."),
+        ("--chatpersonal (Nick y/o IP)", "Crear un chat privado con un usuario."),
         ("--contactos", "Ver historial de gente vista."),
         ("--quienes", "Escanear red (¿Quién está online?)."),
         ("--quienes-si / --quienes-no", "Visibilidad en escáner."),
@@ -359,13 +383,15 @@ def show_help():
         ("--estado (Texto)", "Cambiar estado."),
         ("--log on / off", "Guardar historial."), 
         ("--archivo (Archivo.ext y/o Ruta)", "Enviar archivo."),
-        ("--ls", "Listar usuarios CONECTADOS."), 
+        ("--ls", "Listar usuarios CONECTADOS. en el chat"), 
         ("--clear", "Limpiar pantalla."),
         ("--popno / --popsi", "Control Notificaciones."), 
         ("--descarga-automatica-si/no", "Seguridad de Archivos.")
     ]
     print(f" {Colors.BO}--- COMANDOS ---{Colors.E}")
     for c, d in cmds: print(f" {Colors.BO}{c:<35}{Colors.E} : {d}")
+    print(f" {Colors.BO}--autolevantado-si/no{Colors.E}       : Iniciar app al encender PC (Linux).")
+    print(f" {Colors.BO}--exit{Colors.E}                        : Salir.")
     print("-" * 60)
 
 def get_peer_name(ip):
@@ -1332,6 +1358,50 @@ def try_trigger_updates(peer_list):
 
 # ... existing code ...
 
+def toggle_autostart(enable):
+    """Activa o desactiva el inicio automático en Linux (.config/autostart)"""
+    if platform.system() != "Linux":
+        return safe_print(f"{Colors.F}[!] Solo disponible en Linux por ahora.{Colors.E}")
+        
+    autostart_dir = os.path.expanduser("~/.config/autostart")
+    desktop_file = os.path.join(autostart_dir, "inter_chat_auto.desktop")
+    
+    if enable:
+        try:
+            if not os.path.exists(autostart_dir): os.makedirs(autostart_dir)
+            
+            # Obtener rutas absolutas
+            exe = sys.executable
+            script = os.path.abspath(sys.argv[0])
+            
+            content = f"""[Desktop Entry]
+Type=Application
+Name=InterChat Auto
+Exec={exe} "{script}"
+Terminal=true
+Hidden=false
+NoDisplay=false
+X-GNOME-Autostart-enabled=true
+Comment=Auto-start InterChat Lobby
+"""
+            with open(desktop_file, "w") as f:
+                f.write(content)
+            
+            # Dar permisos de ejecución al script por si acaso
+            os.chmod(script, 0o755)
+            safe_print(f"{Colors.G}[✔] Autolevantado ACTIVADO (Inicio de sesión).{Colors.E}")
+        except Exception as e:
+            safe_print(f"{Colors.F}[!] Error activando autostart: {e}{Colors.E}")
+    else:
+        try:
+            if os.path.exists(desktop_file):
+                os.remove(desktop_file)
+                safe_print(f"{Colors.W}[✔] Autolevantado DESACTIVADO.{Colors.E}")
+            else:
+                safe_print(f"{Colors.W}[!] No estaba activado.{Colors.E}")
+        except Exception as e:
+            safe_print(f"{Colors.F}[!] Error desactivando: {e}{Colors.E}")
+
 # --- COMANDOS LOBBY CENTRALIZADOS ---
 def exec_lobby_cmd(inp, origin_cid=None):
     global MY_NICK, MY_STATUS, MY_IP, LAST_ACT, PENDING_INVITE, VISIBLE_IN_SCAN, LOG_ON, AUTO_DL, POPUP_ON, USER_OFF
@@ -1355,7 +1425,7 @@ def exec_lobby_cmd(inp, origin_cid=None):
             refresh_ui(f"{Colors.G}[*] Grupo creado/unido.{Colors.E}") # FIX BUG 1
         else: safe_print(f"{Colors.F}Falta ID o Clave.{Colors.E}")
 
-    elif cmd in ["--chatpersonal", "--personal", "--chatp", "--p", "--cp"]:
+    elif cmd in ["--chatpersonal", "--personal", "--chatp", "--p", "--cp", "--dm"]:
         t = find_global(args)
         if t:
             if t == MY_IP: safe_print(f"{Colors.F}Eres tú.{Colors.E}")
@@ -1395,7 +1465,11 @@ def exec_lobby_cmd(inp, origin_cid=None):
     elif inp == "--descarga-automatica-no": AUTO_DL=False; save_config(); msg_print(f"{Colors.W}DL MANUAL{Colors.E}")
     elif inp == "--popno": POPUP_ON, USER_OFF = False, True; msg_print(f"{Colors.W}Mute Manual.{Colors.E}")
     elif inp == "--popsi": POPUP_ON, USER_OFF = True, False; msg_print(f"{Colors.G}Popups ON.{Colors.E}")
-
+    
+    # AutoStart Commands
+    elif inp == "--autolevantado-si": toggle_autostart(True)
+    elif inp == "--autolevantado-no": toggle_autostart(False)
+    
     elif inp == "--clear":
         global LOBBY_HISTORY
         LOBBY_HISTORY = [] # Reset total si pide clear manual
@@ -1504,7 +1578,7 @@ def exec_lobby_cmd(inp, origin_cid=None):
             # Comando en el Lobby -> Apagar APP
             shutdown_lobby()
 
-    elif cmd == "--help":
+    elif cmd in ["--help", "--ayuda", "--comandos"]:
          show_help()
 
     # --- RESPUESTAS A INVITACIONES ---
