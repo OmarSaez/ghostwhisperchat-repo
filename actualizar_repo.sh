@@ -1,46 +1,81 @@
 #!/bin/bash
-# Script de Auto-Publicación GhostWhisperChat
-# Ejecutar desde la carpeta del repositorio: ./actualizar_repo.sh
+# Script Maestro de Publicación GhostWhisperChat
+# Autor: CyberDEI Team
+# Uso: ./actualizar_repo.sh
 
 set -e
 
-REPO_ROOT="/home/omar/Escritorio/ghostwhisperchat-repo"
-SOURCE="/home/omar/Escritorio/inter_chat.py"
+# Configuración
+REPO_ROOT=$(pwd)
+SOURCE="$HOME/Escritorio/inter_chat.py"
 PKG_DIR="ghostwhisperchat_pkg"
 BIN_DEST="$PKG_DIR/usr/bin/ghostwhisperchat"
-DEB_NAME="ghostwhisperchat_32.8_all.deb"
-POOL_DIR="pool/main/g"
+DEB_NAME="ghostwhisperchat_32.8_all.deb" # Asegurarse que coincida con control
+POOL_DIR="pool/main/g/ghostwhisperchat"
+DISTS_DIR="dists/stable/main"
 
-echo "=== GhostWhisperChat Release Builder ==="
+echo "=== GhostWhisperChat Repo Builder v2 ==="
 
-# 1. Actualizar Binario
-echo "[1/5] Copiando fuente v32.8..."
+# 1. Preparar Binario
+echo "[1/6] Actualizando binario fuente..."
 cp "$SOURCE" "$BIN_DEST"
 chmod +x "$BIN_DEST"
 
-# 2. Construir Paquete
-echo "[2/5] Construyendo .deb..."
+# 2. Construir .DEB
+echo "[2/6] Construyendo paquete Debian..."
+chmod 755 "$PKG_DIR/DEBIAN"
+chmod 755 "$PKG_DIR/DEBIAN/control"
 dpkg-deb --build "$PKG_DIR" "$DEB_NAME"
 
-# 3. Organizar en Pool
-echo "[3/5] Moviendo a $POOL_DIR..."
-# Limpiar versiones anteriores para evitar duplicados en índice si se desea
-rm -f "$POOL_DIR"/ghostwhisperchat_*.deb
+# 3. Estructura de Repositorio
+echo "[3/6] Organizando estructura de directorios..."
+rm -rf dists pool # Limpieza radical para evitar corrupción
+mkdir -p "$POOL_DIR"
+mkdir -p "$DISTS_DIR/binary-amd64"
+mkdir -p "$DISTS_DIR/binary-i386"
+mkdir -p "$DISTS_DIR/binary-arm64"
+mkdir -p "$DISTS_DIR/binary-all"
+
+# 4. Mover Paquete
+echo "[4/6] Archivando paquete en Pool..."
 mv "$DEB_NAME" "$POOL_DIR/"
 
-# 4. Generar Índices
-echo "[4/5] Escaneando paquetes..."
-# dpkg-scanpackages requiere estar en la raiz y apuntar a pool
-dpkg-scanpackages pool/ > dists/stable/main/binary-amd64/Packages
+# 5. Generar Índices (Packages)
+echo "[5/6] Analizando paquetes..."
+# dpkg-scanpackages busca DEBs desde la raiz y genera rutas relativas
+# binary-amd64
+dpkg-scanpackages . /dev/null > "$DISTS_DIR/binary-amd64/Packages"
+gzip -k -f "$DISTS_DIR/binary-amd64/Packages"
 
-# 5. Comprimir
-echo "[5/5] Comprimiendo metadata..."
-gzip -k -f dists/stable/main/binary-amd64/Packages > dists/stable/main/binary-amd64/Packages.gz
+# binary-i386 (vacío pero necesario para que apt no tire 404 error)
+touch "$DISTS_DIR/binary-i386/Packages"
+gzip -k -f "$DISTS_DIR/binary-i386/Packages"
+
+# binary-all (copia de amd64 pues es arquitectura 'all')
+cp "$DISTS_DIR/binary-amd64/Packages" "$DISTS_DIR/binary-all/Packages"
+gzip -k -f "$DISTS_DIR/binary-all/Packages"
+
+# binary-arm64 (copia de amd64 pues es arquitectura 'all')
+cp "$DISTS_DIR/binary-amd64/Packages" "$DISTS_DIR/binary-arm64/Packages"
+gzip -k -f "$DISTS_DIR/binary-arm64/Packages"
+
+# 6. Generar Release File (Vital para que apt acepte el repo)
+echo "[6/6] Generando archivo Release..."
+cat <<EOF > dists/stable/Release
+Origin: GhostWhisperChat Repo
+Label: GhostWhisperChat
+Suite: stable
+Codename: stable
+Architectures: amd64 i386 arm64 all
+Components: main
+Description: Repositorio oficial de GhostWhisperChat
+EOF
 
 echo "========================================"
-echo "[✔] Repositorio Actualizado a v32.8"
-echo "Ahora ejecuta:"
-echo "  git add ."
-echo "  git commit -m 'Update v32.8'"
-echo "  git push"
+echo "[✔] Repositorio Reconstruido Exitosamente"
+echo "========================================"
+echo "Siguientes pasos:"
+echo "1. git add ."
+echo "2. git commit -m 'Repo refresh v32.8'"
+echo "3. git push"
 echo "========================================"

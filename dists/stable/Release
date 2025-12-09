@@ -1,0 +1,7 @@
+Origin: GhostWhisperChat Repo
+Label: GhostWhisperChat
+Suite: stable
+Codename: stable
+Architectures: amd64 i386 arm64 all
+Components: main
+Description: Repositorio oficial de GhostWhisperChat
