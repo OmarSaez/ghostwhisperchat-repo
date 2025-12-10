@@ -82,6 +82,19 @@ find main -name "Packages.gz" | while read f; do echo " $(md5sum "$f" | awk '{pr
 echo "SHA256:" >> Release
 find main -name "Packages.gz" | while read f; do echo " $(sha256sum "$f" | awk '{print $1}') $(stat -c%s "$f") $f" >> Release; done
 
+# --- 8. FIRMAR CON GPG (Agregado) ---
+echo "🔐 Firmando Release con GPG..."
+rm -f Release.gpg InRelease # Borramos firmas viejas por si acaso
+
+# IMPORTANTE: Cambia este email por el que usaste al crear tu llave GPG
+GPG_NAME="omar.saez@usach.cl"
+
+# 1. Crear Release.gpg (Firma separada)
+gpg --batch --yes --detach-sign --armor --local-user "$GPG_NAME" --output Release.gpg Release
+
+# 2. Crear InRelease (Firma integrada, requerida por sistemas nuevos)
+gpg --batch --yes --clearsign --local-user "$GPG_NAME" --output InRelease Release
+
 cd "$REPO_DIR"
 echo "=========================================="
 echo "✅ ¡ÉXITO! Repositorio listo (Versión $VERSION)"
