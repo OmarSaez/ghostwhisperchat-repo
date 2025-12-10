@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-APP_VER_NUM = 33.11
-APP_VER_TAG = "Hotfix PrintLock"
+APP_VER_NUM = 33.12
+APP_VER_TAG = "UX Power Pack"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 import socket, threading, subprocess, sys, os, time, platform, atexit, re, signal, ctypes, shutil
@@ -562,7 +562,36 @@ def send_all(d, targets=None):
 def update_memory(ip, nick, status):
     """Actualiza memoria y guarda en config"""
     global KNOWN_USERS
-    KNOWN_USERS[ip] = {'nick': nick, 'status': status, 't': time.time()}
+    now = time.time()
+    
+    # Detectar cambio de nombre
+    old_nick = None
+    if ip in KNOWN_USERS:
+        old_nick = KNOWN_USERS[ip].get('nick', nick)
+    
+    KNOWN_USERS[ip] = {'nick': nick, 'status': status, 't': now}
+    
+    if old_nick and old_nick != nick:
+        safe_print(f"{Colors.C}[Info] '{old_nick}' ahora se llama '{nick}'{Colors.E}")
+        # Notificar a los hijos (para que en el chat se vea el cambio)
+        # Iterar chats activos y enviar mensaje de sistema
+        for cid, cdata in ACTIVE_CHATS.items():
+            # Si es privado y es con esa IP:
+            if cdata['type'] == 'PRIV' and cdata.get('remote_id') == ip:
+                 cdata['remote_nick'] = nick # Actualizar metadata interna
+                 # Send alert to child
+                 msg_ipc = f"MSG_IN{SEP}Sistema{SEP}El usuario cambio su nombre a {nick}{SEP}{Colors.C}"
+                 send_ipc(f"FWD_MSG{SEP}{cid}{SEP}{msg_ipc}", cdata.get('port', 0))
+            
+            # Si es grupo, avisar tambien (mas complejo filtrar si esta en el grupo, pero avisamos igual si es relevante)
+            if cdata['type'] == 'GROUP':
+                 # Verificar si IP esta en grupo? Simplificamos: enviamos a todos los grupos activos
+                 msg_ipc = f"MSG_IN{SEP}Sistema{SEP}{old_nick} ahora es {nick}{SEP}{Colors.C}"
+                 send_ipc(f"FWD_MSG{SEP}{cid}{SEP}{msg_ipc}", cdata.get('port', 0))
+
+    if ip in PEERS:
+        if isinstance(PEERS[ip], dict):
+             PEERS[ip]['nick'] = nick
     save_config()
 
 def udp_loop():
@@ -1415,7 +1444,7 @@ def exec_lobby_cmd(inp, origin_cid=None):
             ACTIVE_CHATS[cid] = cdata
             spawn_child_process(cid, cdata)
             refresh_ui(f"{Colors.G}[*] Grupo creado/unido.{Colors.E}") # FIX BUG 1
-        else: safe_print(f"{Colors.F}Falta ID o Clave.{Colors.E}")
+        else: safe_print(f"{Colors.F}El formato es ID CLAVE. Ejemplo: --chatgrupal 10 clave123.{Colors.E}")
 
     elif cmd in ["--chatpersonal", "--personal", "--chatp", "--p", "--cp", "--dm"]:
         t = find_global(args)
@@ -1426,9 +1455,51 @@ def exec_lobby_cmd(inp, origin_cid=None):
 
     # --- COMANDOS GLOBALES / UTILIDADES ---
     elif cmd == "--ls":
-         safe_print(f"{Colors.G}Sesiones Activas ({len(ACTIVE_CHATS)}):{Colors.E}")
+         if origin_cid:
+             # Solicitud desde una ventana hija: Listar miembros de ESE chat specificamente
+             cdata = ACTIVE_CHATS.get(origin_cid)
+             if not cdata: return
+             
+             target_port = cdata.get('port')
+             if not target_port: return
+
+             # Construir lista de miembros
+             members = []
+             members.append(f"{Colors.BO}> {MY_NICK} ({MY_IP}) [Tú]{Colors.E}")
+             
+             if cdata['type'] == 'PRIV':
+                 rid = cdata['remote_id']
+                 rnick = cdata.get('remote_nick', '?')
+                 members.append(f"- {rnick} ({rid})")
+             
+             elif cdata['type'] == 'GROUP':
+                 gid = cdata['remote_id']
+                 # Buscar en PEERS quienes están en este chat
+                 count = 1 # Yo
+                 for ip, pdata in PEERS.items():
+                     if isinstance(pdata, dict) and origin_cid in pdata.get('chats', set()):
+                         members.append(f"- {pdata.get('nick', '?')} ({ip})")
+                         count += 1
+                 
+                 # Enviar cabecera con total
+                 msg = f"{Colors.H}--- MIEMBROS DEL GRUPO ({count}) ---{Colors.E}\n" + "\n".join(members)
+                 # Enviar al hijo via IPC
+                 send_ipc(f"MSG_IN{SEP}Sistema{SEP}{msg}{SEP}{Colors.C}", target_port)
+                 return
+
+         # Si estamos en lobby (sin origin_cid), mostrar chats activos y lista de usuarios conocidos
+         safe_print(f"{Colors.G}--- RESUMEN DE RED ---{Colors.E}")
+         safe_print(f"Total de Usuarios Conocidos: {len(KNOWN_USERS) + 1}") # +1 soy yo
+         safe_print(f"{Colors.BO} > {MY_NICK} ({MY_IP}) [Yo]{Colors.E}")
+         
+         # Listar resto
+         for ip, d in KNOWN_USERS.items():
+             est = d.get('status','?')
+             safe_print(f" - {d['nick']} ({ip}) [{est}]")
+             
+         safe_print(f"\n{Colors.G}Sesiones de Chat Activas ({len(ACTIVE_CHATS)}):{Colors.E}")
          for cid, d in ACTIVE_CHATS.items():
-             safe_print(f" - [{cid}] {d['type']}: {d['remote_id']}")
+             safe_print(f" - [{cid}] {d['type']}: {d.get('remote_nick', d['remote_id'])}")
 
     elif cmd in ["--contactos", "--c", "--history"]:
         safe_print(f"{Colors.G}[*] Historial de Sesión ({len(KNOWN_USERS)}):{Colors.E}")
@@ -1448,8 +1519,14 @@ def exec_lobby_cmd(inp, origin_cid=None):
         send_cmd_all("STATUS_UPDATE", MY_NICK, MY_STATUS)
 
     elif cmd in ["--nick", "--nombre", "--nickname", "--name"]:
+        old_nick = MY_NICK
         MY_NICK = args; save_config()
-        refresh_ui(f"{Colors.G}[✔] Nick cambiado.{Colors.E}")
+        refresh_ui(f"{Colors.G}[✔] Nick cambiado de {old_nick} a {MY_NICK}.{Colors.E}")
+        # Broadcast cambio inmediato
+        send_cmd_all("STATUS_UPDATE", MY_NICK, MY_STATUS) # Esto notifica a todos
+        # Y avisar a mis propias ventanas hijas para que sepan el cambio?
+        # Bueno, el refresco de UI lo maneja lobby, pero el title bar...
+        set_terminal_title(f"GWC Lobby - {MY_NICK}")
 
     elif inp == "--log on": LOG_ON=True; save_config(); msg_print(f"{Colors.G}LOG ON{Colors.E}")
     elif inp == "--log off": LOG_ON=False; save_config(); msg_print(f"{Colors.W}LOG OFF{Colors.E}")
@@ -2123,7 +2200,7 @@ def run_child(cid, ctype, remote, password, mynick, mystatus, myport, rnick="?")
                 "--quienes", "--contactos", "--c", "--history", "--invite",
                 "--quienes-si", "--quienes-no", "--estado", "--status", "--e",
                 "--nick", "--log", "--descarga-automatica-si", "--descarga-automatica-no",
-                "--aceptar", "--accept", "--rechazar", "--deny"
+                "--aceptar", "--accept", "--rechazar", "--deny", "--ls"
             ]
             
             if cmd_part in valid_remote_cmds or (cmd_part == "--log" and len(inp.split())>1):
