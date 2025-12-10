@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-APP_VER_NUM = 33.4
-APP_VER_TAG = "Anti spam grupal y personal"
+APP_VER_NUM = 33.5
+APP_VER_TAG = "Anti spam smart"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 import socket, threading, subprocess, sys, os, time, platform, atexit, difflib, shutil, datetime, json, uuid, re, unicodedata, signal, re, ctypes, urllib.request
@@ -37,7 +37,7 @@ DL_DIR = os.path.join(DL_ROOT, "GhostWhisper_Recibidos")
 if not os.path.exists(DL_DIR):
     try: os.makedirs(DL_DIR)
     except: pass
-TIMERS = {'PRIV': 30, 'GROUP': 60, 'MANUAL': 300, 'INVITE': 15}
+TIMERS = {'PRIV': 60, 'GROUP': 120, 'MANUAL': 300, 'INVITE': 15, 'BAN': 60}
 
 # --- ESTADO PROCESOS ---
 IS_CHILD = False
@@ -198,8 +198,41 @@ def send_cmd_all(cmd, *args):
     send_all(pkt)
 def get_col(n): return Colors.PALETTE[sum(ord(c) for c in n) % len(Colors.PALETTE)] if n else Colors.WH
 
-def popup(t, x):
+def popup(t, x, source_ip=None):
     if not POPUP_ON: return
+    
+    # --- ANTI-SPAM SMART v33.5 ---
+    if source_ip:
+        now = time.time()
+        
+        # 1. Check if Banned
+        if source_ip in BANNED_IPS:
+            if now < BANNED_IPS[source_ip]:
+                return # BANNED -> No Popup (Console already printed)
+            else:
+                del BANNED_IPS[source_ip] # Ban expired
+        
+        # 2. Update History
+        if source_ip not in IP_MSG_HISTORY: IP_MSG_HISTORY[source_ip] = []
+        IP_MSG_HISTORY[source_ip].append(now)
+        
+        # Keep only recent messages (last 3 seconds window is enough for the check)
+        IP_MSG_HISTORY[source_ip] = [ts for ts in IP_MSG_HISTORY[source_ip] if now - ts < 3.0]
+        
+        # 3. Check Burst: 3 messages in less than 2 seconds (User Request)
+        # We need at least 3 messages
+        if len(IP_MSG_HISTORY[source_ip]) >= 3:
+            # Check the span between the last message and the 3rd-to-last
+            # [..., t-2, t-1, t0]
+            t_last = IP_MSG_HISTORY[source_ip][-1]
+            t_start = IP_MSG_HISTORY[source_ip][-3]
+            
+            if (t_last - t_start) < 2.0:
+                 BANNED_IPS[source_ip] = now + TIMERS['BAN'] # Ban configured time
+                 safe_print(f"{Colors.F}[Anti-Spam] 🛡️ IP {source_ip} bloqueada de Popups por {TIMERS['BAN']}s (Burst detectado).{Colors.E}")
+                 return # Block this one too
+    
+    # -----------------------------
     
     if platform.system() == "Linux":
         if HAS_ZENITY: 
@@ -248,6 +281,10 @@ ACTIVE_CHATS = {} # cid -> {type, remote_id, pass, process_handle, port}
 PEERS = {} # ip -> {nick, chats: {cid1, cid2}}
 PEER_STATUSES = {} # ip -> status_str
 SILENT_UPDATES_ALLOWED = False # Global state
+
+# --- ANTI-SPAM STATE ---
+BANNED_IPS = {} # { ip: timestamp_expiry }
+IP_MSG_HISTORY = {} # { ip: [timestamp1, timestamp2, ...] }
 
 def load_config():
     global KNOWN_USERS, MY_NICK, MY_STATUS, VISIBLE_IN_SCAN, LOG_ON, AUTO_DL, TRUSTED_NETS, TRUSTED_PEERS
@@ -905,7 +942,7 @@ def dl_file(name, size, sock, sender, sender_ip=None):
             final_path = os.path.join(DL_DIR, f"{base}_copy_{int(time.time())}{ext}")
         os.rename(tmp, final_path)
         safe_print(f"{Colors.G}[✔] Archivo guardado: {final_path}{Colors.E}")
-        popup(f"De: {sender}", f"Guardado: {name}"); write_log(f"Recibido {name}", "FILE")
+        popup(f"De: {sender}", f"Guardado: {name}", source_ip=sender_ip); write_log(f"Recibido {name}", "FILE")
         
         # Notify Local Chat Windows (Feature Request)
         if sender_ip and sender_ip in PEERS:
@@ -920,7 +957,7 @@ def dl_file(name, size, sock, sender, sender_ip=None):
 
     else:
         PENDING_FILES.append({'t': tmp, 'r': final_path, 's': sender})
-        safe_print(f"{Colors.W}[?] '{name}' de {sender} espera (--aceptar/--rechazar).{Colors.E}"); popup("Archivo", f"{sender}: {name}")
+        safe_print(f"{Colors.W}[?] '{name}' de {sender} espera (--aceptar/--rechazar).{Colors.E}"); popup("Archivo", f"{sender}: {name}", source_ip=sender_ip)
         
         # Notify Local Chat Windows (Manual Wait)
         if sender_ip and sender_ip in PEERS:
@@ -1179,10 +1216,10 @@ def tcp_loop():
                     tag = f"[{get_col(curr_nick)}{curr_nick}{Colors.E}]"
 
                     if target_cid and 'port' in ACTIVE_CHATS[target_cid]:
-                         send_ipc(f"FWD_MSG{SEP}{target_cid}{SEP}{tag}{SEP}{raw}", ACTIVE_CHATS[target_cid]['port'])
+                         send_ipc(f"FWD_MSG{SEP}{target_cid}{SEP}{tag}{SEP}{raw}{SEP}{ip}", ACTIVE_CHATS[target_cid]['port'])
                          write_log(f"[{curr_nick}] (FWD {target_cid}): {raw}", "CHAT")
                     else:
-                        safe_print(f"{tag}: {raw}"); popup(f"MSG: {curr_nick}", raw); write_log(f"[{curr_nick}]: {raw}", "CHAT")
+                        safe_print(f"{tag}: {raw}"); popup(f"MSG: {curr_nick}", raw, source_ip=ip); write_log(f"[{curr_nick}]: {raw}", "CHAT")
 
             if c: c.close()
         except Exception as e:
