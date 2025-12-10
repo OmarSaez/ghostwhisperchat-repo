@@ -10,7 +10,7 @@ REPO_ROOT=$(pwd)
 SOURCE="$HOME/Escritorio/inter_chat.py"
 PKG_DIR="ghostwhisperchat_pkg"
 BIN_DEST="$PKG_DIR/usr/bin/ghostwhisperchat"
-DEB_NAME="ghostwhisperchat_32.8_all.deb" # Asegurarse que coincida con control
+DEB_NAME="ghostwhisperchat_33.0_all.deb" # Asegurarse que coincida con control
 POOL_DIR="pool/main/g/ghostwhisperchat"
 DISTS_DIR="dists/stable/main"
 
@@ -76,6 +76,6 @@ echo "[✔] Repositorio Reconstruido Exitosamente"
 echo "========================================"
 echo "Siguientes pasos:"
 echo "1. git add ."
-echo "2. git commit -m 'Repo refresh v32.8'"
+echo "2. git commit -m 'Repo refresh v33.0'"
 echo "3. git push"
 echo "========================================"

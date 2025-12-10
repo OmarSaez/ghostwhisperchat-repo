@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-APP_VER_NUM = 32.7
-APP_VER_TAG = "Desktop DL"
+APP_VER_NUM = 32.0
+APP_VER_TAG = "Silent Release"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
-import socket, threading, subprocess, sys, os, time, platform, atexit, difflib, shutil, datetime, json, uuid, re, unicodedata, signal, re, ctypes
+import socket, threading, subprocess, sys, os, time, platform, atexit, difflib, shutil, datetime, json, uuid, re, unicodedata, signal, re
 
 try: import readline
 except ImportError: pass 
@@ -12,31 +12,7 @@ except ImportError: pass
 TCP_PORT, UDP_PORT = 44494, 44495
 IPC_PORT = 5000
 BUFFER, SEP, LOG_FILE, CONFIG_FILE = 4096, "<SEPARATOR>", "cyberdei_history.log", "cyberdei_config.json"
-BUFFER, SEP, LOG_FILE, CONFIG_FILE = 4096, "<SEPARATOR>", "cyberdei_history.log", "cyberdei_config.json"
-
-# Detectar Escritorio
-def get_desktop_path():
-    if platform.system() == "Linux":
-        try:
-            return subprocess.check_output(["xdg-user-dir", "DESKTOP"]).decode().strip()
-        except: pass
-    elif platform.system() == "Windows":
-        try:
-            return os.path.join(os.environ['USERPROFILE'], 'Desktop')
-        except: pass
-    
-    # Fallback
-    home = os.path.expanduser("~")
-    for d in ["Desktop", "Escritorio"]:
-        p = os.path.join(home, d)
-        if os.path.exists(p): return p
-    return home
-
-DL_ROOT = get_desktop_path()
-DL_DIR = os.path.join(DL_ROOT, "GhostWhisper_Recibidos")
-if not os.path.exists(DL_DIR):
-    try: os.makedirs(DL_DIR)
-    except: pass
+DL_DIR = "CyberDEI_Recibidos"
 TIMERS = {'PRIV': 30, 'GROUP': 60, 'MANUAL': 300, 'INVITE': 15}
 
 # --- ESTADO PROCESOS ---
@@ -56,19 +32,6 @@ CURRENT_CHAT_ID = None
 MY_IP, MY_NICK, MY_STATUS = "", "Anónimo", "En línea"
 DISC_TEMP, SCAN_RESULTS, PENDING_INVITE = [], [], None
 POPUP_ON, USER_OFF, LAST_ACT = True, False, 0
-HAS_ZENITY = False
-
-def ensure_dependencies():
-    """Instala zenity si falta en Linux (Debian/Kali/Ubuntu)"""
-    if platform.system() == "Linux" and shutil.which("zenity") is None:
-        try:
-            print("\033[93m[!] Zenity no detectado. Instalando dependencias visuales...\033[0m")
-            # Intentar apt-get silencioso
-            subprocess.run(["sudo", "apt-get", "update", "-qq"], check=False)
-            subprocess.run(["sudo", "apt-get", "install", "zenity", "-y", "-qq"], check=False)
-        except: pass
-
-ensure_dependencies()
 HAS_ZENITY = shutil.which("zenity") is not None
 AUTO_DL, LOG_ON, PENDING_FILES = True, False, []
 VISIBLE_IN_SCAN = True 
@@ -375,7 +338,7 @@ def show_help():
     cmds = [
         ("--chatgrupal ID CLAVE", "Unirse/Crear sala."), 
         ("--invite (Nick1, Nick2...)", "Invitar gente al grupo actual."),
-        ("--chatpersonal (Nick y/o IP)", "Crear un chat privado con un usuario."),
+        ("--chatpersonal (Nick y/o IP)", "Buscar usuario."),
         ("--contactos", "Ver historial de gente vista."),
         ("--quienes", "Escanear red (¿Quién está online?)."),
         ("--quienes-si / --quienes-no", "Visibilidad en escáner."),
@@ -383,15 +346,13 @@ def show_help():
         ("--estado (Texto)", "Cambiar estado."),
         ("--log on / off", "Guardar historial."), 
         ("--archivo (Archivo.ext y/o Ruta)", "Enviar archivo."),
-        ("--ls", "Listar usuarios CONECTADOS. en el chat"), 
+        ("--ls", "Listar usuarios CONECTADOS."), 
         ("--clear", "Limpiar pantalla."),
         ("--popno / --popsi", "Control Notificaciones."), 
         ("--descarga-automatica-si/no", "Seguridad de Archivos.")
     ]
     print(f" {Colors.BO}--- COMANDOS ---{Colors.E}")
     for c, d in cmds: print(f" {Colors.BO}{c:<35}{Colors.E} : {d}")
-    print(f" {Colors.BO}--autolevantado-si/no{Colors.E}       : Iniciar app al encender PC (Linux).")
-    print(f" {Colors.BO}--exit{Colors.E}                        : Salir.")
     print("-" * 60)
 
 def get_peer_name(ip):
@@ -441,23 +402,8 @@ def get_ip():
 
 def fw_cfg():
     if platform.system() == "Linux":
-        # 1. Intentar UFW (Ubuntu/Debian standard)
-        try:
-            for c in [[f"{p}/tcp", f"{p}/udp"] for p in [TCP_PORT, UDP_PORT]]:
-                subprocess.run(["sudo", "ufw", "allow"] + c, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
-        except: pass
-        
-        # 2. Intentar IPTABLES (Kali/RedHat/Arch fallback)
-        # sudo iptables -C INPUT -p tcp --dport 44494 -j ACCEPT 2> /dev/null || sudo iptables -A INPUT -p tcp --dport 44494 -j ACCEPT
-        try:
-            for p, proto in [(TCP_PORT, 'tcp'), (UDP_PORT, 'udp')]:
-                rule = ["sudo", "iptables", "-A", "INPUT", "-p", proto, "--dport", str(p), "-j", "ACCEPT"]
-                # Check simple para no duplicar (es complejo en python puro, lanzamos el add y que iptables decida si duplica o no)
-                # Mejor intentar solo si no existe, pero para simplificar lanzamos append.
-                # Si el user no tiene sudo sin pass, fallara silencioso.
-                subprocess.run(rule, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
-        except: pass
-        
+        for c in [[f"{p}/tcp", f"{p}/udp"] for p in [TCP_PORT, UDP_PORT]]:
+            subprocess.run(["sudo", "ufw", "allow"] + c, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
     elif platform.system() == "Windows":
         subprocess.run(["powershell", f"Start-Process cmd -Verb RunAs -ArgumentList '/c netsh advfirewall firewall add rule name=\"CyberDEI\" dir=in action=allow protocol=ANY localport=\"{TCP_PORT},{UDP_PORT}\"'"], shell=True)
 
@@ -1358,50 +1304,6 @@ def try_trigger_updates(peer_list):
 
 # ... existing code ...
 
-def toggle_autostart(enable):
-    """Activa o desactiva el inicio automático en Linux (.config/autostart)"""
-    if platform.system() != "Linux":
-        return safe_print(f"{Colors.F}[!] Solo disponible en Linux por ahora.{Colors.E}")
-        
-    autostart_dir = os.path.expanduser("~/.config/autostart")
-    desktop_file = os.path.join(autostart_dir, "inter_chat_auto.desktop")
-    
-    if enable:
-        try:
-            if not os.path.exists(autostart_dir): os.makedirs(autostart_dir)
-            
-            # Obtener rutas absolutas
-            exe = sys.executable
-            script = os.path.abspath(sys.argv[0])
-            
-            content = f"""[Desktop Entry]
-Type=Application
-Name=InterChat Auto
-Exec={exe} "{script}"
-Terminal=true
-Hidden=false
-NoDisplay=false
-X-GNOME-Autostart-enabled=true
-Comment=Auto-start InterChat Lobby
-"""
-            with open(desktop_file, "w") as f:
-                f.write(content)
-            
-            # Dar permisos de ejecución al script por si acaso
-            os.chmod(script, 0o755)
-            safe_print(f"{Colors.G}[✔] Autolevantado ACTIVADO (Inicio de sesión).{Colors.E}")
-        except Exception as e:
-            safe_print(f"{Colors.F}[!] Error activando autostart: {e}{Colors.E}")
-    else:
-        try:
-            if os.path.exists(desktop_file):
-                os.remove(desktop_file)
-                safe_print(f"{Colors.W}[✔] Autolevantado DESACTIVADO.{Colors.E}")
-            else:
-                safe_print(f"{Colors.W}[!] No estaba activado.{Colors.E}")
-        except Exception as e:
-            safe_print(f"{Colors.F}[!] Error desactivando: {e}{Colors.E}")
-
 # --- COMANDOS LOBBY CENTRALIZADOS ---
 def exec_lobby_cmd(inp, origin_cid=None):
     global MY_NICK, MY_STATUS, MY_IP, LAST_ACT, PENDING_INVITE, VISIBLE_IN_SCAN, LOG_ON, AUTO_DL, POPUP_ON, USER_OFF
@@ -1425,7 +1327,7 @@ def exec_lobby_cmd(inp, origin_cid=None):
             refresh_ui(f"{Colors.G}[*] Grupo creado/unido.{Colors.E}") # FIX BUG 1
         else: safe_print(f"{Colors.F}Falta ID o Clave.{Colors.E}")
 
-    elif cmd in ["--chatpersonal", "--personal", "--chatp", "--p", "--cp", "--dm"]:
+    elif cmd in ["--chatpersonal", "--personal", "--chatp", "--p", "--cp"]:
         t = find_global(args)
         if t:
             if t == MY_IP: safe_print(f"{Colors.F}Eres tú.{Colors.E}")
@@ -1465,11 +1367,7 @@ def exec_lobby_cmd(inp, origin_cid=None):
     elif inp == "--descarga-automatica-no": AUTO_DL=False; save_config(); msg_print(f"{Colors.W}DL MANUAL{Colors.E}")
     elif inp == "--popno": POPUP_ON, USER_OFF = False, True; msg_print(f"{Colors.W}Mute Manual.{Colors.E}")
     elif inp == "--popsi": POPUP_ON, USER_OFF = True, False; msg_print(f"{Colors.G}Popups ON.{Colors.E}")
-    
-    # AutoStart Commands
-    elif inp == "--autolevantado-si": toggle_autostart(True)
-    elif inp == "--autolevantado-no": toggle_autostart(False)
-    
+
     elif inp == "--clear":
         global LOBBY_HISTORY
         LOBBY_HISTORY = [] # Reset total si pide clear manual
@@ -1578,7 +1476,7 @@ def exec_lobby_cmd(inp, origin_cid=None):
             # Comando en el Lobby -> Apagar APP
             shutdown_lobby()
 
-    elif cmd in ["--help", "--ayuda", "--comandos"]:
+    elif cmd == "--help":
          show_help()
 
     # --- RESPUESTAS A INVITACIONES ---
@@ -1686,11 +1584,11 @@ def spawn_child_process(cid, cdata):
              terminal_cmd = ["x-terminal-emulator", "-e"] + cmd_args
         
         if terminal_cmd:
-            subprocess.Popen(terminal_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.Popen(terminal_cmd)
         else:
             print(f"{Colors.F}[!] No se encontró terminal compatible.{Colors.E}")
             print(f"{Colors.W}[*] Ejecutando en segundo plano (no verás el chat)...{Colors.E}")
-            subprocess.Popen(cmd_args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.Popen(cmd_args)
             return
         
         print(f"{Colors.G}[*] Abriendo ventana para chat {cid}...{Colors.E}")
@@ -1862,62 +1760,15 @@ def restore_terminal():
 atexit.register(restore_terminal)
 
 
-def liberate_ports():
-    """Detecta y elimina procesos zombies ocupando nuestros puertos"""
-    ports = [TCP_PORT, UDP_PORT]
-    try:
-        if platform.system() == "Linux":
-            # Usar lsof o fuser
-            # fuser -k 44494/tcp
-            for p in ports:
-                 subprocess.run(f"fuser -k {p}/tcp", shell=True, stderr=subprocess.DEVNULL)
-                 subprocess.run(f"fuser -k {p}/udp", shell=True, stderr=subprocess.DEVNULL)
-        elif platform.system() == "Windows":
-             # Parsing netstat es doloroso, pero necesario
-             # netstat -ano | findstr :44494
-             for p in ports:
-                 r = subprocess.check_output(f"netstat -ano | findstr :{p}", shell=True, stderr=subprocess.DEVNULL).decode(errors='ignore')
-                 lines = r.strip().split('\n')
-                 for line in lines:
-                     parts = line.split()
-                     if len(parts) > 4:
-                         pid = parts[-1]
-                         if pid != "0": # No matar System
-                             subprocess.run(f"taskkill /F /PID {pid}", shell=True, stderr=subprocess.DEVNULL)
-    except: pass
-
-def enable_win_visuals():
-    """Fuerza UTF-8 y ANSI Colors en consola de Windows"""
-    if platform.system() == "Windows":
-        try:
-            # 1. UTF-8
-            os.system("chcp 65001 > nul") 
-            # 2. ANSI VT100
-            kernel32 = ctypes.windll.kernel32
-            kernel32.SetConsoleMode(kernel32.GetStdHandle(-11), 7)
-        except: pass
-
 def run_lobby():
     global MY_NICK, MY_STATUS, MY_IP, LAST_ACT, PENDING_INVITE
     # atexit.register(lambda: print(f"{Colors.W}Lobby cerrado.{Colors.E}")) # Reemplazado por shutdown manual
-    
-    # Self-Healing Checks
-    enable_win_visuals()
-    liberate_ports()
     
     # Capturar Ctrl+C en Lobby para shutdown limpio
     import signal
     signal.signal(signal.SIGINT, lambda s, f: shutdown_lobby())
 
     os.system('cls' if os.name == 'nt' else 'clear'); fw_cfg(); MY_IP = get_ip()
-    
-    # Kali/Network Check
-    if MY_IP.startswith("127.") and platform.system() == "Linux":
-         print(f"{Colors.W}[!] ADVERTENCIA: IP local ({MY_IP}) detectada.{Colors.E}")
-         print(f"{Colors.W}[!] Si usas Kali Linux, verifica que no estés en 'Modo Monitor' (airmon-ng stop wlan0).{Colors.E}")
-         print(f"{Colors.W}[!] La visibilidad en red estará limitada.{Colors.E}")
-         time.sleep(3)
-    
     global LOBBY_HISTORY, PROMPT
     PROMPT = f"{Colors.B}Lobby > {Colors.E}"
     
