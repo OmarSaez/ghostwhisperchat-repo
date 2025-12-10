@@ -1,0 +1,16 @@
+{
+    "known_users": {},
+    "nick": "ola",
+    "status": "En l\u00ednea",
+    "visible": true,
+    "log_on": false,
+    "auto_dl": true,
+    "trusted_nets": {
+        "158.170.12.1_LAN": {
+            "trusted": true,
+            "last_seen": 1765390938.6059258,
+            "name": "158.170.12.1_LAN"
+        }
+    },
+    "trusted_peers": []
+}

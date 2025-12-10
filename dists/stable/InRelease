@@ -1,3 +1,6 @@
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA512
+
 Origin: GhostWhisperChat Repo
 Label: GhostWhisperChat
 Suite: stable
@@ -17,3 +20,17 @@ SHA256:
  1a76b2eacaefe143ebe6eff9ba0b86de1de49f2d408bca0744a1d5fb0c993ed5 564 main/binary-amd64/Packages.gz
  1a76b2eacaefe143ebe6eff9ba0b86de1de49f2d408bca0744a1d5fb0c993ed5 564 main/binary-i386/Packages.gz
  1a76b2eacaefe143ebe6eff9ba0b86de1de49f2d408bca0744a1d5fb0c993ed5 564 main/binary-all/Packages.gz
+-----BEGIN PGP SIGNATURE-----
+
+iQHHBAEBCgAxFiEEf3Em0t7zSmLzcAzGS5gqDAcphTEFAmk5uwETHG9tYXIuc2Fl
+ekB1c2FjaC5jbAAKCRBLmCoMBymFMS36DACD8WqcRzqHSsW0b8WgRBh4DvqpexLO
+QqcWf3sp6cPzpAVjHHlev4aOqFsSfdsVGf0sJUAYHx1q4K3idojmAS/iIR0f8zx+
+gLKPBLN7ppE+8VGkrNc1tTOK5ra/O4SHycZBau9dvnL1AjyBfJapcIXNypYYjMa5
+y/NXaxA2kx8aNqOviRIQpahgv1QE/X8Zb0T3LN6KWMAvspKcrvf3IUgqbxanXzgn
+Z6yaEWTkxgHaGT1KIlx27ZuouncuZl9I+Bk1ZQ665TTSKOh+6eyXFZaabXaZtUt5
+I5nuUzcct87VB7KAKghGgPz0q+7AdiSz2EMgndvW86+IEV31vIVrmORdx5tTJdqi
+i6z6zH58FZ2F3QujoeCoN4Lq5gaLXUDC/lRAW3D8wzCjTk5pBgrMiB9AbwTJjmZo
+tA7GxdHO5iko14ZW8NXBt+v+kyXpqyT2hVt7cWxmDMVgxvfu7CSB19ftFK/UokrT
+36mJHn/CakM0RHPoak//aCDV+b12qsqJ+2A=
+=nyee
+-----END PGP SIGNATURE-----
