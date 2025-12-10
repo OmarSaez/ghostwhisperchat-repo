@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-APP_VER_NUM = 33.10
-APP_VER_TAG = "Hotfix Shutil"
+APP_VER_NUM = 33.11
+APP_VER_TAG = "Hotfix PrintLock"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 import socket, threading, subprocess, sys, os, time, platform, atexit, re, signal, ctypes, shutil
@@ -86,6 +86,7 @@ class Colors:
     PALETTE = [B, C, M, W, WH]
 
 PROMPT = f"\001{Colors.B}\002Lobby > \001{Colors.E}\002"
+print_lock = threading.Lock()
 
 # --- UTILS ---
 def set_terminal_title(title):
