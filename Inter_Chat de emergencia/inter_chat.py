@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-APP_VER_NUM = 33.0
-APP_VER_TAG = "Repo Update"
+APP_VER_NUM = 33.1
+APP_VER_TAG = "Clean Check"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 import socket, threading, subprocess, sys, os, time, platform, atexit, difflib, shutil, datetime, json, uuid, re, unicodedata, signal, re, ctypes, urllib.request
@@ -118,7 +118,7 @@ def write_log(txt, type="MSG"):
                 f.write(f"[{datetime.datetime.now().strftime('%F %T')}] [{type}] {txt}\n")
         except: pass
 
-KNOWN_USERS = {} # {ip: {nick: 'x', status: 'y', t: time}}
+KNOWN_USERS = {} # {ip: {nick, status, t}}
 LOBBY_HISTORY = [] # Buffer para repintar la UI
 
 # --- PROTOCOLO v27.0 ---
@@ -240,17 +240,16 @@ def popup(t, x):
 # --- CONFIG & STATE ---
 CONFIG_FILE = "inter_chat.json"
 KNOWN_USERS = {} # {ip: {nick, status, t}}
-TRUSTED_PEERS = set() # IPs de gente con chat privado exitoso {ip}
-TRUSTED_NETS = {} # {network_id: {'trusted': bool, 'last_seen': ts, 'name': str}}
+# TRUSTED_PEERS removed – no longer needed
 MY_NICK = socket.gethostname()
 # ... rest of vars ...
 ACTIVE_CHATS = {} # cid -> {type, remote_id, pass, process_handle, port}
 PEERS = {} # ip -> {nick, chats: {cid1, cid2}}
 PEER_STATUSES = {} # ip -> status_str
-SILENT_UPDATES_ALLOWED = False # Global state
+# TRUSTED_NETS y SILENT_UPDATES_ALLOWED eliminados (Repo Update)
 
 def load_config():
-    global KNOWN_USERS, MY_NICK, MY_STATUS, VISIBLE_IN_SCAN, LOG_ON, AUTO_DL, TRUSTED_NETS, TRUSTED_PEERS
+    global KNOWN_USERS, MY_NICK, MY_STATUS, VISIBLE_IN_SCAN, LOG_ON, AUTO_DL
     if os.path.exists(CONFIG_FILE):
         try:
             with open(CONFIG_FILE, 'r') as f:
@@ -261,10 +260,10 @@ def load_config():
                 VISIBLE_IN_SCAN = d.get('visible', True)
                 LOG_ON = d.get('log_on', True)
                 AUTO_DL = d.get('auto_dl', True)
-                TRUSTED_NETS = d.get('trusted_nets', {})
-                TRUSTED_PEERS = set(d.get('trusted_peers', []))
+                # TRUSTED_PEERS loading removed
                 return True
-        except: pass
+        except Exception as e:
+            safe_print(f"{Colors.F}Error loading config: {e}{Colors.E}")
     return False
 
 def save_config():
@@ -277,70 +276,12 @@ def save_config():
                 'visible': VISIBLE_IN_SCAN,
                 'log_on': LOG_ON,
                 'auto_dl': AUTO_DL,
-                'trusted_nets': TRUSTED_NETS,
-                'trusted_peers': list(TRUSTED_PEERS)
+                # 'trusted_peers' entry removed
             }, f, indent=4)
-    except: pass
+    except Exception as e:
+        safe_print(f"{Colors.F}Error saving config: {e}{Colors.E}")
 
 # --- NETWORK IDENTIFICATION ---
-def get_network_id():
-    """Identifica la red actual (Gateway + SSID/Name)"""
-    gw = "UNK_GW"
-    ssid = "LAN"
-    
-    try:
-        if platform.system() == "Linux":
-            # Gateway
-            r = subprocess.check_output("ip route | grep default", shell=True).decode()
-            gw = r.split()[2] if len(r.split()) > 2 else "UNK"
-            # SSID/Interface
-            try:
-                w = subprocess.check_output("iwgetid -r", shell=True).decode().strip()
-                if w: ssid = w
-            except: pass
-            
-        elif platform.system() == "Windows":
-             # 1. Gateway via Powershell (NextHop)
-             try:
-                 cmd_gw = "Get-NetRoute -DestinationPrefix 0.0.0.0/0 | Select-Object -ExpandProperty NextHop"
-                 r = subprocess.check_output(["powershell", "-Command", cmd_gw], creationflags=0x08000000).decode().strip()
-                 if r: gw = r
-             except: 
-                 # Fallback ipconfig parse
-                 try:
-                     r = subprocess.check_output("ipconfig", creationflags=0x08000000).decode()
-                     # Buscar "Default Gateway . . . : 192..."
-                     m = re.search(r"Default Gateway.*: ([\d\.]+)", r)
-                     if m: gw = m.group(1)
-                 except: pass
-
-             # 2. SSID via netsh
-             try:
-                 r = subprocess.check_output("netsh wlan show interfaces", creationflags=0x08000000).decode()
-                 m = re.search(r"^\s+SSID\s+:\s+(.+)$", r, re.MULTILINE)
-                 if m: ssid = m.group(1).strip()
-             except: pass
-    except: pass
-    
-    return f"{gw}_{ssid}"
-
-def check_network_trust():
-    """Verifica si la red actual es confiable para updates"""
-    net_id = get_network_id()
-    now = time.time()
-    
-    data = TRUSTED_NETS.get(net_id)
-    ask = False
-    
-    if not data:
-        # Nueva red
-        ask = True
-        msg = f"Se ha detectado una nueva red:\n{net_id}\n\n¿Desea activar actualizaciones silenciosas en esta red?"
-    else:
-        # Red conocida, verificar timestamp (3 weeks = 1814400s)
-        if (now - data['last_seen']) > 1814400:
-            ask = True
-            msg = f"No te conectas a esta red ({net_id}) en más de 3 semanas.\n\n¿Mantener actualizaciones silenciosas?"
         else:
             # Update timestamp and proceed
             TRUSTED_NETS[net_id]['last_seen'] = now
@@ -983,7 +924,7 @@ def tcp_loop():
                                  PEERS[ip]['chats'].add(cid)
                              
                              # TRUSTED PEERS (Add logic)
-                             TRUSTED_PEERS.add(ip); save_config()
+                             # TRUSTED_PEERS.add(ip) removed
 
                              spawn_child_process(cid, cdata)
                              refresh_ui(f"{Colors.G}[*] {r_nick} aceptó tu invitación.{Colors.E}")
@@ -1513,7 +1454,7 @@ def exec_lobby_cmd(inp, origin_cid=None):
                  PEERS[ip]['chats'].add(cid)
              
              # TRUSTED PEERS (New Security)
-             TRUSTED_PEERS.add(ip); save_config()
+             # TRUSTED_PEERS.add(ip) removed
 
              cdata['remote_nick'] = nick
              send_cmd(ip, "INVITE_ACC", MY_NICK, MY_STATUS)
@@ -1849,14 +1790,7 @@ def run_lobby():
             except: sys.exit()
         save_config()
     
-    # Check Network Security on Startup
-    global SILENT_UPDATES_ALLOWED
-    SILENT_UPDATES_ALLOWED = check_network_trust()
-    if SILENT_UPDATES_ALLOWED:
-        pass # safe_print(f"{Colors.G}[Sec] Actualizaciones silenciosas ACTIVAS en esta red.{Colors.E}")
-    else:
-        pass # safe_print(f"{Colors.W}[Sec] Actualizaciones silenciosas DESACTIVADAS.{Colors.E}")
-
+    # Update Security: Repo Check only
     refresh_ui() # Clean start with Dashboard
     
     # Aseguramos limpieza al inicio también por si acaso

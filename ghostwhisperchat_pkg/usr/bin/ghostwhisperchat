@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 APP_VER_NUM = 33.0
-APP_VER_TAG = "Auto Update desde Repo"
+APP_VER_TAG = "Repo Update"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 import socket, threading, subprocess, sys, os, time, platform, atexit, difflib, shutil, datetime, json, uuid, re, unicodedata, signal, re, ctypes, urllib.request
