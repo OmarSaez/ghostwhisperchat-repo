@@ -1,0 +1,12 @@
+%echo Generating a basic OpenPGP key
+Key-Type: RSA
+Key-Length: 2048
+Subkey-Type: RSA
+Subkey-Length: 2048
+Name-Real: Omar Saez
+Name-Email: omar.saez@usach.cl
+Name-Comment: GhostWhisperChat Repository Key
+Expire-Date: 0
+%no-protection
+%commit
+%echo done
