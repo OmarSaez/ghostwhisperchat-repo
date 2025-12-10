@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-APP_VER_NUM = 33.3
-APP_VER_TAG = "Anti Spam"
+APP_VER_NUM = 33.4
+APP_VER_TAG = "Anti spam grupal y personal"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 import socket, threading, subprocess, sys, os, time, platform, atexit, difflib, shutil, datetime, json, uuid, re, unicodedata, signal, re, ctypes, urllib.request
