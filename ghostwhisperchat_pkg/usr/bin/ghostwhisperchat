@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-APP_VER_NUM = 33.0
-APP_VER_TAG = "Repo Update"
+APP_VER_NUM = 33.2
+APP_VER_TAG = "Refined Interface"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 import socket, threading, subprocess, sys, os, time, platform, atexit, difflib, shutil, datetime, json, uuid, re, unicodedata, signal, re, ctypes, urllib.request
@@ -372,26 +372,38 @@ def check_network_trust():
     return False # Should not reach
 
 def show_help():
-    cmds = [
-        ("--chatgrupal ID CLAVE", "Unirse/Crear sala."), 
-        ("--invite (Nick1, Nick2...)", "Invitar gente al grupo actual."),
-        ("--chatpersonal (Nick y/o IP)", "Crear un chat privado con un usuario."),
-        ("--contactos", "Ver historial de gente vista."),
-        ("--quienes", "Escanear red (¿Quién está online?)."),
-        ("--quienes-si / --quienes-no", "Visibilidad en escáner."),
-        ("--salir", "Desconectar de la sesión."),
-        ("--estado (Texto)", "Cambiar estado."),
-        ("--log on / off", "Guardar historial."), 
-        ("--archivo (Archivo.ext y/o Ruta)", "Enviar archivo."),
-        ("--ls", "Listar usuarios CONECTADOS. en el chat"), 
-        ("--clear", "Limpiar pantalla."),
-        ("--popno / --popsi", "Control Notificaciones."), 
-        ("--descarga-automatica-si/no", "Seguridad de Archivos.")
-    ]
-    print(f" {Colors.BO}--- COMANDOS ---{Colors.E}")
-    for c, d in cmds: print(f" {Colors.BO}{c:<35}{Colors.E} : {d}")
-    print(f" {Colors.BO}--autolevantado-si/no{Colors.E}       : Iniciar app al encender PC (Linux).")
-    print(f" {Colors.BO}--exit{Colors.E}                        : Salir.")
+    print(f" {Colors.BO}--- AYUDA Y COMANDOS ---{Colors.E}")
+    
+    cats = {
+        "GESTIÓN DE CHATS": [
+            ("--chatpersonal (Nick y/o IP)", "Crear un chat privado con un usuario."),
+            ("--chatgrupal ID CLAVE", "Unirse/Crear sala."), 
+            ("--invite (Nick1, Nick2...)", "Invitar gente al grupo actual."),
+            ("--ls", "Listar usuarios CONECTADOS en el chat."), 
+            ("--salir", "Desconectar de la sesión.")
+        ],
+        "RED Y CONTACTOS": [
+            ("--quienes", "Escanear red (¿Quién está online?)."),
+            ("--contactos", "Ver historial de gente vista."),
+            ("--quienes-si / --quienes-no", "Visibilidad en escáner.")
+        ],
+        "UTILIDADES Y ARCHIVOS": [
+            ("--archivo (Archivo.ext y/o Ruta)", "Enviar archivo."),
+            ("--estado (Texto)", "Cambiar estado."),
+            ("--limpiar", "Limpiar pantalla.")
+        ],
+        "SISTEMA Y CONFIGURACIÓN": [
+             ("--log on / off", "Guardar historial."), 
+             ("--popno / --popsi", "Control Notificaciones."), 
+             ("--autolevantado-si/no", "Iniciar app al encender PC (Linux).")
+        ]
+    }
+
+    for cat_name, cmds in cats.items():
+        print(f"\n {Colors.C}:: {cat_name} ::{Colors.E}")
+        for c, d in cmds: 
+            print(f"   {Colors.BO}{c:<35}{Colors.E} : {d}")
+
     print("-" * 60)
 
 def get_peer_name(ip):
@@ -1378,8 +1390,6 @@ def exec_lobby_cmd(inp, origin_cid=None):
 
     elif inp == "--log on": LOG_ON=True; save_config(); msg_print(f"{Colors.G}LOG ON{Colors.E}")
     elif inp == "--log off": LOG_ON=False; save_config(); msg_print(f"{Colors.W}LOG OFF{Colors.E}")
-    elif inp == "--descarga-automatica-si": AUTO_DL=True; save_config(); msg_print(f"{Colors.G}DL AUTO{Colors.E}")
-    elif inp == "--descarga-automatica-no": AUTO_DL=False; save_config(); msg_print(f"{Colors.W}DL MANUAL{Colors.E}")
     elif inp == "--popno": POPUP_ON, USER_OFF = False, True; msg_print(f"{Colors.W}Mute Manual.{Colors.E}")
     elif inp == "--popsi": POPUP_ON, USER_OFF = True, False; msg_print(f"{Colors.G}Popups ON.{Colors.E}")
     
@@ -1387,7 +1397,7 @@ def exec_lobby_cmd(inp, origin_cid=None):
     elif inp == "--autolevantado-si": toggle_autostart(True)
     elif inp == "--autolevantado-no": toggle_autostart(False)
     
-    elif inp == "--clear":
+    elif inp in ["--clear", "--limpieza", "--limpiar"]:
         global LOBBY_HISTORY
         LOBBY_HISTORY = [] # Reset total si pide clear manual
         refresh_ui()
