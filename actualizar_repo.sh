@@ -1,81 +1,72 @@
 #!/bin/bash
-# Script Maestro de Publicación GhostWhisperChat
-# Autor: CyberDEI Team
-# Uso: ./actualizar_repo.sh
+# actualizar_repo.sh
+# Script para actualizar automáticamente el repositorio de GhostWhisperChat
 
-set -e
+set -e  # Salir si hay algún error
 
-# Configuración
-REPO_ROOT=$(pwd)
-SOURCE="$HOME/Escritorio/inter_chat.py"
-PKG_DIR="ghostwhisperchat_pkg"
-BIN_DEST="$PKG_DIR/usr/bin/ghostwhisperchat"
-DEB_NAME="ghostwhisperchat_33.4_all.deb" # Asegurarse que coincida con control
-POOL_DIR="pool/main/g/ghostwhisperchat"
-DISTS_DIR="dists/stable/main"
+# Variables
+REPO_DIR="$(pwd)"
+POOL_DIR="$REPO_DIR/pool/main/g/ghostwhisperchat"
+DIST_DIR="$REPO_DIR/dists/stable"
+ARCHS=("amd64" "all" "arm64" "i386")  # Arquitecturas soportadas
+PACKAGE_NAME="ghostwhisperchat"
 
-echo "=== GhostWhisperChat Repo Builder v2 ==="
+echo "==> Actualizando paquete en el repositorio..."
 
-# 1. Preparar Binario
-echo "[1/6] Actualizando binario fuente..."
-cp "$SOURCE" "$BIN_DEST"
-chmod +x "$BIN_DEST"
+# Copiar nuevo .deb a pool
+LATEST_DEB=$(ls -1t $REPO_DIR/ghostwhisperchat_pkg/usr/bin/ghostwhisperchat* 2>/dev/null | head -n 1)
+if [[ -z "$LATEST_DEB" ]]; then
+    echo "No se encontró el paquete a actualizar. Verifica la ruta."
+    exit 1
+fi
 
-# 2. Construir .DEB
-echo "[2/6] Construyendo paquete Debian..."
-chmod 755 "$PKG_DIR/DEBIAN"
-chmod 755 "$PKG_DIR/DEBIAN/control"
-dpkg-deb --build "$PKG_DIR" "$DEB_NAME"
+# Para simplificar, asumimos que ya tienes el .deb listo en pool
+# Si quieres, puedes generar el .deb automáticamente aquí también con dpkg-deb
 
-# 3. Estructura de Repositorio
-echo "[3/6] Organizando estructura de directorios..."
-rm -rf dists pool # Limpieza radical para evitar corrupción
-mkdir -p "$POOL_DIR"
-mkdir -p "$DISTS_DIR/binary-amd64"
-mkdir -p "$DISTS_DIR/binary-i386"
-mkdir -p "$DISTS_DIR/binary-arm64"
-mkdir -p "$DISTS_DIR/binary-all"
+echo "==> Generando Packages.gz para cada arquitectura..."
+for ARCH in "${ARCHS[@]}"; do
+    mkdir -p "$DIST_DIR/main/binary-$ARCH"
+    dpkg-scanpackages "$POOL_DIR" /dev/null | gzip -9c > "$DIST_DIR/main/binary-$ARCH/Packages.gz"
+done
 
-# 4. Mover Paquete
-echo "[4/6] Archivando paquete en Pool..."
-mv "$DEB_NAME" "$POOL_DIR/"
-
-# 5. Generar Índices (Packages)
-echo "[5/6] Analizando paquetes..."
-# dpkg-scanpackages busca DEBs desde la raiz y genera rutas relativas
-# binary-amd64
-dpkg-scanpackages . /dev/null > "$DISTS_DIR/binary-amd64/Packages"
-gzip -k -f "$DISTS_DIR/binary-amd64/Packages"
-
-# binary-i386 (vacío pero necesario para que apt no tire 404 error)
-touch "$DISTS_DIR/binary-i386/Packages"
-gzip -k -f "$DISTS_DIR/binary-i386/Packages"
-
-# binary-all (copia de amd64 pues es arquitectura 'all')
-cp "$DISTS_DIR/binary-amd64/Packages" "$DISTS_DIR/binary-all/Packages"
-gzip -k -f "$DISTS_DIR/binary-all/Packages"
-
-# binary-arm64 (copia de amd64 pues es arquitectura 'all')
-cp "$DISTS_DIR/binary-amd64/Packages" "$DISTS_DIR/binary-arm64/Packages"
-gzip -k -f "$DISTS_DIR/binary-arm64/Packages"
-
-# 6. Generar Release File (Vital para que apt acepte el repo)
-echo "[6/6] Generando archivo Release..."
-cat <<EOF > dists/stable/Release
+echo "==> Generando Release..."
+cat > "$DIST_DIR/Release" <<EOF
 Origin: GhostWhisperChat Repo
 Label: GhostWhisperChat
 Suite: stable
 Codename: stable
-Architectures: amd64 i386 arm64 all
+Architectures: amd64 all arm64 i386
 Components: main
-Description: Repositorio oficial de GhostWhisperChat
+Description: Repositorio de GhostWhisperChat
 EOF
 
-echo "========================================"
-echo "[✔] Repositorio Reconstruido Exitosamente"
-echo "========================================"
-echo "Siguientes pasos:"
-echo "1. git add ."
-echo "2. git commit -m 'Repo refresh v33.4'"
-echo "3. git push"
-echo "========================================"
+# Calcular hashes automáticamente
+echo "MD5Sum:" >> "$DIST_DIR/Release"
+find "$DIST_DIR/main" -type f -name "Packages.gz" | while read f; do
+    MD5=$(md5sum "$f" | awk '{print $1}')
+    SIZE=$(stat -c%s "$f")
+    echo " $MD5 $SIZE $(realpath --relative-to="$DIST_DIR" "$f")" >> "$DIST_DIR/Release"
+done
+
+echo "SHA1:" >> "$DIST_DIR/Release"
+find "$DIST_DIR/main" -type f -name "Packages.gz" | while read f; do
+    SHA1=$(sha1sum "$f" | awk '{print $1}')
+    SIZE=$(stat -c%s "$f")
+    echo " $SHA1 $SIZE $(realpath --relative-to="$DIST_DIR" "$f")" >> "$DIST_DIR/Release"
+done
+
+echo "SHA256:" >> "$DIST_DIR/Release"
+find "$DIST_DIR/main" -type f -name "Packages.gz" | while read f; do
+    SHA256=$(sha256sum "$f" | awk '{print $1}')
+    SIZE=$(stat -c%s "$f")
+    echo " $SHA256 $SIZE $(realpath --relative-to="$DIST_DIR" "$f")" >> "$DIST_DIR/Release"
+done
+
+echo "SHA512:" >> "$DIST_DIR/Release"
+find "$DIST_DIR/main" -type f -name "Packages.gz" | while read f; do
+    SHA512=$(sha512sum "$f" | awk '{print $1}')
+    SIZE=$(stat -c%s "$f")
+    echo " $SHA512 $SIZE $(realpath --relative-to="$DIST_DIR" "$f")" >> "$DIST_DIR/Release"
+done
+
+echo "==> Repositorio actualizado correctamente."
