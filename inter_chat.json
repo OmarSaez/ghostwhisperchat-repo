@@ -26,6 +26,11 @@
             "trusted": true,
             "last_seen": 1765393195.7000332,
             "name": "158.170.12.1_USACH-Funcionarios"
+        },
+        "192.168.1.1_TP-Link-O": {
+            "trusted": true,
+            "last_seen": 1765407718.9114027,
+            "name": "192.168.1.1_TP-Link-O"
         }
     },
     "trusted_peers": [
