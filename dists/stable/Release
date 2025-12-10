@@ -1,25 +1,21 @@
-Date: Wed, 10 Dec 2025 13:59:41 +0000
+Origin: GhostWhisperChat Repo
+Label: GhostWhisperChat
+Suite: stable
+Codename: stable
+Date: Wed, 10 Dec 2025 14:05:08 +0000
+
 MD5Sum:
- 1a835a8709899dbbd6d23ef793ec363b               38 Release
+ 15ad0669f0e58264ec0f0dfa89b97806               38 Release
  7a8e05820bb378e6468f0247ec94b40e              350 main/binary-all/Packages.gz
- 7a8e05820bb378e6468f0247ec94b40e              350 main/binary-amd64/Packages.gz
- 7a8e05820bb378e6468f0247ec94b40e              350 main/binary-arm64/Packages.gz
- 7a8e05820bb378e6468f0247ec94b40e              350 main/binary-i386/Packages.gz
+
 SHA1:
- 187b775750bb579bd662b9637e8cd7fcc8a124e9               38 Release
+ d3b36b8f72cedd4b7d2bdc4f15d8a728efc16b6f               38 Release
  f1def08966372fbad73f1762ece6a8e05b26d06b              350 main/binary-all/Packages.gz
- f1def08966372fbad73f1762ece6a8e05b26d06b              350 main/binary-amd64/Packages.gz
- f1def08966372fbad73f1762ece6a8e05b26d06b              350 main/binary-arm64/Packages.gz
- f1def08966372fbad73f1762ece6a8e05b26d06b              350 main/binary-i386/Packages.gz
+
 SHA256:
- d9d9c952171ee651d5c580b6881ae92ca57abb3694d2597b3cfe74fc928802fa               38 Release
+ 92bf7b8eae91c38164f6ba3c7516d1052b4f28cda4af2bdc82ee5ff83b1de4cb               38 Release
  df7cac48ab4cba6bb5b52a7425a9048f8c13c066db7f19ff83046fa7d18020bc              350 main/binary-all/Packages.gz
- df7cac48ab4cba6bb5b52a7425a9048f8c13c066db7f19ff83046fa7d18020bc              350 main/binary-amd64/Packages.gz
- df7cac48ab4cba6bb5b52a7425a9048f8c13c066db7f19ff83046fa7d18020bc              350 main/binary-arm64/Packages.gz
- df7cac48ab4cba6bb5b52a7425a9048f8c13c066db7f19ff83046fa7d18020bc              350 main/binary-i386/Packages.gz
+
 SHA512:
- de55868ad9fa1fc4267495ea3e8d49d25631cea11776c24a0cfb33ac4ed9634f0c5cb6e45b72233787480aa662141bcf085d274ebf15a443427bdc429ea8a211               38 Release
- c59bf6b5e97e228e2cc47d9531179a91aae2ba73c89fa95ab1c0d125d61b2d97e6116b72c200e5ce230f0e0724494b1a23d33fdd3c858ef7ff6f0fc65bed0ff4              350 main/binary-all/Packages.gz
- c59bf6b5e97e228e2cc47d9531179a91aae2ba73c89fa95ab1c0d125d61b2d97e6116b72c200e5ce230f0e0724494b1a23d33fdd3c858ef7ff6f0fc65bed0ff4              350 main/binary-amd64/Packages.gz
- c59bf6b5e97e228e2cc47d9531179a91aae2ba73c89fa95ab1c0d125d61b2d97e6116b72c200e5ce230f0e0724494b1a23d33fdd3c858ef7ff6f0fc65bed0ff4              350 main/binary-arm64/Packages.gz
- c59bf6b5e97e228e2cc47d9531179a91aae2ba73c89fa95ab1c0d125d61b2d97e6116b72c200e5ce230f0e0724494b1a23d33fdd3c858ef7ff6f0fc65bed0ff4              350 main/binary-i386/Packages.gz
+ 04191ede976efde2d57538ea954ebe517b0e505a181756cdc0231f6a2d01a2fd267ffe31cac082efeb1220d8adc4d8d18e5b0258a85979b5f7df972b76e347a8               38 Release
+ b7e6336829f6c374ff68cef3ac5595ce4de262f748f80b8d2aadcb49af55bbb1cc573b6e9558cce6e2082a924efc751a4456d4d0b3895b054b57f7e63d2bf997              350 main/binary-all/Packages.gz
