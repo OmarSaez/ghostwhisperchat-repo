@@ -3,6 +3,7 @@
 # Script para construir, limpiar y actualizar el repositorio
 
 set -e
+export LC_TIME=C
 
 # --- 1. CONFIGURACIÓN ---
 REPO_DIR="$(pwd)"
