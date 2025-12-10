@@ -74,7 +74,7 @@ Version: 1.0
 Architectures: amd64 all arm64 i386
 Components: main
 Description: Repositorio oficial de GhostWhisperChat
-Date: $(LANG=C date -R)
+Date: $(LANG=C date -u -R)
 EOF
 
 # Generar Hashes

@@ -9,28 +9,28 @@ Version: 1.0
 Architectures: amd64 all arm64 i386
 Components: main
 Description: Repositorio oficial de GhostWhisperChat
-Date: Wed, 10 Dec 2025 15:34:07 -0300
+Date: Wed, 10 Dec 2025 18:40:07 +0000
 MD5Sum:
- d60ae4f54444bc4d2b0027aee1d7d645 566 main/binary-arm64/Packages.gz
- d60ae4f54444bc4d2b0027aee1d7d645 566 main/binary-amd64/Packages.gz
- d60ae4f54444bc4d2b0027aee1d7d645 566 main/binary-i386/Packages.gz
- d60ae4f54444bc4d2b0027aee1d7d645 566 main/binary-all/Packages.gz
+ 560220c88e046aa862bf9d6d52854155 562 main/binary-arm64/Packages.gz
+ 560220c88e046aa862bf9d6d52854155 562 main/binary-amd64/Packages.gz
+ 560220c88e046aa862bf9d6d52854155 562 main/binary-i386/Packages.gz
+ 560220c88e046aa862bf9d6d52854155 562 main/binary-all/Packages.gz
 SHA256:
- 686b81ee821d7e21871b82f1c0ea6a61ca6fd9d5e6144b7d89423789ce8687ff 566 main/binary-arm64/Packages.gz
- 686b81ee821d7e21871b82f1c0ea6a61ca6fd9d5e6144b7d89423789ce8687ff 566 main/binary-amd64/Packages.gz
- 686b81ee821d7e21871b82f1c0ea6a61ca6fd9d5e6144b7d89423789ce8687ff 566 main/binary-i386/Packages.gz
- 686b81ee821d7e21871b82f1c0ea6a61ca6fd9d5e6144b7d89423789ce8687ff 566 main/binary-all/Packages.gz
+ 2f2acfaadd6936d91ee8a8d4293b650043c009e7a45d3fa9ce467f30db27d242 562 main/binary-arm64/Packages.gz
+ 2f2acfaadd6936d91ee8a8d4293b650043c009e7a45d3fa9ce467f30db27d242 562 main/binary-amd64/Packages.gz
+ 2f2acfaadd6936d91ee8a8d4293b650043c009e7a45d3fa9ce467f30db27d242 562 main/binary-i386/Packages.gz
+ 2f2acfaadd6936d91ee8a8d4293b650043c009e7a45d3fa9ce467f30db27d242 562 main/binary-all/Packages.gz
 -----BEGIN PGP SIGNATURE-----
 
-iQHHBAEBCgAxFiEEf3Em0t7zSmLzcAzGS5gqDAcphTEFAmk5vR8THG9tYXIuc2Fl
-ekB1c2FjaC5jbAAKCRBLmCoMBymFMeWYDACiofxCpgceS2N+6ONy683cSopT2l6M
-CQ575VKTU8919Om+bMm8Vw2N82UvSevdT3vKG1Ho9MT05xgB4WiidHnXdGuS8TDS
-Jv+pgMQiCIUK7hDMWBeeLrQSsDcSx/vrUanfNbJ/hnV6Y6wlNKrkgDd0INx9t22h
-sG9Eu0mzU8HDfOcACDmt1sE18K+WnGrVh32K9urCv3WN7VQz8gkq9nFn+3rpIiMt
-ohmDyw05VQNqNQDHis0xOQoEJCIQOuTXRuWI2MssiOQFVt4xqNFuUWl4cjYL7u0j
-uquOUjnXxLx6H8TuIDXHHrNbY1twxk6auVHKefqCKXN+jrZUfuCShYcDLIFWLrYd
-L4p9VzBbhvMdELgkoJILzxAGoo7hKmoPCDGtGWj5zWsJv0mNjNSyvI0yepbc98bT
-mwvERbJxbORGvIu+Y9axeKHTtz1EN1SYScO+Ei9pnQrZan/WBhjBpr6oyEuLzDMJ
-xHmc2OJlPwNi1KDABMznwcFvQRerRN3NpeM=
-=JY5y
+iQHHBAEBCgAxFiEEf3Em0t7zSmLzcAzGS5gqDAcphTEFAmk5vocTHG9tYXIuc2Fl
+ekB1c2FjaC5jbAAKCRBLmCoMBymFMZq0DAC43rSfrw1vZnTdwBz39XdU7ruk4OM4
+R6+oBSTBSCVnhd4MpWE0CDHgyCJ5Kl7yCfcav/ciIu16Rfe2V54+DyqKKoeIq1s3
+oHtiFfDeEJ/xPNk1rZNay/GwVDzUc9+YjEJ4uIOOcx6aBRQMc99pvIwVFfDnR6LH
+ohxATWmFkS9eXvYyVNn4Hvl9aBwLqj7iYevC9OoeSPyDFjCou9kGSECS56rSZ4Ng
+2+BS9Lg1Qe4Zz5dd2yuGmlTlwgerxPnE5tstXQeZfLfjRBhEotvRyJIwKkuH/8XG
+8F1qpxlOmOZXs3p3XBaj0VOoDbl/C4RX/oEV3brTtT014K75vczCaKPFa7Z6U+nL
+w7r3uEaOdlxSNsphLUGfFsNo61ZKxh4iPsiByUVtgf7L2virI/k6ZUUXbJ+WDB+w
+491e0kS+1LqzTug1SHzELLqWS+3fnc7OGU+dfybuXsyBm0VB4QskIMwN2WIkFB7d
+Ac6uS9sjBomhTqBVVl283H/GjDQeqYoqo7Q=
+=k5kF
 -----END PGP SIGNATURE-----
