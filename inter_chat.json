@@ -1,5 +1,11 @@
 {
-    "known_users": {},
+    "known_users": {
+        "158.170.12.104": {
+            "nick": "neymar",
+            "status": "En l\u00ednea",
+            "t": 1765393203.921489
+        }
+    },
     "nick": "ola",
     "status": "En l\u00ednea",
     "visible": true,
@@ -10,7 +16,19 @@
             "trusted": true,
             "last_seen": 1765390938.6059258,
             "name": "158.170.12.1_LAN"
+        },
+        "10.0.160.1_USACH-Funcionarios": {
+            "trusted": true,
+            "last_seen": 1765393142.2662275,
+            "name": "10.0.160.1_USACH-Funcionarios"
+        },
+        "158.170.12.1_USACH-Funcionarios": {
+            "trusted": true,
+            "last_seen": 1765393195.7000332,
+            "name": "158.170.12.1_USACH-Funcionarios"
         }
     },
-    "trusted_peers": []
+    "trusted_peers": [
+        "158.170.12.104"
+    ]
 }
