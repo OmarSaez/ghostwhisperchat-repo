@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-APP_VER_NUM = 35.4
-APP_VER_TAG = "Help Update: Nick & Invite"
+APP_VER_NUM = 36.0
+APP_VER_TAG = "Folders & Integrity Check"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 import socket, threading, subprocess, sys, os, time, platform, atexit, re, signal, ctypes, shutil
@@ -10,6 +10,7 @@ difflib = None
 urllib = None
 unicodedata = None
 request = None
+hashlib = None # v36.0
 
 try: import readline
 except ImportError: pass 
@@ -1122,7 +1123,7 @@ def handle_invite_logic(ip, nick, type, extra_data=None):
 
 
 
-def dl_file(name, size, sock, sender, sender_ip=None):
+def dl_file(name, size, sock, sender, sender_ip=None, expected_hash=None, file_type='FILE'):
     if not os.path.exists(DL_DIR): os.makedirs(DL_DIR)
     tmp = os.path.join(DL_DIR, f".tmp_{int(time.time())}_{name}")
     try:
@@ -1134,12 +1135,39 @@ def dl_file(name, size, sock, sender, sender_ip=None):
                 f.write(ch); r += len(ch)
     except Exception as e: return safe_print(f"{Colors.F}Error DL: {e}{Colors.E}")
 
+    # v36.0: Integrity Check
+    if expected_hash:
+        safe_print(f"{Colors.W}[*] Verificando integridad...{Colors.E}")
+        cal_hash = calculate_file_hash(tmp)
+        if cal_hash != expected_hash:
+             safe_print(f"{Colors.F}[X] ERRO INTEGRIDAD: Hash mismatch.{Colors.E}")
+             safe_print(f"    Esperado: {expected_hash[:8]}...")
+             safe_print(f"    Recibido: {cal_hash[:8]}...")
+             os.remove(tmp)
+             return
+        else:
+             safe_print(f"{Colors.G}[✔] Integridad verificada.{Colors.E}")
+
     final_path = os.path.join(DL_DIR, name)
+    
+    # v36.0: Folder Logic (Si es DIR, es un zip que debemos descomprimir)
+    is_zip_archive = (file_type == 'DIR')
+    
     if AUTO_DL:
         if os.path.exists(final_path): 
             base, ext = os.path.splitext(name)
             final_path = os.path.join(DL_DIR, f"{base}_copy_{int(time.time())}{ext}")
-        os.rename(tmp, final_path)
+        
+        # Rename or Unzip
+        if is_zip_archive:
+             # Es un directorio comprimido. Le quitamos la extension .zip al nombre final si la tiene
+             folder_final_path = final_path.replace('.zip', '')
+             shutil.unpack_archive(tmp, folder_final_path)
+             os.remove(tmp) # Borrar zip temporal
+             final_path = folder_final_path + " (Carpeta)"
+        else:
+             os.rename(tmp, final_path)
+
         safe_print(f"{Colors.G}[✔] Archivo guardado: {final_path}{Colors.E}")
         popup(f"De: {sender}", f"Guardado: {name}", source_ip=sender_ip); write_log(f"Recibido {name}", "FILE")
         
@@ -1151,11 +1179,15 @@ def dl_file(name, size, sock, sender, sender_ip=None):
                     if cid in ACTIVE_CHATS and 'port' in ACTIVE_CHATS[cid]:
                          # Send System Notification to Child
                          tag = f"[{Colors.C}📁{Colors.E}]"
-                         msg = f"{Colors.C}{sender} ha enviado un archivo: {name}{Colors.E}"
+                         msg = f"{Colors.C}{sender} ha enviado {'una carpeta' if is_zip_archive else 'un archivo'}: {name}{Colors.E}"
                          send_ipc(f"FWD_MSG{SEP}{cid}{SEP}{tag}{SEP}{msg}", ACTIVE_CHATS[cid]['port'])
 
     else:
-        PENDING_FILES.append({'t': tmp, 'r': final_path, 's': sender})
+        # pending files logic, store hash/type for later accept? 
+        # For simplicity, we assume if we are here we already accepted stream or stream happens anyway.
+        # But wait, logic says "Wait for accept" BUT tcp stream ALREADY downloaded to tmp.
+        # So we just keep tmp stored in PENDING_FILES with the metadata.
+        PENDING_FILES.append({'t': tmp, 'r': final_path, 's': sender, 'hash': expected_hash, 'type': file_type})
         safe_print(f"{Colors.W}[?] '{name}' de {sender} espera (--aceptar/--rechazar).{Colors.E}"); popup("Archivo", f"{sender}: {name}", source_ip=sender_ip)
         
         # Notify Local Chat Windows (Manual Wait)
@@ -1385,17 +1417,22 @@ def tcp_loop():
                          pass # Deprecated P2P Update Commands
                         
                     elif cmd == "FILE_TRANSFER":
-                        # args: FNAME, SIZE
+                        # args: FNAME, SIZE, [HASH, TYPE]
                         if len(args) >= 2:
+                            fname = args[0]
+                            fsize = int(args[1])
+                            fhash = args[2] if len(args) > 2 else None
+                            ftype = args[3] if len(args) > 3 else 'FILE'
+
                             target_cid = None
                             pdata = PEERS.get(ip)
                             if pdata and isinstance(pdata, dict):
                                 for cid in pdata.get('chats', set()):
                                      if cid in ACTIVE_CHATS: target_cid = cid; break
-
-                            # SIEMPRE descargar el archivo. dl_file se encarga de notificar si corresponde.
-                            safe_print(f"{Colors.W}[⇩] Recibiendo '{os.path.basename(args[0])}'...{Colors.E}")
-                            threading.Thread(target=dl_file, args=(os.path.basename(args[0]), int(args[1]), c, get_peer_name(ip), ip)).start()
+                            
+                            display_name = fname + " (Carpeta)" if ftype == 'DIR' else fname
+                            safe_print(f"{Colors.W}[⇩] Recibiendo '{display_name}' ({fsize} bytes)...{Colors.E}")
+                            threading.Thread(target=dl_file, args=(fname, fsize, c, get_peer_name(ip), ip, fhash, ftype)).start()
                             c = None # Prevent close in finally
 
                 else:
@@ -1427,7 +1464,26 @@ def tcp_loop():
 
 def send_file(arg):
     path = os.path.expanduser(arg.strip().strip("'\""))
-    if not os.path.isfile(path): return safe_print(f"{Colors.F}[X] No existe.{Colors.E}")
+    if not os.path.exists(path): return safe_print(f"{Colors.F}[X] No existe.{Colors.E}") # isfile -> exists (for dirs)
+    
+    # v36.0: Folder Support
+    is_dir = os.path.isdir(path)
+    to_send_path = path
+    file_type = 'FILE'
+    
+    if is_dir:
+        safe_print(f"{Colors.W}[*] Comprimiendo carpeta '{os.path.basename(path)}'...{Colors.E}")
+        # Crear zip temporal
+        # make_archive (base_name, format, root_dir)
+        # shutil.make_archive generará filename + .zip
+        tmp_zip_base = f".gwc_tmp_{int(time.time())}"
+        shutil.make_archive(tmp_zip_base, 'zip', path)
+        to_send_path = tmp_zip_base + ".zip"
+        file_type = 'DIR'
+    
+    # Calculate integrity
+    f_hash = calculate_file_hash(to_send_path)
+    n, s = os.path.basename(to_send_path) if not is_dir else os.path.basename(path) + ".zip", os.path.getsize(to_send_path)
 
     # Target logic same as send_all
     targets = []
@@ -1438,21 +1494,26 @@ def send_file(arg):
 
     if not targets: return safe_print(f"{Colors.F}[X] Nadie en el chat actual.{Colors.E}")
 
-    n, s = os.path.basename(path), os.path.getsize(path); safe_print(f"{Colors.W}[⇧] Enviando '{n}'...{Colors.E}"); write_log(f"Send {n}", "FILE")
+    safe_print(f"{Colors.W}[⇧] Enviando '{n}' ({s} bytes, Hash: {f_hash[:8]})...{Colors.E}"); write_log(f"Send {n}", "FILE")
 
     cnt = 0
     for ip in [i for i in targets if i != MY_IP]:
         try:
             k = socket.socket(socket.AF_INET, socket.SOCK_STREAM); k.settimeout(2); k.connect((ip, TCP_PORT))
-            k.send(build_packet("FILE_TRANSFER", n, s)); time.sleep(0.1)
-            with open(path, "rb") as f:
+            # PACKET v36: FILE_TRANSFER | NAME | SIZE | HASH | TYPE
+            k.send(build_packet("FILE_TRANSFER", n, s, f_hash, file_type)); time.sleep(0.1)
+            with open(to_send_path, "rb") as f:
                 while True:
                     d = f.read(BUFFER);
                     if not d: break
                     k.sendall(d)
             k.close(); cnt += 1
-        except: pass
+        except Exception as e: safe_print(f"Err Send: {e}")
     safe_print(f"{Colors.G}[✔] Enviado a {cnt}.{Colors.E}")
+    
+    # Cleanup tmp zip
+    if is_dir and os.path.exists(to_send_path):
+        os.remove(to_send_path)
 
 def send_ipc(msg, port):
     try:
@@ -1819,7 +1880,7 @@ def exec_lobby_cmd(inp, origin_cid=None):
                      reply_print(f"   > Invitación enviada a {tnick} ({ip}).", origin_cid)
                  else:
                      # Priv Logic (Upgrade?)
-                     # No se puede invitar a 3ros a un chat privado.
+                     # No se puede invitar a terceros a un chat privado.
                      reply_print(f"   [!] No se puede invitar a terceros a un chat privado.", origin_cid)
              
              if unknown_nicks:
@@ -2216,14 +2277,6 @@ def restore_terminal():
 # Asegurar restauración al salir brusco
 atexit.register(restore_terminal)
 
-
-def liberate_ports():
-    """Detecta y elimina procesos zombies ocupando nuestros puertos"""
-    ports = [TCP_PORT, UDP_PORT]
-    try:
-        if platform.system() == "Linux":
-            # Usar lsof o fuser
-            # fuser -k 44494/tcp
             for p in ports:
                  subprocess.run(f"fuser -k {p}/tcp", shell=True, stderr=subprocess.DEVNULL)
                  subprocess.run(f"fuser -k {p}/udp", shell=True, stderr=subprocess.DEVNULL)
@@ -2336,6 +2389,9 @@ def run_lobby():
     signal.signal(signal.SIGINT, lambda s, f: shutdown_lobby())
     
     lazy_import() # Load heavy libraries only when needed (Lobby or Child)
+    global hashlib
+    import hashlib # v36.0 Integrity check
+
 
     os.system('cls' if os.name == 'nt' else 'clear'); fw_cfg(); MY_IP = get_ip()
     set_terminal_title(f"GWC Lobby - {MY_NICK}")
