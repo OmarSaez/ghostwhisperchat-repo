@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-APP_VER_NUM = 35.1
-APP_VER_TAG = "Fix Autocomplete & Enhanced Status"
+APP_VER_NUM = 35.3
+APP_VER_TAG = "Hyper-Smart Autocomplete"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 import socket, threading, subprocess, sys, os, time, platform, atexit, re, signal, ctypes, shutil
@@ -271,6 +271,7 @@ def write_log(txt, type="MSG"):
 
 KNOWN_USERS = {} # {ip: {nick, status, t}}
 LOBBY_HISTORY = [] # Buffer para repintar la UI
+DISC_TEMP = [] # Buffer para descubrimiento (Scan)
 
 # --- PROTOCOLO v27.0 ---
 PKT_PREFIX = "[CMD]"
@@ -1900,7 +1901,7 @@ def exec_lobby_cmd(inp, origin_cid=None):
         lines.append(f" {Colors.BO}Auto-Inicio (Linux):{Colors.E} {auto_st}")
         
         lines.append("")
-        lines.append(f"{Colors.BO}:: LISTADO DE CONTACTOS (Memoria) ::{Colors.E}")
+        lines.append(f"{Colors.BO}:: LISTADO DE CONTACTOS Hitoricos (Total: {len(KNOWN_USERS)}) ::{Colors.E}")
         if not KNOWN_USERS:
             lines.append(" (Vacío)")
         else:
@@ -1909,7 +1910,7 @@ def exec_lobby_cmd(inp, origin_cid=None):
                 lines.append(f" - {d['nick']} ({ip}) [{d['status']}] (Visto: {seen})")
         
         lines.append("")
-        lines.append(f"{Colors.BO}:: CHATS ACTIVOS ::{Colors.E}")
+        lines.append(f"{Colors.BO}:: CHATS ACTIVOS (Total: {len(ACTIVE_CHATS)}) ::{Colors.E}")
         if not ACTIVE_CHATS:
              lines.append(" (Ninguno)")
         else:
@@ -2263,9 +2264,46 @@ def setup_autocomplete():
                     if alias.startswith('--'):
                         all_commands.append(alias)
             
-            # Función de autocompletado
+            # Función de autocompletado Inteligente
             def completer(text, state):
-                options = [i for i in all_commands if i.startswith(text)]
+                buffer = readline.get_line_buffer()
+                line_parts = buffer.lstrip().split()
+                
+                options = []
+                
+                # Contexto: ¿Es el inicio de la línea o un comando?
+                # Si estamos escribiendo la primera palabra
+                if not line_parts or (len(line_parts) == 1 and not buffer.endswith(' ')):
+                    options = [i for i in all_commands if i.startswith(text)]
+                
+                else:
+                    # Contexto: Argumentos
+                    cmd_str = line_parts[0]
+                    cmd_key = resolve_cmd(cmd_str)
+                    
+                    # Si el comando es INVITE o CHAT_PRIV, sugerir Usuarios
+                    if cmd_key in ['INVITE', 'CHAT_PRIV']:
+                        # Prioridad 1: Contactos Conocidos (Memoria + Peers)
+                        prio_candidates = set()
+                        for d in KNOWN_USERS.values(): prio_candidates.add(d['nick'])
+                        for p in PEERS.values(): 
+                            if isinstance(p, dict): prio_candidates.add(p.get('nick', '?'))
+                        
+                        options_prio = [n for n in prio_candidates if n.startswith(text)]
+                        
+                        # Prioridad 2: Resultados de Escaneo Reciente (DISC_TEMP)
+                        # "si no encuentra nada similar... busca en listado de quienes interno"
+                        sec_candidates = set()
+                        global DISC_TEMP
+                        for item in DISC_TEMP:
+                            # item structure depends on scan func: (ip, nick, stat)
+                            if len(item) >= 2: sec_candidates.add(item[1])
+                            
+                        options_sec = [n for n in sec_candidates if n.startswith(text) and n not in prio_candidates]
+                        
+                        # Combinar: Primero contactos, luego descubiertos
+                        options = options_prio + options_sec
+                
                 if state < len(options):
                     return options[state]
                 else:
@@ -2273,8 +2311,9 @@ def setup_autocomplete():
 
             readline.set_completer(completer)
             readline.parse_and_bind("tab: complete")
-            # Configurar delimitadores para que guiones se consideren parte de la palabra
-            readline.set_completer_delims(' \t\n')
+            # Configurar delimitadores: espacio, tab, salto linea y COMA (para invites multiples)
+            # El guion (-) se quitó para permitir comandos con guiones
+            readline.set_completer_delims(' \t\n,')
             
             safe_print(f"{Colors.G}[✔] Autocompletado activado (presiona TAB).{Colors.E}")
         except ImportError:
