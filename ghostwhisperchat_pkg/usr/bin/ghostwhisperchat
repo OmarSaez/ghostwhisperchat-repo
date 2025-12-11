@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-APP_VER_NUM = 33.13
-APP_VER_TAG = "Fix Updates"
+APP_VER_NUM = 33.15
+APP_VER_TAG = "Total UX Fusion"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 import socket, threading, subprocess, sys, os, time, platform, atexit, re, signal, ctypes, shutil
@@ -117,6 +117,25 @@ def safe_print(s):
     # Imprime Y guarda en historial (Eventos publicos)
     LOBBY_HISTORY.append(s)
     raw_print(s)
+
+def reply_print(msg, target_cid=None):
+    """
+    Imprime en el destino correcto:
+    - Si target_cid es None -> Imprime en Lobby (safe_print).
+    - Si target_cid existe -> Envía IPC al hijo para que lo muestre.
+    """
+    if target_cid and target_cid in ACTIVE_CHATS:
+        # Enviar al hijo
+        cdata = ACTIVE_CHATS[target_cid]
+        port = cdata.get('port')
+        if port:
+            # Usamos MSG_IN con 'Sistema' como remitente
+            # Limpiamos colores para IPC? No, el hijo soporta colores.
+            send_ipc(f"MSG_IN{SEP}Sistema{SEP}{msg}{SEP}{Colors.C}", port)
+        else:
+            safe_print(msg) # Fallback
+    else:
+        safe_print(msg)
 
 def send_ipc(msg, port=IPC_PORT):
     try:
@@ -1450,9 +1469,10 @@ def exec_lobby_cmd(inp, origin_cid=None):
     elif cmd in ["--chatpersonal", "--personal", "--chatp", "--p", "--cp", "--dm"]:
         t = find_global(args)
         if t:
-            if t == MY_IP: safe_print(f"{Colors.F}Eres tú.{Colors.E}")
+            if t == MY_IP: reply_print(f"{Colors.F}Eres tú.{Colors.E}", origin_cid)
             else:
-                safe_print(f"{Colors.W}[*] Invitando...{Colors.E}"); send_cmd(t, "INVITE", MY_NICK, "PRIV", MY_STATUS)
+                reply_print(f"{Colors.W}[*] Invitando...{Colors.E}", origin_cid)
+                send_cmd(t, "INVITE", MY_NICK, "PRIV", MY_STATUS)
 
     # --- COMANDOS GLOBALES / UTILIDADES ---
     elif cmd == "--ls":
@@ -1503,26 +1523,37 @@ def exec_lobby_cmd(inp, origin_cid=None):
              safe_print(f" - [{cid}] {d['type']}: {d.get('remote_nick', d['remote_id'])}")
 
     elif cmd in ["--contactos", "--c", "--history"]:
-        safe_print(f"{Colors.G}[*] Historial de Sesión ({len(KNOWN_USERS)}):{Colors.E}")
-        for ip, d in KNOWN_USERS.items(): safe_print(f"   - {d['nick']} ({ip}) [{d['status']}] (Visto: {time.strftime('%H:%M', time.localtime(d['t']))})")
+        reply_print(f"{Colors.G}[*] Historial de Sesión ({len(KNOWN_USERS)}):{Colors.E}", origin_cid)
+        for ip, d in KNOWN_USERS.items(): 
+            msg = f"   - {d['nick']} ({ip}) [{d['status']}] (Visto: {time.strftime('%H:%M', time.localtime(d['t']))})"
+            reply_print(msg, origin_cid)
 
-    elif inp == "--quienes": scan_network()
+    elif inp == "--quienes": scan_network(target_cid=origin_cid)
     elif inp == "--quienes-si":
         VISIBLE_IN_SCAN=True; save_config()
-        refresh_ui(f"{Colors.G}[✔] Visible en escáner.{Colors.E}")
+        # refresh_ui borra pantalla, eso no se puede redirigir facil al chat, asi que enviamos solo texto
+        if origin_cid: reply_print(f"{Colors.G}[✔] Visible en escáner.{Colors.E}", origin_cid)
+        else: refresh_ui(f"{Colors.G}[✔] Visible en escáner.{Colors.E}")
+        
     elif inp == "--quienes-no":
         VISIBLE_IN_SCAN=False; save_config()
-        refresh_ui(f"{Colors.W}[✔] Oculto en escáner.{Colors.E}")
+        if origin_cid: reply_print(f"{Colors.W}[✔] Oculto en escáner.{Colors.E}", origin_cid)
+        else: refresh_ui(f"{Colors.W}[✔] Oculto en escáner.{Colors.E}")
 
     elif cmd in ["--estado", "--status", "--e"]:
         MY_STATUS = args; save_config()
-        refresh_ui(f"{Colors.G}[✔] Estado actualizado.{Colors.E}")
+        if origin_cid: reply_print(f"{Colors.G}[✔] Estado actualizado.{Colors.E}", origin_cid)
+        else: refresh_ui(f"{Colors.G}[✔] Estado actualizado.{Colors.E}")
         send_cmd_all("STATUS_UPDATE", MY_NICK, MY_STATUS)
 
     elif cmd in ["--nick", "--nombre", "--nickname", "--name"]:
         old_nick = MY_NICK
         MY_NICK = args; save_config()
-        refresh_ui(f"{Colors.G}[✔] Nick cambiado de {old_nick} a {MY_NICK}.{Colors.E}")
+        
+        msg = f"{Colors.G}[✔] Nick cambiado de {old_nick} a {MY_NICK}.{Colors.E}"
+        if origin_cid: reply_print(msg, origin_cid)
+        else: refresh_ui(msg)
+        
         # Broadcast cambio inmediato
         send_cmd_all("STATUS_UPDATE", MY_NICK, MY_STATUS) # Esto notifica a todos
         # Y avisar a mis propias ventanas hijas para que sepan el cambio?
@@ -1555,7 +1586,7 @@ def exec_lobby_cmd(inp, origin_cid=None):
              chat_data = ACTIVE_CHATS.get(origin_cid)
              if not chat_data: return
 
-             safe_print(f"{Colors.W}[*] Procesando invitaciones para chat {origin_cid}...{Colors.E}")
+             reply_print(f"{Colors.W}[*] Procesando invitaciones para chat {origin_cid}...{Colors.E}", origin_cid)
 
              targets_map = {} # IP -> Nick (o 'Unknown')
              unknown_nicks = []
@@ -1594,7 +1625,7 @@ def exec_lobby_cmd(inp, origin_cid=None):
              
              # 2. Escaneo Activo para desconocidos (Lento: 2s)
              if unknown_nicks:
-                 safe_print(f"{Colors.W}[*] Escaneando red para: {', '.join(unknown_nicks)}...{Colors.E}")
+                 reply_print(f"{Colors.W}[*] Escaneando red para: {', '.join(unknown_nicks)}...{Colors.E}", origin_cid)
                  global DISC_TEMP
                  DISC_TEMP = [] # Reset buffer discovery
 
@@ -1615,11 +1646,11 @@ def exec_lobby_cmd(inp, origin_cid=None):
                          if normalize_str(d_nick) == clean_target:
                              targets_map[d_ip] = d_nick
                              found_scan = True
-                             safe_print(f"{Colors.G}[+] Encontrado: {d_nick} ({d_ip}){Colors.E}")
+                             reply_print(f"{Colors.G}[+] Encontrado: {d_nick} ({d_ip}){Colors.E}", origin_cid)
                              break
 
              if not targets_map:
-                 safe_print(f"{Colors.F}[!] Ningún objetivo válido encontrado.{Colors.E}")
+                 reply_print(f"{Colors.F}[!] Ningún objetivo válido encontrado.{Colors.E}", origin_cid)
                  return
 
              # Enviar invitaciones finales
@@ -2210,15 +2241,9 @@ def run_child(cid, ctype, remote, password, mynick, mystatus, myport, rnick="?")
                  continue
             
             if inp == "--help":
-                print(f"{Colors.C}--- AYUDA LOCAL ---{Colors.E}")
-                # Mostramos un resumen breve de comandos útiles en chat
-                print(" --invite <nicks> : Invitar al grupo")
-                print(" --archivo <ruta> : Enviar archivo")
-                print(" --ls             : Ver miembros")
-                print(" --popno / --popsi: Controlar popups")
-                print(" --exit / --salir : Salir del chat")
-                print(" --clear          : Limpiar pantalla")
-                print(" (Comandos globales como --estado o --nick se sincronizan con Lobby)")
+                # Usamos la misma ayuda que el lobby, ya que los comandos son reenviados
+                show_help()
+                print(f"{Colors.W}[!] Nota: Algunos comandos globales mostrarán su resultado en la ventana del Lobby.{Colors.E}")
                 continue
 
             if inp == "--ls":
