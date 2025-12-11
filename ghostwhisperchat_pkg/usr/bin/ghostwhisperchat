@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-APP_VER_NUM = 35.0
-APP_VER_TAG = "Global Status & Autocomplete"
+APP_VER_NUM = 35.1
+APP_VER_TAG = "Fix Autocomplete & Enhanced Status"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 import socket, threading, subprocess, sys, os, time, platform, atexit, re, signal, ctypes, shutil
@@ -1881,8 +1881,9 @@ def exec_lobby_cmd(inp, origin_cid=None):
         else: safe_print(full_msg)
 
     elif cmd_key == 'GLOBAL_STATUS':
-        # v35.0
+        # v35.1 Mejorado
         lines = [f"{Colors.H}=== ESTADO GLOBAL DEL SISTEMA ==={Colors.E}"]
+        lines.append(f" {Colors.BO}Versión:{Colors.E} {APP_VERSION}")
         lines.append(f" {Colors.BO}Usuario:{Colors.E} {MY_NICK} ({MY_IP})")
         lines.append(f" {Colors.BO}Estado:{Colors.E} {MY_STATUS}")
         lines.append(f" {Colors.BO}Visibilidad Red:{Colors.E} {'VISIBLE' if VISIBLE_IN_SCAN else 'OCULTO (Ghost Mode)'}")
@@ -1898,9 +1899,23 @@ def exec_lobby_cmd(inp, origin_cid=None):
         else: auto_st = "N/A (No Linux)"
         lines.append(f" {Colors.BO}Auto-Inicio (Linux):{Colors.E} {auto_st}")
         
-        lines.append(f" {Colors.BO}Contactos Memoria:{Colors.E} {len(KNOWN_USERS)}")
-        lines.append(f" {Colors.BO}Chats Activos:{Colors.E} {len(ACTIVE_CHATS)}")
+        lines.append("")
+        lines.append(f"{Colors.BO}:: LISTADO DE CONTACTOS (Memoria) ::{Colors.E}")
+        if not KNOWN_USERS:
+            lines.append(" (Vacío)")
+        else:
+            for ip, d in KNOWN_USERS.items():
+                seen = time.strftime('%H:%M', time.localtime(d['t']))
+                lines.append(f" - {d['nick']} ({ip}) [{d['status']}] (Visto: {seen})")
         
+        lines.append("")
+        lines.append(f"{Colors.BO}:: CHATS ACTIVOS ::{Colors.E}")
+        if not ACTIVE_CHATS:
+             lines.append(" (Ninguno)")
+        else:
+             for cid, d in ACTIVE_CHATS.items():
+                 lines.append(f" - [{cid}] {d['type']}: {d.get('remote_nick', d['remote_id'])}")
+
         full_msg = "\n".join(lines)
         if origin_cid: reply_print(full_msg, origin_cid)
         else: safe_print(full_msg)
@@ -2258,6 +2273,9 @@ def setup_autocomplete():
 
             readline.set_completer(completer)
             readline.parse_and_bind("tab: complete")
+            # Configurar delimitadores para que guiones se consideren parte de la palabra
+            readline.set_completer_delims(' \t\n')
+            
             safe_print(f"{Colors.G}[✔] Autocompletado activado (presiona TAB).{Colors.E}")
         except ImportError:
             safe_print(f"{Colors.W}[!] Módulo 'readline' no encontrado. Autocompletado no disponible.{Colors.E}")
