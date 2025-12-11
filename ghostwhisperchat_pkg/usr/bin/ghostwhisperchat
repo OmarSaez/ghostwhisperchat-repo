@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-APP_VER_NUM = 34.1
-APP_VER_TAG = "Abreviaciones: Arreglado"
+APP_VER_NUM = 34.2
+APP_VER_TAG = "Abreviaciones: Clean UI"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 import socket, threading, subprocess, sys, os, time, platform, atexit, re, signal, ctypes, shutil
@@ -566,6 +566,7 @@ def show_help():
         "UTILIDADES Y ARCHIVOS": [
             ("--archivo (Archivo.ext y/o Ruta)", "Enviar archivo."),
             ("--estado (Texto)", "Cambiar estado."),
+            ("--abreviaciones", "Ver todos los formatos aceptados por cada comando."),
             ("--limpiar", "Limpiar pantalla.")
         ],
         "SISTEMA Y CONFIGURACIÓN": [
@@ -1839,15 +1840,18 @@ def exec_lobby_cmd(inp, origin_cid=None):
 
     elif cmd_key == 'SHORTCUTS':
         # Nueva funcionalidad v34.0
-        msg_lines = [f"{Colors.H}=== ABREVIACIONES Y ALIAS (v34.0) ==={Colors.E}"]
+        msg_lines = [f"{Colors.H}=== ABREVIACIONES Y ALIAS (v34.x) ==={Colors.E}"]
+        msg_lines.append("") # Spacer
+        
         # Ordenar keys por nombre
         for key in sorted(COMMAND_DEFS.keys()):
             data = COMMAND_DEFS[key]
             # Mostrar max 5 alias por linea para no saturar
             aliases = data['aliases']
             desc = data['desc']
-            msg_lines.append(f"{Colors.BO}{key}{Colors.E}: {desc}")
-            msg_lines.append(f"   Variantes: {', '.join(aliases)}")
+            msg_lines.append(f"{Colors.BO}● {key}{Colors.E} : {desc}")
+            msg_lines.append(f"   ↳ Variantes: { Colors.C + ', '.join(aliases) + Colors.E }")
+            msg_lines.append("") # Spacer entre comandos para legibilidad
         
         full_msg = "\n".join(msg_lines)
         if origin_cid: reply_print(full_msg, origin_cid)
