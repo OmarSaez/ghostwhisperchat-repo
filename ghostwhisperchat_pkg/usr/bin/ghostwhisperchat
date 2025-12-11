@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-APP_VER_NUM = 34.3
-APP_VER_TAG = "Restored DL & Log Fixes"
+APP_VER_NUM = 34.4
+APP_VER_TAG = "Help Update: Auto-Downloads"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 import socket, threading, subprocess, sys, os, time, platform, atexit, re, signal, ctypes, shutil
@@ -574,6 +574,7 @@ def show_help():
         "UTILIDADES Y ARCHIVOS": [
             ("--archivo (Archivo.ext y/o Ruta)", "Enviar archivo."),
             ("--estado (Texto)", "Cambiar estado."),
+            ("--descarga-si / --descarga-no", "Control descarga automática."),
             ("--abreviaciones", "Ver todos los formatos aceptados por cada comando."),
             ("--limpiar", "Limpiar pantalla.")
         ],
@@ -1857,7 +1858,7 @@ def exec_lobby_cmd(inp, origin_cid=None):
 
     elif cmd_key == 'SHORTCUTS':
         # Nueva funcionalidad v34.0
-        msg_lines = [f"{Colors.H}=== ABREVIACIONES Y ALIAS (v34.x) ==={Colors.E}"]
+        msg_lines = [f"{Colors.H}=== ABREVIACIONES Y ALIAS (Orden Alfabético) ==={Colors.E}"]
         msg_lines.append("") # Spacer
         
         # Ordenar keys por nombre
