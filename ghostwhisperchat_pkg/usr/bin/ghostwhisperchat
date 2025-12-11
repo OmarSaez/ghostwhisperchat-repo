@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-APP_VER_NUM = 35.3
-APP_VER_TAG = "Hyper-Smart Autocomplete"
+APP_VER_NUM = 35.4
+APP_VER_TAG = "Help Update: Nick & Invite"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 import socket, threading, subprocess, sys, os, time, platform, atexit, re, signal, ctypes, shutil
@@ -568,6 +568,7 @@ def show_help():
             ("--chatpersonal (Nick y/o IP)", "Crear un chat privado con un usuario."),
             ("--chatgrupal ID CLAVE", "Unirse/Crear sala."), 
             ("--invite (Nick1, Nick2...) y/o IPs", "Invitar gente al grupo actual."),
+            ("--aceptar / --rechazar", "Responder a invitaciones pendientes."),
             ("--ls", "Listar usuarios CONECTADOS en el chat."), 
             ("--salir", "Desconectar de la sesión.")
         ],
@@ -578,6 +579,7 @@ def show_help():
         ],
         "UTILIDADES Y ARCHIVOS": [
             ("--archivo (Archivo.ext y/o Ruta)", "Enviar archivo."),
+            ("--nombre (NuevoNick)", "Cambiar tu nombre visible."),
             ("--estado (Texto)", "Cambiar estado."),
             ("--descarga-si / --descarga-no", "Control descarga automática."),
             ("--estados-globales", "Ver resumen de configuración."),
