@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-APP_VER_NUM = 34.0
-APP_VER_TAG = "Abreviaciones Update"
+APP_VER_NUM = 34.1
+APP_VER_TAG = "Abreviaciones: Arreglado"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 import socket, threading, subprocess, sys, os, time, platform, atexit, re, signal, ctypes, shutil
@@ -235,7 +235,7 @@ COMMAND_DEFS = {
         'desc': 'Ver lista de comandos y sus variantes.'
     },
     'HELP': {
-        'aliases': ['--help', '--ayuda', '-?', '--?'],
+        'aliases': ['--help', '--ayuda', '-?', '--?', '--comandos'],
         'desc': 'Ver ayuda general.'
     }
 }
@@ -2219,7 +2219,7 @@ def run_lobby():
     # Check Network Security on Startup
     global SILENT_UPDATES_ALLOWED
     SILENT_UPDATES_ALLOWED = check_network_trust()
-    if SILENT_UPDATED_ALLOWED:
+    if SILENT_UPDATES_ALLOWED:
         pass # safe_print(f"{Colors.G}[Sec] Actualizaciones silenciosas ACTIVAS en esta red.{Colors.E}")
     else:
         pass # safe_print(f"{Colors.W}[Sec] Actualizaciones silenciosas DESACTIVADAS.{Colors.E}")
