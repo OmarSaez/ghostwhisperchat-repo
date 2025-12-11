@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-APP_VER_NUM = 36.1
-APP_VER_TAG = "Carpeta: Fix & Hash"
+APP_VER_NUM = 36.3
+APP_VER_TAG = "Full Routing Fix"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 import socket, threading, subprocess, sys, os, time, platform, atexit, re, signal, ctypes, shutil
@@ -561,8 +561,9 @@ def check_network_trust():
     
     return False # Should not reach
 
-def show_help():
-    print(f" {Colors.BO}--- AYUDA Y COMANDOS ---{Colors.E}")
+def show_help(target_cid=None):
+    lines = []
+    lines.append(f" {Colors.BO}--- AYUDA Y COMANDOS ---{Colors.E}")
     
     cats = {
         "GESTIÓN DE CHATS": [
@@ -595,11 +596,15 @@ def show_help():
     }
 
     for cat_name, cmds in cats.items():
-        print(f"\n {Colors.C}:: {cat_name} ::{Colors.E}")
+        lines.append(f"\n {Colors.C}:: {cat_name} ::{Colors.E}")
         for c, d in cmds: 
-            print(f"   {Colors.BO}{c:<35}{Colors.E} : {d}")
+            lines.append(f"   {Colors.BO}{c:<35}{Colors.E} : {d}")
 
-    print("-" * 60)
+    lines.append("-" * 60)
+    
+    full_msg = "\n".join(lines)
+    if target_cid: reply_print(full_msg, target_cid)
+    else: safe_print(full_msg)
 
 def get_peer_name(ip):
     p = PEERS.get(ip)
@@ -881,16 +886,16 @@ def find_global(t):
 
     return None
 
-def scan_network():
+def scan_network(target_cid=None):
     global SCAN_RESULTS
-    safe_print(f"{Colors.W}[*] Escaneando red local (2s)...{Colors.E}")
+    reply_print(f"{Colors.W}[*] Escaneando red local (2s)...{Colors.E}", target_cid)
     SCAN_RESULTS = []; u = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); u.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
     u.sendto(build_packet("WHO_ALL"), ('255.255.255.255', UDP_PORT)); u.close(); time.sleep(2)
 
-    safe_print(f"{Colors.G}[*] Equipos Encontrados ({len(SCAN_RESULTS)}):{Colors.E}")
+    reply_print(f"{Colors.G}[*] Equipos Encontrados ({len(SCAN_RESULTS)}):{Colors.E}", target_cid)
     for res in SCAN_RESULTS:
-        safe_print(f"   > {Colors.BO}{res['nick']}{Colors.E} ({res['ip']}) [{res['status']}]")
-    if not SCAN_RESULTS: safe_print("   (Ninguno visible)")
+        reply_print(f"   > {Colors.BO}{res['nick']}{Colors.E} ({res['ip']}) [{res['status']}]", target_cid)
+    if not SCAN_RESULTS: reply_print("   (Ninguno visible)", target_cid)
 
 def leave_sess(silent=False, exclude_ip=None, target_cid=None):
     global PEERS, PEER_STATUSES, CURRENT_CHAT_ID
@@ -1595,10 +1600,10 @@ def check_repo_update():
 
 # ... existing code ...
 
-def toggle_autostart(enable):
+def toggle_autostart(enable, target_cid=None):
     """Activa o desactiva el inicio automático en Linux (.config/autostart)"""
     if platform.system() != "Linux":
-        return safe_print(f"{Colors.F}[!] Solo disponible en Linux por ahora.{Colors.E}")
+        return reply_print(f"{Colors.F}[!] Solo disponible en Linux por ahora.{Colors.E}", target_cid)
         
     autostart_dir = os.path.expanduser("~/.config/autostart")
     desktop_file = os.path.join(autostart_dir, "inter_chat_auto.desktop")
@@ -1627,18 +1632,18 @@ Comment=Auto-start InterChat Lobby
             # Dar permisos de ejecución al script por si acaso
             # os.chmod(script, 0o755) # Comentado: Falla en /usr/bin/ si no eres root. Ya debería ser ejecutable.
             
-            safe_print(f"{Colors.G}[✔] Autolevantado ACTIVADO (Inicio de sesión).{Colors.E}")
+            reply_print(f"{Colors.G}[✔] Autolevantado ACTIVADO (Inicio de sesión).{Colors.E}", target_cid)
         except Exception as e:
-            safe_print(f"{Colors.F}[!] Error activando autostart: {e}{Colors.E}")
+            reply_print(f"{Colors.F}[!] Error activando autostart: {e}{Colors.E}", target_cid)
     else:
         try:
             if os.path.exists(desktop_file):
                 os.remove(desktop_file)
-                safe_print(f"{Colors.W}[✔] Autolevantado DESACTIVADO.{Colors.E}")
+                reply_print(f"{Colors.W}[✔] Autolevantado DESACTIVADO.{Colors.E}", target_cid)
             else:
-                safe_print(f"{Colors.W}[!] No estaba activado.{Colors.E}")
+                reply_print(f"{Colors.W}[!] No estaba activado.{Colors.E}", target_cid)
         except Exception as e:
-            safe_print(f"{Colors.F}[!] Error desactivando: {e}{Colors.E}")
+            reply_print(f"{Colors.F}[!] Error desactivando: {e}{Colors.E}", target_cid)
 
 # --- COMANDOS LOBBY CENTRALIZADOS ---
 def exec_lobby_cmd(inp, origin_cid=None):
@@ -1766,23 +1771,23 @@ def exec_lobby_cmd(inp, origin_cid=None):
         # Bueno, el refresco de UI lo maneja lobby, pero el title bar...
         set_terminal_title(f"GWC Lobby - {MY_NICK}")
 
-    elif cmd_key == 'LOG_ON': LOG_ON=True; save_config(); msg_print(f"{Colors.G}LOG ON - Historial activado.{Colors.E}")
-    elif cmd_key == 'LOG_OFF': LOG_ON=False; save_config(); msg_print(f"{Colors.W}LOG OFF - Historial desactivado.{Colors.E}")
-    elif cmd_key == 'POP_OFF': POPUP_ON, USER_OFF = False, True; msg_print(f"{Colors.W}Mute Manual.{Colors.E}")
-    elif cmd_key == 'POP_ON': POPUP_ON, USER_OFF = True, False; msg_print(f"{Colors.G}Popups ON.{Colors.E}")
+    elif cmd_key == 'LOG_ON': LOG_ON=True; save_config(); reply_print(f"{Colors.G}LOG ON - Historial activado.{Colors.E}", origin_cid)
+    elif cmd_key == 'LOG_OFF': LOG_ON=False; save_config(); reply_print(f"{Colors.W}LOG OFF - Historial desactivado.{Colors.E}", origin_cid)
+    elif cmd_key == 'POP_OFF': POPUP_ON, USER_OFF = False, True; reply_print(f"{Colors.W}Mute Manual.{Colors.E}", origin_cid)
+    elif cmd_key == 'POP_ON': POPUP_ON, USER_OFF = True, False; reply_print(f"{Colors.G}Popups ON.{Colors.E}", origin_cid)
     
     # Auto Download
     elif cmd_key == 'DL_ON':
         AUTO_DL = True; save_config()
-        msg_print(f"{Colors.G}[✔] Descarga automática ACTIVADA.{Colors.E}")
+        reply_print(f"{Colors.G}[✔] Descarga automática ACTIVADA.{Colors.E}", origin_cid)
         
     elif cmd_key == 'DL_OFF':
         AUTO_DL = False; save_config()
-        msg_print(f"{Colors.W}[✔] Descarga automática DESACTIVADA (Se preguntará).{Colors.E}")
+        reply_print(f"{Colors.W}[✔] Descarga automática DESACTIVADA (Se preguntará).{Colors.E}", origin_cid)
 
     # AutoStart Commands
-    elif cmd_key == 'AUTOSTART_ON': toggle_autostart(True)
-    elif cmd_key == 'AUTOSTART_OFF': toggle_autostart(False)
+    elif cmd_key == 'AUTOSTART_ON': toggle_autostart(True, origin_cid)
+    elif cmd_key == 'AUTOSTART_OFF': toggle_autostart(False, origin_cid)
     
     elif cmd_key == 'CLEAR':
         global LOBBY_HISTORY
@@ -1933,7 +1938,7 @@ def exec_lobby_cmd(inp, origin_cid=None):
             reply_print(f"{Colors.W}Nada que rechazar.{Colors.E}", origin_cid)
 
     elif cmd_key == 'HELP':
-        show_help()
+        show_help(origin_cid)
 
     elif cmd_key == 'SHORTCUTS':
         # Nueva funcionalidad v34.0
@@ -2478,6 +2483,8 @@ def run_child(cid, ctype, remote, password, mynick, mystatus, myport, rnick="?")
     CURRENT_CHAT_ID = cid
     
     lazy_import() # Ensure libs are loaded in child too
+    global hashlib
+    import hashlib # v36.2 Fix: Explicit import in child
     
     MY_NICK = mynick
     MY_STATUS = mystatus
@@ -2600,7 +2607,7 @@ def run_child(cid, ctype, remote, password, mynick, mystatus, myport, rnick="?")
             # Send TCP Msg
             # ... (Resto del código original de envio de mensaje)
             
-            print(f"{Colors.WH}Tú: {inp}{Colors.E}")
+            # print(f"{Colors.WH}Tú: {inp}{Colors.E}") # Fix double echo
             
             if ctype == 'GROUP':
                  send_cmd_all("GRP_MSG", remote, inp)
