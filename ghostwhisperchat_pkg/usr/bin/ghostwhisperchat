@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-APP_VER_NUM = 36.7
-APP_VER_TAG = "Version APT"
+APP_VER_NUM = 36.8
+APP_VER_TAG = "Debug & Threaded Spawn"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 import socket, threading, subprocess, sys, os, time, platform, atexit, re, signal, ctypes, shutil
@@ -273,9 +273,22 @@ def write_log(txt, type="MSG"):
 KNOWN_USERS = {} # {ip: {nick, status, t}}
 LOBBY_HISTORY = [] # Buffer para repintar la UI
 DISC_TEMP = [] # Buffer para descubrimiento (Scan)
+DEBUG_MODE = False # v36.8
 
 # --- PROTOCOLO v27.0 ---
 PKT_PREFIX = "[CMD]"
+SEP = "|"
+
+# --- UTILS VISUALES ---
+def safe_print(msg):
+    """Thread-safe print"""
+    try:
+        sys.stdout.write(msg + '\n')
+    except: pass
+
+def debug_log(msg):
+    if DEBUG_MODE:
+        safe_print(f"{Colors.M}[DEBUG] {msg}{Colors.E}")
 TAG_MARK = "<TAG>"
 LEN_MARK = "<LEN>"
 
@@ -1248,6 +1261,7 @@ def tcp_loop():
                     # BLOCK MODULAR DE COMANDOS
                     if cmd == "INVITE":
                         # args: NICK, TYPE, (GID, GPASS, MEMBERS if group)
+                        debug_log(f"Received INVITE from {ip}")
                         if len(args) >= 2:
                             nick, type = args[0], args[1]
                             extra = None
@@ -1262,6 +1276,7 @@ def tcp_loop():
 
                     elif cmd == "INVITE_ACC":
                         # args: R_NICK, R_STATUS
+                        debug_log(f"Received INVITE_ACC from {ip}")
                         if len(args) >= 2:
                              r_nick, r_stat = args[0], args[1]
                              
@@ -1276,11 +1291,13 @@ def tcp_loop():
                              if ip not in PEERS: PEERS[ip] = {'nick': r_nick, 'chats': set()}
                              if isinstance(PEERS[ip], dict):
                                  PEERS[ip]['chats'].add(cid)
+                                 debug_log(f"Linked IP {ip} to CID {cid}")
                              
                              # TRUSTED PEERS (Add logic)
                              TRUSTED_PEERS.add(ip); save_config()
 
-                             spawn_child_process(cid, cdata)
+                             # Threading spawn to avoid blocking TCP loop (Fix Slowness)
+                             threading.Thread(target=spawn_child_process, args=(cid, cdata)).start()
                              refresh_ui(f"{Colors.G}[*] {r_nick} aceptó tu invitación.{Colors.E}")
                              
                              # TRIGGER UPDATE CHECK (Private)
@@ -1450,27 +1467,29 @@ def tcp_loop():
                             threading.Thread(target=dl_file, args=(fname, fsize, c, get_peer_name(ip), ip, fhash, ftype)).start()
                             c = None # Prevent close in finally
 
-                else:
-                    # 2. NO ES COMANDO V27 -> Mensaje de Chat Privado (Texto Plano)
-                    # Asumimos que es un mensaje de chat privado
-
-                    # Identificar chat privado origen
-                    target_cid = None
-                    pdata = PEERS.get(ip)
-                    if pdata:
-                        for cid in pdata.get('chats', set()):
-                             if cid in ACTIVE_CHATS and ACTIVE_CHATS[cid]['type'] == 'PRIV':
-                                 target_cid = cid
-                                 break
-
-                    curr_nick = PEERS.get(ip, {}).get('nick', '?')
-                    tag = f"[{get_col(curr_nick)}{curr_nick}{Colors.E}]"
-
-                    if target_cid and 'port' in ACTIVE_CHATS[target_cid]:
-                         send_ipc(f"FWD_MSG{SEP}{target_cid}{SEP}{tag}{SEP}{raw}{SEP}{ip}", ACTIVE_CHATS[target_cid]['port'])
-                         write_log(f"[{curr_nick}] (FWD {target_cid}): {raw}", "CHAT")
                     else:
-                        safe_print(f"{tag}: {raw}"); popup(f"MSG: {curr_nick}", raw, source_ip=ip); write_log(f"[{curr_nick}]: {raw}", "CHAT")
+                        # 2. NO ES COMANDO V27 -> Mensaje de Chat Privado (Texto Plano)
+                        # Asumimos que es un mensaje de chat privado
+
+                        # Identificar chat privado origen
+                        target_cid = None
+                        pdata = PEERS.get(ip)
+                        if pdata:
+                            for cid in pdata.get('chats', set()):
+                                 if cid in ACTIVE_CHATS and ACTIVE_CHATS[cid]['type'] == 'PRIV':
+                                     target_cid = cid
+                                     break
+                        
+                        curr_nick = PEERS.get(ip, {}).get('nick', '?')
+                        tag = f"[{get_col(curr_nick)}{curr_nick}{Colors.E}]"
+
+                        if target_cid and 'port' in ACTIVE_CHATS[target_cid]:
+                             send_ipc(f"FWD_MSG{SEP}{target_cid}{SEP}{tag}{SEP}{raw}{SEP}{ip}", ACTIVE_CHATS[target_cid]['port'])
+                             write_log(f"[{curr_nick}] (FWD {target_cid}): {raw}", "CHAT")
+                        else:
+                            debug_log(f"Routing fail for {ip}: TargetCID={target_cid}, Active={target_cid in ACTIVE_CHATS if target_cid else False}")
+                            if target_cid: debug_log(f"Port present: {'port' in ACTIVE_CHATS[target_cid]}")
+                            safe_print(f"{tag}: {raw}"); popup(f"MSG: {curr_nick}", raw, source_ip=ip); write_log(f"[{curr_nick}]: {raw}", "CHAT")
 
             if c: c.close()
         except Exception as e:
@@ -1959,6 +1978,19 @@ def exec_lobby_cmd(inp, origin_cid=None):
         if origin_cid: reply_print(full_msg, origin_cid)
         else: safe_print(full_msg)
 
+    elif cmd_key == 'CLEAR':
+        global LOBBY_HISTORY
+        LOBBY_HISTORY = []
+        os.system('cls' if os.name == 'nt' else 'clear')
+        if origin_cid: reply_print(f"{Colors.G}Pantalla limpiada.{Colors.E}", origin_cid) # Virtual clear msg
+        else: safe_print(f"{Colors.B}Lobby limpiado.{Colors.E}")
+        
+    elif cmd_key == 'DEBUG':
+        global DEBUG_MODE
+        DEBUG_MODE = not DEBUG_MODE
+        state = "ACTIVADO" if DEBUG_MODE else "DESACTIVADO"
+        reply_print(f"{Colors.M}[DEBUG] Modo Debug {state}.{Colors.E}", origin_cid)
+
     elif cmd_key == 'GLOBAL_STATUS':
         # v35.1 Mejorado
         lines = [f"{Colors.H}=== ESTADO GLOBAL DEL SISTEMA ==={Colors.E}"]
@@ -2070,6 +2102,7 @@ def spawn_child_process(cid, cdata):
         "--port", str(child_port),
         "--rnick", rnick
     ]
+    debug_log(f"Spawn CMD: {cmd_args}")
     
     
     if SILENT_UPDATES_ALLOWED:
