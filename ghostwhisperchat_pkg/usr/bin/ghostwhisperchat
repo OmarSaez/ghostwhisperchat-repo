@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-APP_VER_NUM = 36.9
-APP_VER_TAG = "Syntax Fix Globals"
+APP_VER_NUM = 36.12
+APP_VER_TAG = "Fix Logic INVITE_ACC"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 import socket, threading, subprocess, sys, os, time, platform, atexit, re, signal, ctypes, shutil
@@ -250,6 +250,10 @@ COMMAND_DEFS = {
     'GLOBAL_STATUS': {
         'aliases': ['--estados-globales', '--global-status', '--gst', '-gst', '--status-full'],
         'desc': 'Ver resumen de toda la configuración actual.'
+    },
+    'DEBUG': {
+        'aliases': ['--debug', '--dbg', '-dbg'],
+        'desc': 'Activar/Desactivar logs de depuración.'
     }
 }
 
@@ -310,25 +314,18 @@ def parse_packet(raw_str):
     
     try:
         # Extraer TAG
-        # [CMD]<TAG>CMD<TAG>...
-        # 01234 5
-        # split por TAG_MARK
         parts = raw_str.split(TAG_MARK) 
-        # parts[0] = "[CMD]"
-        # parts[1] = "NOMBRE_CMD"
-        # parts[2] = "<LEN>N<LEN><SEP>ARGS..."
         
-        if len(parts) < 3: return (False, None, None)
+        if len(parts) < 3: 
+            return (False, None, None)
         cmd_name = parts[1]
         
         rest = parts[2]
         # Extraer LEN
         lparts = rest.split(LEN_MARK)
-        # lparts[0] = "" (vacío si pegado a TAG, o basura)
-        # lparts[1] = "N"
-        # lparts[2] = "<SEP>ARGS..."
         
-        if len(lparts) < 3: return (False, None, None)
+        if len(lparts) < 3: 
+            return (False, None, None)
         n_args = int(lparts[1])
         
         # Args raw string está en lparts[2], pero empieza con SEP
@@ -337,20 +334,15 @@ def parse_packet(raw_str):
             args_payload = args_payload[len(SEP):]
             
         # Split args
-        # Ojo: Si n_args es 0, payload puede ser vacío
         if n_args == 0:
             args = []
         else:
             args = args_payload.split(SEP)
             
-        # Validación básica de integridad (opcional warning si difiere, pero aceptamos lo que llegue)
-        if len(args) != n_args:
-            # print(f"[WARN] Protocol mismatch: Header says {n_args}, got {len(args)}")
-            pass
-            
         return (True, cmd_name, args)
         
-    except:
+    except Exception as e:
+        debug_log(f"ParsePacket Error: {e} | Raw: {raw_str}")
         return (False, None, None)
 
 def send_cmd(ip, cmd, *args):
@@ -968,6 +960,10 @@ def start_private_chat(ip, nick, status="En línea"):
 
     PEER_STATUSES[ip] = status
     update_memory(ip, nick, status)
+    
+    # v36.12 CRITICAL FIX: Send acceptance to inviter so they open their window!
+    send_cmd(ip, "INVITE_ACC", MY_NICK, MY_STATUS)
+    
     spawn_child_process(cid, ACTIVE_CHATS[cid]) # Spawn child immediately
     refresh_ui(f"{Colors.G}[*] Chat privado con {nick} iniciado.{Colors.E}")
     return cid
@@ -1448,6 +1444,18 @@ def tcp_loop():
                     elif cmd == "VER_CHECK" or cmd == "REQ_UPDATE" or cmd == "PUSH_UPDATE" or cmd == "VER_INFO":
                          pass # Deprecated P2P Update Commands
                         
+                    elif cmd == "WHOIS":
+                        # args: SENDER_IP (Que debería coincidir con ip)
+                        # v36.11: Manejar WHOIS para evitar que caiga al lobby como texto
+                        debug_log(f"Received WHOIS from {ip}")
+                        # Actualizar nick si viene? No, WHOIS v27 solo trae IP.
+                        # Pero dispara un send_cmd INVITE_ACC?? No.
+                        # El protocolo es: Child sends WHOIS. Peer receives.
+                        # Peer should reply?
+                        # En v27 original: WHOIS -> "ACK_WHOIS"? No, se usa para discovery.
+                        # Solo actualizamos presence.
+                        pass
+
                     elif cmd == "FILE_TRANSFER":
                         # args: FNAME, SIZE, [HASH, TYPE]
                         if len(args) >= 2:
