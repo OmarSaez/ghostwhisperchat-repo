@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-APP_VER_NUM = 34.4
-APP_VER_TAG = "Help Update: Auto-Downloads"
+APP_VER_NUM = 35.0
+APP_VER_TAG = "Global Status & Autocomplete"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 import socket, threading, subprocess, sys, os, time, platform, atexit, re, signal, ctypes, shutil
@@ -245,6 +245,10 @@ COMMAND_DEFS = {
     'HELP': {
         'aliases': ['--help', '--ayuda', '-?', '--?', '--comandos'],
         'desc': 'Ver ayuda general.'
+    },
+    'GLOBAL_STATUS': {
+        'aliases': ['--estados-globales', '--global-status', '--gst', '-gst', '--status-full'],
+        'desc': 'Ver resumen de toda la configuración actual.'
     }
 }
 
@@ -562,7 +566,7 @@ def show_help():
         "GESTIÓN DE CHATS": [
             ("--chatpersonal (Nick y/o IP)", "Crear un chat privado con un usuario."),
             ("--chatgrupal ID CLAVE", "Unirse/Crear sala."), 
-            ("--invite (Nick1, Nick2...)", "Invitar gente al grupo actual."),
+            ("--invite (Nick1, Nick2...) y/o IPs", "Invitar gente al grupo actual."),
             ("--ls", "Listar usuarios CONECTADOS en el chat."), 
             ("--salir", "Desconectar de la sesión.")
         ],
@@ -575,6 +579,7 @@ def show_help():
             ("--archivo (Archivo.ext y/o Ruta)", "Enviar archivo."),
             ("--estado (Texto)", "Cambiar estado."),
             ("--descarga-si / --descarga-no", "Control descarga automática."),
+            ("--estados-globales", "Ver resumen de configuración."),
             ("--abreviaciones", "Ver todos los formatos aceptados por cada comando."),
             ("--limpiar", "Limpiar pantalla.")
         ],
@@ -1811,7 +1816,7 @@ def exec_lobby_cmd(inp, origin_cid=None):
                      reply_print(f"   > Invitación enviada a {tnick} ({ip}).", origin_cid)
                  else:
                      # Priv Logic (Upgrade?)
-                     # No se puede invitar a 3ros a un priv...
+                     # No se puede invitar a 3ros a un chat privado.
                      reply_print(f"   [!] No se puede invitar a terceros a un chat privado.", origin_cid)
              
              if unknown_nicks:
@@ -1858,7 +1863,7 @@ def exec_lobby_cmd(inp, origin_cid=None):
 
     elif cmd_key == 'SHORTCUTS':
         # Nueva funcionalidad v34.0
-        msg_lines = [f"{Colors.H}=== ABREVIACIONES Y ALIAS (Orden Alfabético) ==={Colors.E}"]
+        msg_lines = [f"{Colors.H}=== ABREVIACIONES Y ALIAS (v34.x) ==={Colors.E}"]
         msg_lines.append("") # Spacer
         
         # Ordenar keys por nombre
@@ -1872,6 +1877,31 @@ def exec_lobby_cmd(inp, origin_cid=None):
             msg_lines.append("") # Spacer entre comandos para legibilidad
         
         full_msg = "\n".join(msg_lines)
+        if origin_cid: reply_print(full_msg, origin_cid)
+        else: safe_print(full_msg)
+
+    elif cmd_key == 'GLOBAL_STATUS':
+        # v35.0
+        lines = [f"{Colors.H}=== ESTADO GLOBAL DEL SISTEMA ==={Colors.E}"]
+        lines.append(f" {Colors.BO}Usuario:{Colors.E} {MY_NICK} ({MY_IP})")
+        lines.append(f" {Colors.BO}Estado:{Colors.E} {MY_STATUS}")
+        lines.append(f" {Colors.BO}Visibilidad Red:{Colors.E} {'VISIBLE' if VISIBLE_IN_SCAN else 'OCULTO (Ghost Mode)'}")
+        lines.append(f" {Colors.BO}Auto-Descargas:{Colors.E} {'ACTIVADAS' if AUTO_DL else 'DESACTIVADAS (Preguntar)'}")
+        lines.append(f" {Colors.BO}Notificaciones:{Colors.E} {'ON' if POPUP_ON else 'OFF (Mute Global)'}")
+        lines.append(f" {Colors.BO}Guardar Historial:{Colors.E} {'ON' if LOG_ON else 'OFF'}")
+        
+        # Determine autostart status on Linux
+        auto_st = "?"
+        if platform.system() == "Linux":
+             p = os.path.expanduser("~/.config/autostart/inter_chat_auto.desktop")
+             auto_st = "ACTIVADO" if os.path.exists(p) else "DESACTIVADO"
+        else: auto_st = "N/A (No Linux)"
+        lines.append(f" {Colors.BO}Auto-Inicio (Linux):{Colors.E} {auto_st}")
+        
+        lines.append(f" {Colors.BO}Contactos Memoria:{Colors.E} {len(KNOWN_USERS)}")
+        lines.append(f" {Colors.BO}Chats Activos:{Colors.E} {len(ACTIVE_CHATS)}")
+        
+        full_msg = "\n".join(lines)
         if origin_cid: reply_print(full_msg, origin_cid)
         else: safe_print(full_msg)
 
@@ -2204,6 +2234,36 @@ def enable_win_visuals():
             kernel32.SetConsoleMode(kernel32.GetStdHandle(-11), 7)
         except: pass
 
+def setup_autocomplete():
+    """Configura el autocompletado para la línea de comandos del lobby."""
+    if platform.system() != "Windows": # Readline no está disponible en Windows por defecto
+        try:
+            import readline
+            
+            # Obtener todos los comandos y sus alias
+            all_commands = []
+            for cmd_key, data in COMMAND_DEFS.items():
+                all_commands.append(f"--{cmd_key.lower()}") # Comando principal
+                for alias in data['aliases']:
+                    if alias.startswith('--'):
+                        all_commands.append(alias)
+            
+            # Función de autocompletado
+            def completer(text, state):
+                options = [i for i in all_commands if i.startswith(text)]
+                if state < len(options):
+                    return options[state]
+                else:
+                    return None
+
+            readline.set_completer(completer)
+            readline.parse_and_bind("tab: complete")
+            safe_print(f"{Colors.G}[✔] Autocompletado activado (presiona TAB).{Colors.E}")
+        except ImportError:
+            safe_print(f"{Colors.W}[!] Módulo 'readline' no encontrado. Autocompletado no disponible.{Colors.E}")
+        except Exception as e:
+            safe_print(f"{Colors.F}[!] Error al configurar autocompletado: {e}{Colors.E}")
+
 def run_lobby():
     global MY_NICK, MY_STATUS, MY_IP, LAST_ACT, PENDING_INVITE
     # atexit.register(lambda: print(f"{Colors.W}Lobby cerrado.{Colors.E}")) # Reemplazado por shutdown manual
@@ -2251,6 +2311,9 @@ def run_lobby():
     # Aseguramos limpieza al inicio también por si acaso
     restore_terminal()
     
+    # Setup Autocomplete (v35.0)
+    setup_autocomplete()
+
     threading.Thread(target=ipc_listen_parent, daemon=True).start()
     threading.Thread(target=tcp_loop, daemon=True).start() # Para recibir invitaciones
     threading.Thread(target=udp_loop, daemon=True).start() # Para discovery global
