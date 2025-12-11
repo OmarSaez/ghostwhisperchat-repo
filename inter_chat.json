@@ -6,7 +6,7 @@
             "t": 1765393203.921489
         }
     },
-    "nick": "Omar-laptop",
+    "nick": "Omar-Laptop",
     "status": "En l\u00ednea",
     "visible": true,
     "log_on": false,
@@ -29,7 +29,7 @@
         },
         "192.168.1.1_TP-Link-O": {
             "trusted": true,
-            "last_seen": 1765414867.7414577,
+            "last_seen": 1765415299.8456447,
             "name": "192.168.1.1_TP-Link-O"
         }
     },

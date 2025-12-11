@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-APP_VER_NUM = 34.2
-APP_VER_TAG = "Abreviaciones: Clean UI"
+APP_VER_NUM = 34.3
+APP_VER_TAG = "Restored DL & Log Fixes"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 import socket, threading, subprocess, sys, os, time, platform, atexit, re, signal, ctypes, shutil
@@ -213,6 +213,14 @@ COMMAND_DEFS = {
     'AUTOSTART_OFF': {
         'aliases': ['--autolevantado-no', '--boot-off', '--startup-off'],
         'desc': 'No iniciar app al arrancar.'
+    },
+    'DL_ON': {
+        'aliases': ['--descarga-si', '--dl-si', '--dl-on', '--auto-dl-on', '--descarga-automatica-si'],
+        'desc': 'Aceptar descargas automáticamente (Sin preguntar).'
+    },
+    'DL_OFF': {
+        'aliases': ['--descarga-no', '--dl-no', '--dl-off', '--auto-dl-off', '--descarga-automatica-no'],
+        'desc': 'Preguntar antes de descargar cada archivo.'
     },
     'ACCEPT': {
         'aliases': ['--aceptar', '--accept', '--ok', '-y', '--y', '--yes', '--acc'],
@@ -1678,11 +1686,20 @@ def exec_lobby_cmd(inp, origin_cid=None):
         # Bueno, el refresco de UI lo maneja lobby, pero el title bar...
         set_terminal_title(f"GWC Lobby - {MY_NICK}")
 
-    elif cmd_key == 'LOG_ON': LOG_ON=True; save_config(); msg_print(f"{Colors.G}LOG ON{Colors.E}")
-    elif cmd_key == 'LOG_OFF': LOG_ON=False; save_config(); msg_print(f"{Colors.W}LOG OFF{Colors.E}")
+    elif cmd_key == 'LOG_ON': LOG_ON=True; save_config(); msg_print(f"{Colors.G}LOG ON - Historial activado.{Colors.E}")
+    elif cmd_key == 'LOG_OFF': LOG_ON=False; save_config(); msg_print(f"{Colors.W}LOG OFF - Historial desactivado.{Colors.E}")
     elif cmd_key == 'POP_OFF': POPUP_ON, USER_OFF = False, True; msg_print(f"{Colors.W}Mute Manual.{Colors.E}")
     elif cmd_key == 'POP_ON': POPUP_ON, USER_OFF = True, False; msg_print(f"{Colors.G}Popups ON.{Colors.E}")
     
+    # Auto Download
+    elif cmd_key == 'DL_ON':
+        AUTO_DL = True; save_config()
+        msg_print(f"{Colors.G}[✔] Descarga automática ACTIVADA.{Colors.E}")
+        
+    elif cmd_key == 'DL_OFF':
+        AUTO_DL = False; save_config()
+        msg_print(f"{Colors.W}[✔] Descarga automática DESACTIVADA (Se preguntará).{Colors.E}")
+
     # AutoStart Commands
     elif cmd_key == 'AUTOSTART_ON': toggle_autostart(True)
     elif cmd_key == 'AUTOSTART_OFF': toggle_autostart(False)
