@@ -2306,8 +2306,8 @@ def liberate_ports():
     try:
         if platform.system() == "Linux":
             for p in ports:
-                 subprocess.run(f"fuser -k {p}/tcp", shell=True, stderr=subprocess.DEVNULL)
-                 subprocess.run(f"fuser -k {p}/udp", shell=True, stderr=subprocess.DEVNULL)
+                subprocess.run(f"fuser -k {p}/tcp", shell=True, stderr=subprocess.DEVNULL)
+                subprocess.run(f"fuser -k {p}/udp", shell=True, stderr=subprocess.DEVNULL)
         elif platform.system() == "Windows":
              for p in ports:
                  try:
