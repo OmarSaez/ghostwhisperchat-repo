@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-APP_VER_NUM = 36.8
-APP_VER_TAG = "Debug & Threaded Spawn"
+APP_VER_NUM = 36.9
+APP_VER_TAG = "Syntax Fix Globals"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 import socket, threading, subprocess, sys, os, time, platform, atexit, re, signal, ctypes, shutil
@@ -1667,6 +1667,7 @@ Comment=Auto-start InterChat Lobby
 # --- COMANDOS LOBBY CENTRALIZADOS ---
 def exec_lobby_cmd(inp, origin_cid=None):
     global MY_NICK, MY_STATUS, MY_IP, LAST_ACT, PENDING_INVITE, VISIBLE_IN_SCAN, LOG_ON, AUTO_DL, POPUP_ON, USER_OFF
+    global LOBBY_HISTORY, DEBUG_MODE # v36.9 Fix SyntaxError
 
     inp = inp.strip()
     if not inp: return
@@ -1979,14 +1980,14 @@ def exec_lobby_cmd(inp, origin_cid=None):
         else: safe_print(full_msg)
 
     elif cmd_key == 'CLEAR':
-        global LOBBY_HISTORY
+        # global LOBBY_HISTORY -> Moved to top
         LOBBY_HISTORY = []
         os.system('cls' if os.name == 'nt' else 'clear')
         if origin_cid: reply_print(f"{Colors.G}Pantalla limpiada.{Colors.E}", origin_cid) # Virtual clear msg
         else: safe_print(f"{Colors.B}Lobby limpiado.{Colors.E}")
         
     elif cmd_key == 'DEBUG':
-        global DEBUG_MODE
+        # global DEBUG_MODE -> Moved to top
         DEBUG_MODE = not DEBUG_MODE
         state = "ACTIVADO" if DEBUG_MODE else "DESACTIVADO"
         reply_print(f"{Colors.M}[DEBUG] Modo Debug {state}.{Colors.E}", origin_cid)
