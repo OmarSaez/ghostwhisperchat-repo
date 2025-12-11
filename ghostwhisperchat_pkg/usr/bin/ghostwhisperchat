@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-APP_VER_NUM = 36.4
-APP_VER_TAG = "Debug Child Spawn"
+APP_VER_NUM = 36.7
+APP_VER_TAG = "Version APT"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 import socket, threading, subprocess, sys, os, time, platform, atexit, re, signal, ctypes, shutil
