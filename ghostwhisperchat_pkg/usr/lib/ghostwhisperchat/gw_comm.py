@@ -81,7 +81,6 @@ def send_udp_cmd_all(cmd, *args):
             s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
             s.sendto(data, ('255.255.255.255', UDP_PORT))
     except: pass
-    except: pass
 
 # v37.8: TCP Logic moved here
 TCP_PORT = 44494
