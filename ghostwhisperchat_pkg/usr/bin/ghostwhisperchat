@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-APP_VER_NUM = 37.4
-APP_VER_TAG = "Spanish Debug & Analysis"
+APP_VER_NUM = 37.5
+APP_VER_TAG = "Fix GUI Loop"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 import socket, threading, subprocess, sys, os, time, platform, atexit, re, signal, ctypes, shutil
@@ -1066,7 +1066,9 @@ def handle_invite_logic(ip, nick, type, extra_data=None):
         while time.time() - start_t < 30: # 30s timeout
             if proc.poll() is not None:
                 answered = True
-                pass
+                debug_log(f"[INVITE_LOGIC] GUI process finished (Return Code: {proc.returncode})")
+                break
+            time.sleep(0.5) # Evitar consumo CPU 100%
 
         if answered:
             if proc.returncode == 0: # YES
@@ -1689,7 +1691,7 @@ def exec_lobby_cmd(inp, origin_cid=None):
             if t == MY_IP: reply_print(f"{Colors.F}Eres tú.{Colors.E}", origin_cid)
             else:
                 reply_print(f"{Colors.W}[*] Invitando...{Colors.E}", origin_cid)
-                debug_log(f"[CMD] Enviando comando INVITE a {t} (Nick: {MY_NICK})")
+                debug_log(f"[CMD] Enviando comando INVITE a IP={t} (Contenido del paquete: MiNick={MY_NICK})")
                 send_cmd(t, "INVITE", MY_NICK, "PRIV", MY_STATUS)
 
     # --- COMANDOS GLOBALES / UTILIDADES ---

@@ -1,30 +1,4 @@
 Package: ghostwhisperchat
-Version: 37.2
-Architecture: all
-Maintainer: Omar Saez <omar.saez@usach.cl>
-Filename: pool/main/g/ghostwhisperchat/ghostwhisperchat_37.2_all.deb
-Size: 30988
-MD5sum: 6a5be22ec1040a222c1217fcde04152b
-SHA1: 83a0e99f3c0205aebe673440b0e06b25d2a0cc49
-SHA256: d62cab69f1cc5741b1d3e8073d73f5cd70ddd52d5d43e20e6f7ae6b3e7759d68
-Section: net
-Priority: optional
-Description: GhostWhisperChat - Chat LAN silencioso para comunicación 1 a 1 y grupos.
-
-Package: ghostwhisperchat
-Version: 37.3
-Architecture: all
-Maintainer: Omar Saez <omar.saez@usach.cl>
-Filename: pool/main/g/ghostwhisperchat/ghostwhisperchat_37.3_all.deb
-Size: 31104
-MD5sum: f3df4397799a63609605e6ce266fc736
-SHA1: d2c6316f85b406ef5f4ce8f480239c08a87cf4f9
-SHA256: 7e4804d8b33595e1b221d231be8354799b163d53563e78ef47ae7f9c1e8ad0c5
-Section: net
-Priority: optional
-Description: GhostWhisperChat - Chat LAN silencioso para comunicación 1 a 1 y grupos.
-
-Package: ghostwhisperchat
 Version: 37.4
 Architecture: all
 Maintainer: Omar Saez <omar.saez@usach.cl>
@@ -33,6 +7,32 @@ Size: 31216
 MD5sum: 87c1b19e1b0531cbefff507396e5b798
 SHA1: a6e4ab3770eadb1b73ef91d5d772e4490d583397
 SHA256: c2e7b418f70fb7caab75431935374bec740bb82b4228ac7891e788fd3c9959e0
+Section: net
+Priority: optional
+Description: GhostWhisperChat - Chat LAN silencioso para comunicación 1 a 1 y grupos.
+
+Package: ghostwhisperchat
+Version: 37.5
+Architecture: all
+Maintainer: Omar Saez <omar.saez@usach.cl>
+Filename: pool/main/g/ghostwhisperchat/ghostwhisperchat_37.5_all.deb
+Size: 31256
+MD5sum: f4d4cd42e386dd49d5720a6c7491069d
+SHA1: 6edb327bf80004067b25f2b3f7932022f6d7b6b8
+SHA256: 7f70c61291d18a8b984ad319c73130b6f6cb10460e2e9998af3d8f133f139866
+Section: net
+Priority: optional
+Description: GhostWhisperChat - Chat LAN silencioso para comunicación 1 a 1 y grupos.
+
+Package: ghostwhisperchat
+Version: 37.6
+Architecture: all
+Maintainer: Omar Saez <omar.saez@usach.cl>
+Filename: pool/main/g/ghostwhisperchat/ghostwhisperchat_37.6_all.deb
+Size: 31268
+MD5sum: 0c4e8082d557030b04a50685e3e73ad8
+SHA1: 1ec9d26526c43bc32ec2a94cb1bf75ae8d043957
+SHA256: a506759779419dee4e6b16283495e760dd9e5f6af60441df9bfb0b69654d803c
 Section: net
 Priority: optional
 Description: GhostWhisperChat - Chat LAN silencioso para comunicación 1 a 1 y grupos.
