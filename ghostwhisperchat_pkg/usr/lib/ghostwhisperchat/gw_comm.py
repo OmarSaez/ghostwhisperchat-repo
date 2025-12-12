@@ -7,6 +7,8 @@ SEP = "|"
 TAG_MARK = "<TAG>"
 LEN_MARK = "<LEN>"
 UDP_PORT = 44495
+TCP_PORT = 44494 # v37.8 Added TCP Port
+
 
 def build_packet(cmd_name, *args):
     """
@@ -79,3 +81,34 @@ def send_udp_cmd_all(cmd, *args):
             s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
             s.sendto(data, ('255.255.255.255', UDP_PORT))
     except: pass
+    except: pass
+
+# v37.8: TCP Logic moved here
+TCP_PORT = 44494
+
+def send_tcp_packet(ip, data):
+    """Envia datos raw via TCP (Reliable)"""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(2); s.connect((ip, TCP_PORT))
+        if isinstance(data, str): s.send(data.encode())
+        else: s.send(data)
+        s.close()
+    except: pass
+
+def send_cmd(ip, cmd, *args):
+    """
+    Wrapper inteligente: Elige TCP o UDP según el tipo de comando.
+    """
+    udp_cmds = ["WHO_ALL", "IAM_HERE", "WHOIS", "USER_HERE", "SEARCH_GROUP", "I_EXIST"]
+    
+    if cmd in udp_cmds:
+        send_udp_cmd(ip, cmd, *args)
+    else:
+        # Por defecto TCP (INVITE, INVITE_ACC, INVITE_REJ, etc)
+        pkt = build_packet(cmd, *args)
+        send_tcp_packet(ip, pkt)
+
+def send_cmd_all(cmd, *args):
+    """Broadcast UDP a todos"""
+    send_udp_cmd_all(cmd, *args)

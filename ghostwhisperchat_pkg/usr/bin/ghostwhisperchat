@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-APP_VER_NUM = 37.5
-APP_VER_TAG = "Fix GUI Loop"
+APP_VER_NUM = 37.8
+APP_VER_TAG = "Full gw_comm Integration"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 import socket, threading, subprocess, sys, os, time, platform, atexit, re, signal, ctypes, shutil
@@ -315,15 +315,16 @@ def debug_log(msg):
         safe_print(f"{Colors.M}[DEBUG] {msg}{Colors.E}")
 
 # --- PROTOCOLO (Delegado a gw_comm) ---
-# build_packet y parse_packet eliminados de aquí
-
+# --- PROTOCOLO (Delegado a gw_comm) ---
+# Funciones redirigidas totalmente al módulo
 def send_cmd(ip, cmd, *args):
-    """Wrapper para enviar comandos UDP usando gw_comm"""
-    gw_comm.send_udp_cmd(ip, cmd, *args)
+    gw_comm.send_cmd(ip, cmd, *args)
 
 def send_cmd_all(cmd, *args):
-    """Helper para enviar comando a todos (STATUS, etc)"""
-    gw_comm.send_udp_cmd_all(cmd, *args)
+    gw_comm.send_cmd_all(cmd, *args)
+
+def send_raw(ip, d):
+    gw_comm.send_tcp_packet(ip, d)
 
 def get_col(n): return Colors.PALETTE[sum(ord(c) for c in n) % len(Colors.PALETTE)] if n else Colors.WH
 
@@ -660,18 +661,7 @@ def fw_cfg():
     elif platform.system() == "Windows":
         subprocess.run(["powershell", f"Start-Process cmd -Verb RunAs -ArgumentList '/c netsh advfirewall firewall add rule name=\"CyberDEI\" dir=in action=allow protocol=ANY localport=\"{TCP_PORT},{UDP_PORT}\"'"], shell=True)
 
-def send_raw(ip, d):
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.settimeout(2); s.connect((ip, TCP_PORT))
-        if isinstance(d, str): s.send(d.encode())
-        else: s.send(d)
-        s.close()
-    except:
-        if ip in PEERS:
-             # No borrar inmediatamente en error temporal, o manejar mejor
-             pass
-
+# send_raw eliminado (Replaced by alias above)
 def send_all(d, targets=None):
     if targets is None:
         # Enviar solo a usuarios del chat actual
