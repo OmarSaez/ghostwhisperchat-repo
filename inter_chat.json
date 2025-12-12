@@ -4,6 +4,11 @@
             "nick": "neymar",
             "status": "En l\u00ednea",
             "t": 1765393203.921489
+        },
+        "192.168.1.227": {
+            "nick": "Omar-pc",
+            "status": "En l\u00ednea",
+            "t": 1765510473.5725281
         }
     },
     "nick": "Omar-Laptop",
@@ -29,7 +34,7 @@
         },
         "192.168.1.1_TP-Link-O": {
             "trusted": true,
-            "last_seen": 1765420300.7326345,
+            "last_seen": 1765510499.46635,
             "name": "192.168.1.1_TP-Link-O"
         }
     },
