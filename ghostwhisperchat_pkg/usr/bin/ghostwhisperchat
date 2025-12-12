@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-APP_VER_NUM = 37.12
-APP_VER_TAG = "Logs on Desktop & TCP Debug"
+APP_VER_NUM = 37.13
+APP_VER_TAG = "Debug Persist & Hist++"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 import socket, threading, subprocess, sys, os, time, platform, atexit, re, signal, ctypes, shutil
@@ -326,7 +326,14 @@ def safe_print(msg):
 
 def debug_log(msg):
     if DEBUG_MODE:
-        safe_print(f"{Colors.M}[DEBUG] {msg}{Colors.E}")
+        s = f"{Colors.M}[DEBUG] {msg}{Colors.E}"
+        safe_print(s)
+        # v37.13: Persist debug to file
+        try:
+             dsk = get_desktop_path()
+             with open(os.path.join(dsk, "gwc_lobby_debug.log"), "a", encoding="utf-8") as f:
+                 f.write(f"[{time.time()}] {msg}\n")
+        except: pass
 
 # --- PROTOCOLO (Delegado a gw_comm) ---
 # --- PROTOCOLO (Delegado a gw_comm) ---
@@ -603,11 +610,10 @@ def get_peer_name(ip):
         return p.get('nick', ip)
     return ip
 
-def msg_print(txt):
     """Imprime y guarda en historial para repintado"""
     safe_print(txt)
     # LOBBY_HISTORY append is handled by safe_print now
-    if len(LOBBY_HISTORY) > 50: LOBBY_HISTORY.pop(0)
+    if len(LOBBY_HISTORY) > 200: LOBBY_HISTORY.pop(0) # v37.13 Increased limit
 
 def refresh_ui(msg=None):
     os.system('cls' if os.name == 'nt' else 'clear')
