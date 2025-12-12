@@ -1,5 +1,7 @@
 import socket
 import sys
+import os
+import time
 
 # --- CONSTANTS v27.0 ---
 PKT_PREFIX = "[CMD]"
@@ -93,7 +95,10 @@ def send_tcp_packet(ip, data):
         if isinstance(data, str): s.send(data.encode())
         else: s.send(data)
         s.close()
-    except: pass
+    except Exception as e:
+        print(f"[GW_COMM] TCP Error to {ip}: {e}")
+        # traceback.print_exc() if imported
+        pass
 
 def send_cmd(ip, cmd, *args):
     """
