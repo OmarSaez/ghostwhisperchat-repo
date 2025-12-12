@@ -1,25 +1,45 @@
 #!/usr/bin/env python3
-APP_VER_NUM = 36.12
-APP_VER_TAG = "Fix Logic INVITE_ACC"
+APP_VER_NUM = 37.1
+APP_VER_TAG = "Restore Legacy Ports"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 import socket, threading, subprocess, sys, os, time, platform, atexit, re, signal, ctypes, shutil
-# Lazy imports for performance
-json = None
-difflib = None
-urllib = None
-unicodedata = None
-request = None
-hashlib = None # v36.0
+import json, difflib
+import urllib.request # Lazy loaded usually, but kept for updater
+import uuid
+import unicodedata
 
-try: import readline
-except ImportError: pass 
+# v37.0: Modularización
+LIB_PATH = "/usr/lib/ghostwhisperchat"
+if os.path.exists(LIB_PATH):
+    sys.path.append(LIB_PATH)
+    try:
+        import gw_comm
+    except ImportError:
+        print("Error: gw_comm module not found in /usr/lib/ghostwhisperchat")
+        sys.exit(1)
+else:
+    # Dev fallback (Current dir?)
+    sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+    try:
+        import gw_comm
+    except:
+        # Fallback for dev environment without install
+        if os.path.exists("ghostwhisperchat_pkg/usr/lib/ghostwhisperchat"):
+             sys.path.append("ghostwhisperchat_pkg/usr/lib/ghostwhisperchat")
+             import gw_comm
+        else:
+             # Last resort: define basic dummies to not crash editor (but run will fail)
+             pass
 
-# --- CONFIGURACIÓN & GLOBALES ---
-TCP_PORT, UDP_PORT = 44494, 44495
-IPC_PORT = 5000
-BUFFER, SEP, LOG_FILE, CONFIG_FILE = 4096, "<SEPARATOR>", "cyberdei_history.log", "cyberdei_config.json"
-BUFFER, SEP, LOG_FILE, CONFIG_FILE = 4096, "<SEPARATOR>", "cyberdei_history.log", "cyberdei_config.json"
+from gw_comm import PKT_PREFIX, SEP, TAG_MARK, LEN_MARK, UDP_PORT
+from gw_comm import build_packet, parse_packet
+
+# --- CONFIGURACIÓN ---
+TCP_PORT = 44494
+IPC_PORT = 5000 # Puerto base para IPC (Hijos) -> UDP
+multicast_group = ('224.0.0.1', 44496) # Multicast opcional (futuro)
+BUFFER, LOG_FILE, CONFIG_FILE = 4096, "cyberdei_history.log", "cyberdei_config.json"
 
 # Detectar Escritorio
 def get_desktop_path():
@@ -279,10 +299,6 @@ LOBBY_HISTORY = [] # Buffer para repintar la UI
 DISC_TEMP = [] # Buffer para descubrimiento (Scan)
 DEBUG_MODE = False # v36.8
 
-# --- PROTOCOLO v27.0 ---
-PKT_PREFIX = "[CMD]"
-SEP = "|"
-
 # --- UTILS VISUALES ---
 def safe_print(msg):
     """Thread-safe print"""
@@ -293,67 +309,18 @@ def safe_print(msg):
 def debug_log(msg):
     if DEBUG_MODE:
         safe_print(f"{Colors.M}[DEBUG] {msg}{Colors.E}")
-TAG_MARK = "<TAG>"
-LEN_MARK = "<LEN>"
 
-def build_packet(cmd, *args):
-    """Construye un paquete estructurado v27.0"""
-    # [CMD]<TAG>COMANDO<TAG><LEN>N_ARGS<LEN><SEP>ARG1<SEP>ARG2...
-    valid_args = [str(a) for a in args]
-    header = f"{PKT_PREFIX}{TAG_MARK}{cmd}{TAG_MARK}{LEN_MARK}{len(valid_args)}{LEN_MARK}{SEP}"
-    payload = SEP.join(valid_args)
-    return (header + payload).encode('utf-8')
-
-def parse_packet(raw_str):
-    """
-    Parsea un string crudo. 
-    Retorna: (EsComando, NombreCmd, ListaArgs)
-    """
-    if not raw_str.startswith(PKT_PREFIX):
-        return (False, None, None)
-    
-    try:
-        # Extraer TAG
-        parts = raw_str.split(TAG_MARK) 
-        
-        if len(parts) < 3: 
-            return (False, None, None)
-        cmd_name = parts[1]
-        
-        rest = parts[2]
-        # Extraer LEN
-        lparts = rest.split(LEN_MARK)
-        
-        if len(lparts) < 3: 
-            return (False, None, None)
-        n_args = int(lparts[1])
-        
-        # Args raw string está en lparts[2], pero empieza con SEP
-        args_payload = lparts[2]
-        if args_payload.startswith(SEP):
-            args_payload = args_payload[len(SEP):]
-            
-        # Split args
-        if n_args == 0:
-            args = []
-        else:
-            args = args_payload.split(SEP)
-            
-        return (True, cmd_name, args)
-        
-    except Exception as e:
-        debug_log(f"ParsePacket Error: {e} | Raw: {raw_str}")
-        return (False, None, None)
+# --- PROTOCOLO (Delegado a gw_comm) ---
+# build_packet y parse_packet eliminados de aquí
 
 def send_cmd(ip, cmd, *args):
-    """Helper para enviar comando estructurado"""
-    pkt = build_packet(cmd, *args)
-    send_raw(ip, pkt)
+    """Wrapper para enviar comandos UDP usando gw_comm"""
+    gw_comm.send_udp_cmd(ip, cmd, *args)
 
 def send_cmd_all(cmd, *args):
     """Helper para enviar comando a todos (STATUS, etc)"""
-    pkt = build_packet(cmd, *args)
-    send_all(pkt)
+    gw_comm.send_udp_cmd_all(cmd, *args)
+
 def get_col(n): return Colors.PALETTE[sum(ord(c) for c in n) % len(Colors.PALETTE)] if n else Colors.WH
 
 def popup(t, x, source_ip=None):
@@ -893,9 +860,9 @@ def find_global(t):
 
 def scan_network(target_cid=None):
     global SCAN_RESULTS
-    reply_print(f"{Colors.W}[*] Escaneando red local (2s)...{Colors.E}", target_cid)
+    reply_print(f"{Colors.W}[*] Escaneando red local (1s)...{Colors.E}", target_cid)
     SCAN_RESULTS = []; u = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); u.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-    u.sendto(build_packet("WHO_ALL"), ('255.255.255.255', UDP_PORT)); u.close(); time.sleep(2)
+    u.sendto(build_packet("WHO_ALL"), ('255.255.255.255', UDP_PORT)); u.close(); time.sleep(1) # Optimizacion 2s -> 1s
 
     reply_print(f"{Colors.G}[*] Equipos Encontrados ({len(SCAN_RESULTS)}):{Colors.E}", target_cid)
     for res in SCAN_RESULTS:
@@ -2087,7 +2054,8 @@ def spawn_child_process(cid, cdata):
     # Random range + check? IPC_PORT + 1 + len(ACTIVE_CHATS) may collide.
     # Usaremos socket bind check.
     child_port = IPC_PORT + 1
-    while True:
+    # Optimization: Limited search range to avoid infinite loop lag
+    for i in range(100): 
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
                 s.bind(('127.0.0.1', child_port))
@@ -2111,7 +2079,7 @@ def spawn_child_process(cid, cdata):
         "--port", str(child_port),
         "--rnick", rnick
     ]
-    debug_log(f"Spawn CMD: {cmd_args}")
+    debug_log(f"Spawn start ({time.time()}) CMD: {cmd_args}")
     
     
     if SILENT_UPDATES_ALLOWED:
