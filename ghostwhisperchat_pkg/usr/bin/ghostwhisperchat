@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-APP_VER_NUM = 37.3
-APP_VER_TAG = "Fix Crash & Debug Trace"
+APP_VER_NUM = 37.4
+APP_VER_TAG = "Spanish Debug & Analysis"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 import socket, threading, subprocess, sys, os, time, platform, atexit, re, signal, ctypes, shutil
@@ -933,7 +933,9 @@ def start_private_chat(ip, nick, status="En línea"):
     update_memory(ip, nick, status)
     
     # v36.12 CRITICAL FIX: Send acceptance to inviter so they open their window!
+    debug_log(f"[PROTOCOLO] Enviando INVITE_ACC (Confirmación) a {ip}...")
     send_cmd(ip, "INVITE_ACC", MY_NICK, MY_STATUS)
+    debug_log(f"[PROTOCOLO] INVITE_ACC enviado. Ahora abriendo mi consola...")
     
     spawn_child_process(cid, ACTIVE_CHATS[cid]) # Spawn child immediately
     refresh_ui(f"{Colors.G}[*] Chat privado con {nick} iniciado.{Colors.E}")
@@ -1029,11 +1031,11 @@ def handle_invite_logic(ip, nick, type, extra_data=None):
     req_text = ""
     if type == "PRIV": 
         req_text = f"💬 ¡Hey! {nick} ({ip}) quiere iniciar una conversación contigo.\n\n¿Te gustaría aceptar la conexión?"
-        debug_log(f"[INVITE_LOGIC] Prompting user for PRIV chat from {nick} ({ip})")
+        debug_log(f"[INVITE_LOGIC] Solicitando al usuario aceptar chat PRIV de {nick} ({ip})")
     else: 
         gid, gpass, members = extra_data
         req_text = f"📢 {nick} quiere que formes parte del grupo \"{gid}\".\n\n¿Te unes a la conversación?"
-        debug_log(f"[INVITE_LOGIC] Prompting user for GROUP chat {gid} from {nick}")
+        debug_log(f"[INVITE_LOGIC] Solicitando al usuario aceptar chat GROUP {gid} de {nick}")
 
     # --- GUI HANDLING (v26.1 Style: Popen + Polling) ---
     proc = None
@@ -1070,11 +1072,11 @@ def handle_invite_logic(ip, nick, type, extra_data=None):
             if proc.returncode == 0: # YES
                 # Construir dict temporal y llamar yes
                 safe_print(f"{Colors.M}[GUI] Aceptando invitación...{Colors.E}")
-                debug_log(f"[INVITE_LOGIC] GUI accepted. Triggering --y")
+                debug_log(f"[INVITE_LOGIC] Usuario aceptó en GUI. Ejecutando --y")
                 PENDING_INVITE = {'ip': ip, 'nick': nick, 'type': type, 'data': extra_data}
                 exec_lobby_cmd("--y")
             else:
-                debug_log(f"[INVITE_LOGIC] GUI rejected. Triggering --n")
+                debug_log(f"[INVITE_LOGIC] Usuario rechazó en GUI. Ejecutando --n")
                 PENDING_INVITE = {'ip': ip, 'nick': nick, 'type': type, 'data': extra_data}
                 exec_lobby_cmd("--n") # NO
             return
@@ -1232,7 +1234,7 @@ def tcp_loop():
                     # BLOCK MODULAR DE COMANDOS
                     if cmd == "INVITE":
                         # args: NICK, TYPE, (GID, GPASS, MEMBERS if group)
-                        debug_log(f"Received INVITE from {ip}")
+                        debug_log(f"[RED] Recibido INVITE de {ip}")
                         if len(args) >= 2:
                             nick, type = args[0], args[1]
                             extra = None
@@ -1247,7 +1249,7 @@ def tcp_loop():
 
                     elif cmd == "INVITE_ACC":
                         # args: R_NICK, R_STATUS
-                        debug_log(f"Received INVITE_ACC from {ip}. Processing acceptance...")
+                        debug_log(f"[RED] Recibido INVITE_ACC de {ip}. Procesando aceptación...")
                         if len(args) >= 2:
                              r_nick, r_stat = args[0], args[1]
                              
@@ -1262,13 +1264,13 @@ def tcp_loop():
                              if ip not in PEERS: PEERS[ip] = {'nick': r_nick, 'chats': set()}
                              if isinstance(PEERS[ip], dict):
                                  PEERS[ip]['chats'].add(cid)
-                                 debug_log(f"Linked IP {ip} to CID {cid} (INVITE_ACC)")
+                                 debug_log(f"[RED] Vinculada IP {ip} a CID {cid} (INVITE_ACC)")
                              
                              # TRUSTED PEERS (Add logic)
                              TRUSTED_PEERS.add(ip); save_config()
 
                              # Threading spawn to avoid blocking TCP loop (Fix Slowness)
-                             debug_log(f"Spawning child for confirmed invite {cid}")
+                             debug_log(f"[PROCESO] Iniciando consola hija para chat confirmado {cid}")
                              threading.Thread(target=spawn_child_process, args=(cid, cdata)).start()
                              refresh_ui(f"{Colors.G}[*] {r_nick} aceptó tu invitación.{Colors.E}")
                              
@@ -1687,6 +1689,7 @@ def exec_lobby_cmd(inp, origin_cid=None):
             if t == MY_IP: reply_print(f"{Colors.F}Eres tú.{Colors.E}", origin_cid)
             else:
                 reply_print(f"{Colors.W}[*] Invitando...{Colors.E}", origin_cid)
+                debug_log(f"[CMD] Enviando comando INVITE a {t} (Nick: {MY_NICK})")
                 send_cmd(t, "INVITE", MY_NICK, "PRIV", MY_STATUS)
 
     # --- COMANDOS GLOBALES / UTILIDADES ---
@@ -1926,6 +1929,7 @@ def exec_lobby_cmd(inp, origin_cid=None):
             reply_print(f"{Colors.W}No tienes invitaciones pendientes.{Colors.E}", origin_cid)
         else:
              reply_print(f"{Colors.G}[*] Aceptando...{Colors.E}", origin_cid)
+             debug_log(f"[CMD] Ejecutando logic ACCEPT para {PENDING_INVITE['ip']}")
              # PENDING_INVITE: {'ip': ip, 'type': 'GROUP'/'PRIV', 'id': gid/None, 'pass': pass/None}
              if PENDING_INVITE['type'] == 'GROUP':
                   exec_lobby_cmd(f"--chatgrupal {PENDING_INVITE['data'][0]} {PENDING_INVITE['data'][1]}")
