@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-APP_VER_NUM = 37.18
-APP_VER_TAG = "Fix Syntax & Raw Packets"
+APP_VER_NUM = 37.19
+APP_VER_TAG = "Fix Indentation & IPC Debug"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 import socket, threading, subprocess, sys, os, time, platform, atexit, re, signal, ctypes, shutil
@@ -1255,12 +1255,17 @@ def tcp_loop():
                         # args: NICK, TYPE, (GID, GPASS, MEMBERS if group)
                         debug_log(f"[RED] Recibido INVITE de {ip}")
                         if len(args) >= 2:
+                            nick, type = args[0], args[1]
+                            extra = None
+                            if type == "GROUP" and len(args) >= 5:
                                 extra = (args[2], args[3], args[4]) # gid, pass, members
 
                             PEERS[ip]['nick'] = nick
                             st = args[len(args)-1] if type == "PRIV" and len(args) >= 3 else "?" # Status is last arg for PRIV
                             PEER_STATUSES[ip] = st
                             update_memory(ip, PEERS[ip]['nick'], st) # Sync al recibir
+                            
+                            debug_log(f"[INVITE_LOGIC] Iniciando logica de invitacion para {nick} (Tipo: {type})")
                             threading.Thread(target=handle_invite_logic, args=(ip, nick, type, extra)).start()
 
                     elif cmd == "INVITE_ACC":
@@ -2214,9 +2219,10 @@ def ipc_listen_parent():
                 if len(p) >= 3:
                      cstr = p[2]
                      print(f"\n{Colors.M}[IPC] Ejecutando comando remoto: {cstr}{Colors.E}")
-                     exec_lobby_cmd(cstr, origin_cid=p[1])
+                     exec_lobby_cmd(cstr, origin_cid=parts[1])
 
-        except: pass
+    except Exception as e:
+        debug_log(f"[IPC_ERROR] Error en listener IPC del Lobby: {e}")
 
 def ipc_listen_child(my_port, lock_state):
     # lock_state es un dict compartido con el thread principal del hijo para leer/escribir estado de POPs
