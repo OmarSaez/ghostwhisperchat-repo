@@ -1,12 +1,12 @@
 Package: ghostwhisperchat
-Version: 37.7
+Version: 37.10
 Architecture: all
 Maintainer: Omar Saez <omar.saez@usach.cl>
-Filename: pool/main/g/ghostwhisperchat/ghostwhisperchat_37.7_all.deb
-Size: 31434
-MD5sum: 6edcaaf57686348a06930d0b8625b009
-SHA1: 1bdf52c257d682a4a9918e94dca2439a7e80b489
-SHA256: e44184d2336bbb47345b6c4a54a5d8da9c96ae4467a540f8fc04332c4fa47be1
+Filename: pool/main/g/ghostwhisperchat/ghostwhisperchat_37.10_all.deb
+Size: 31660
+MD5sum: 88f254292f8a9cdf19b23724621169f1
+SHA1: 6c6cafc5de0f6030422fe477ec357bc16b46e0d5
+SHA256: 16fa46b360cdee7793ca5d5a8738b7406bf835542ee8a3352932ad69b1a7934d
 Section: net
 Priority: optional
 Description: GhostWhisperChat - Chat LAN silencioso para comunicación 1 a 1 y grupos.
