@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-APP_VER_NUM = 37.20
-APP_VER_TAG = "Fix Indentation & IPC Debug"
+APP_VER_NUM = 37.21
+APP_VER_TAG = "Fix IPC Port Zombie"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 import socket, threading, subprocess, sys, os, time, platform, atexit, re, signal, ctypes, shutil
@@ -76,6 +76,15 @@ def get_desktop_path():
         p = os.path.join(home, d)
         if os.path.exists(p): return p
     return home
+
+def find_free_port(start_port=5001, max_tries=50):
+    for p in range(start_port, start_port + max_tries):
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+                s.bind(('127.0.0.1', p))
+                return p
+        except: continue
+    return start_port # Fallback
 
 DL_ROOT = get_desktop_path()
 DL_DIR = os.path.join(DL_ROOT, "GhostWhisper_Recibidos")
