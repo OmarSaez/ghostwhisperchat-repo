@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-APP_VER_NUM = 37.15
-APP_VER_TAG = "Debug Fallback Crash"
+APP_VER_NUM = 37.16
+APP_VER_TAG = "Debug TCP Routing"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 import socket, threading, subprocess, sys, os, time, platform, atexit, re, signal, ctypes, shutil
@@ -1469,25 +1469,30 @@ def tcp_loop():
 
                     else:
                         # 2. NO ES COMANDO V27 -> Mensaje de Chat Privado (Texto Plano)
-                        # Asumimos que es un mensaje de chat privado
-
-                        # Identificar chat privado origen
+                        debug_log(f"[TCP_ROUTING] Recibido mensaje plano de {ip}: '{msg[:20]}...'")
+                        
                         target_cid = None
                         pdata = PEERS.get(ip)
                         if pdata:
-                            for cid in pdata.get('chats', set()):
+                            chats = pdata.get('chats', set())
+                            debug_log(f"[TCP_ROUTING] Chats asociados a IP {ip}: {chats}")
+                            for cid in chats:
                                  if cid in ACTIVE_CHATS and ACTIVE_CHATS[cid]['type'] == 'PRIV':
                                      target_cid = cid
                                      break
+                        else:
+                             debug_log(f"[TCP_ROUTING] IP {ip} no encontrada en PEERS.")
                         
                         curr_nick = PEERS.get(ip, {}).get('nick', '?')
                         tag = f"[{get_col(curr_nick)}{curr_nick}{Colors.E}]"
 
                         if target_cid and 'port' in ACTIVE_CHATS[target_cid]:
-                             send_ipc(f"FWD_MSG{SEP}{target_cid}{SEP}{tag}{SEP}{raw}{SEP}{ip}", ACTIVE_CHATS[target_cid]['port'])
-                             write_log(f"[{curr_nick}] (FWD {target_cid}): {raw}", "CHAT")
+                             debug_log(f"[TCP_ROUTING] Reenviando por IPC a CID {target_cid} (Port {ACTIVE_CHATS[target_cid]['port']})")
+                             send_ipc(f"FWD_MSG{SEP}{target_cid}{SEP}{tag}{SEP}{msg}{SEP}{ip}", ACTIVE_CHATS[target_cid]['port'])
+                             write_log(f"[{curr_nick}] (FWD {target_cid}): {msg}", "CHAT")
                         else:
-                            debug_log(f"Routing fail for {ip}: TargetCID={target_cid}, Active={target_cid in ACTIVE_CHATS if target_cid else False}")
+                            debug_log(f"[TCP_ROUTING] Fallo de enrutamiento para {ip}: CID={target_cid}")
+                            if target_cid: debug_log(f"[TCP_ROUTING] Port Info: {ACTIVE_CHATS[target_cid].get('port', 'NO PORT')}")
                             if target_cid: debug_log(f"Port present: {'port' in ACTIVE_CHATS[target_cid]}")
                             safe_print(f"{tag}: {raw}"); popup(f"MSG: {curr_nick}", raw, source_ip=ip); write_log(f"[{curr_nick}]: {raw}", "CHAT")
 
