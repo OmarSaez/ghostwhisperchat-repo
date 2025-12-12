@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-APP_VER_NUM = 37.10
-APP_VER_TAG = "Robust Import & Child Log"
+APP_VER_NUM = 37.11
+APP_VER_TAG = "Debug Child Msg Send"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 import socket, threading, subprocess, sys, os, time, platform, atexit, re, signal, ctypes, shutil
@@ -2645,9 +2645,17 @@ def run_child(cid, ctype, remote, password, mynick, mystatus, myport, rnick="?")
             # print(f"{Colors.WH}Tú: {inp}{Colors.E}") # Fix double echo
             
             if ctype == 'GROUP':
+                 print(f"{Colors.W}[DEBUG] Enviando mensaje de GRUPO.{Colors.E}")
                  send_cmd_all("GRP_MSG", remote, inp)
             else:
-                 send_all(inp.encode())
+                 print(f"{Colors.W}[DEBUG] Intentando enviar mensaje PRIVADO a {remote}...{Colors.E}")
+                 # Debug raw packet
+                 try:
+                     print(f"{Colors.W}[DEBUG] Llamando a send_all...{Colors.E}")
+                     send_all(inp.encode())
+                     print(f"{Colors.W}[DEBUG] send_all completado.{Colors.E}")
+                 except Exception as e:
+                     print(f"{Colors.F}[DEBUG] ERROR en send_all: {e}{Colors.E}")
 
         except KeyboardInterrupt:
              # Handle Ctrl+C clean exit from child loop
