@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-APP_VER_NUM = 37.13
-APP_VER_TAG = "Debug Persist & Hist++"
+APP_VER_NUM = 37.14
+APP_VER_TAG = "Verify Log Path"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 import socket, threading, subprocess, sys, os, time, platform, atexit, re, signal, ctypes, shutil
@@ -331,9 +331,11 @@ def debug_log(msg):
         # v37.13: Persist debug to file
         try:
              dsk = get_desktop_path()
-             with open(os.path.join(dsk, "gwc_lobby_debug.log"), "a", encoding="utf-8") as f:
+             path = os.path.join(dsk, "gwc_lobby_debug.log")
+             with open(path, "a", encoding="utf-8") as f:
                  f.write(f"[{time.time()}] {msg}\n")
-        except: pass
+        except Exception as e:
+             safe_print(f"{Colors.F}[!] Error escribiendo log en disco: {e}{Colors.E}")
 
 # --- PROTOCOLO (Delegado a gw_comm) ---
 # --- PROTOCOLO (Delegado a gw_comm) ---
@@ -1987,10 +1989,14 @@ def exec_lobby_cmd(inp, origin_cid=None):
         else: safe_print(f"{Colors.B}Lobby limpiado.{Colors.E}")
         
     elif cmd_key == 'DEBUG':
-        # global DEBUG_MODE -> Moved to top
         DEBUG_MODE = not DEBUG_MODE
-        state = "ACTIVADO" if DEBUG_MODE else "DESACTIVADO"
-        reply_print(f"{Colors.M}[DEBUG] Modo Debug {state}.{Colors.E}", origin_cid)
+        status = "ACTIVADO" if DEBUG_MODE else "DESACTIVADO"
+        dsk = get_desktop_path()
+        log_path = os.path.join(dsk, "gwc_lobby_debug.log")
+        reply_print(f"{Colors.M}[DEBUG] Modo Debug {status}.{Colors.E}", origin_cid)
+        if DEBUG_MODE:
+            reply_print(f"{Colors.M}[DEBUG] Guardando logs en: {log_path}{Colors.E}", origin_cid)
+            debug_log("--- SESION DE DEBUG INICIADA ---")
 
     elif cmd_key == 'GLOBAL_STATUS':
         # v35.1 Mejorado
