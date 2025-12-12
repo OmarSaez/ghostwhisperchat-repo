@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-APP_VER_NUM = 37.21
-APP_VER_TAG = "Fix IPC Port Zombie"
+APP_VER_NUM = 37.22
+APP_VER_TAG = "Fix False Terminal Crash"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 import socket, threading, subprocess, sys, os, time, platform, atexit, re, signal, ctypes, shutil
@@ -2171,15 +2171,24 @@ def spawn_child_process(cid, cdata):
             # safe_print(f"CMD: {terminal_cmd}")
             proc = subprocess.Popen(terminal_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             # Check immediate failure
-            time.sleep(0.2)
-            if proc.poll() is not None:
-                print(f"{Colors.F}[!] Error: La terminal se cerró inmediatamente (Code {proc.returncode}).{Colors.E}")
+            time.sleep(0.5)
+            poll_res = proc.poll()
+            
+            # v37.22 Fix: gnome-terminal exits with 0 immediately upon successful launch (detach).
+            # We should only consider it a crash if it exits with != 0, OR if we track pids differently.
+            # actually, if it exits with 0, we assume the window opened.
+            
+            if poll_res is not None and poll_res != 0:
+                print(f"{Colors.F}[!] Error: La terminal falló (Code {proc.returncode}).{Colors.E}")
                 # Fallback to background
                 print(f"{Colors.W}[*] Intentando fallback (segundo plano)...{Colors.E}")
                 # v37.15: Capture output for fallback too
                 log_path = os.path.join(get_desktop_path(), "gwc_child_error.log")
                 with open(log_path, "a") as err_log:
                     proc = subprocess.Popen(cmd_args, stdout=err_log, stderr=err_log)
+            elif poll_res == 0:
+                 # Terminal launched and detached successfully
+                 pass
 
             ACTIVE_CHATS[cid]['pid'] = proc.pid
         else:
