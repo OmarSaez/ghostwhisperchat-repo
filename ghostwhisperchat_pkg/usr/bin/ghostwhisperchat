@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-APP_VER_NUM = 37.17
-APP_VER_TAG = "Expose TCP Errors"
+APP_VER_NUM = 37.18
+APP_VER_TAG = "Fix Syntax & Raw Packets"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 import socket, threading, subprocess, sys, os, time, platform, atexit, re, signal, ctypes, shutil
@@ -740,7 +740,12 @@ def udp_loop():
 
     while True:
         try:
-            d, a = u.recvfrom(4096); msg, ip = d.decode('utf-8', errors='ignore'), a[0]
+            d, a = u.recvfrom(4096);
+            if not d: return # Assuming 'data' in instruction refers to 'd'
+            
+            msg, ip = d.decode('utf-8', errors='ignore'), a[0]
+            debug_log(f"[TCP_RAW] Recibido de {ip}: {msg[:100]}") # Show first 100 chars
+            
             if ip == MY_IP: continue
 
             is_cmd, cmd, args = parse_packet(msg)
@@ -1248,20 +1253,8 @@ def tcp_loop():
                     # BLOCK MODULAR DE COMANDOS
                     if cmd == "INVITE":
                         # args: NICK, TYPE, (GID, GPASS, MEMBERS if group)
-                        def main():
-    # v37.17: Clear debug log on startup
-    try:
-        dsk = get_desktop_path()
-        path = os.path.join(dsk, "gwc_lobby_debug.log")
-        if os.path.exists(path):
-            with open(path, "w") as f: f.write(f"--- NUEVA EJECUCIÓN {time.ctime()} ---\n")
-    except: pass
-
-    global APP_VERSION
-    if len(sys.argv) > 1:
-                            nick, type = args[0], args[1]
-                            extra = None
-                            if type == "GROUP" and len(args) >= 5:
+                        debug_log(f"[RED] Recibido INVITE de {ip}")
+                        if len(args) >= 2:
                                 extra = (args[2], args[3], args[4]) # gid, pass, members
 
                             PEERS[ip]['nick'] = nick
@@ -2699,6 +2692,15 @@ def run_child(cid, ctype, remote, password, mynick, mystatus, myport, rnick="?")
             print(f"{Colors.F}Error Child: {e}{Colors.E}")
 
 def main():
+    # v37.18: Clear debug log on startup (Real location)
+    try:
+        if "--child" not in sys.argv: # Only lobby clears it
+            dsk = get_desktop_path()
+            path = os.path.join(dsk, "gwc_lobby_debug.log")
+            if os.path.exists(path):
+                with open(path, "w") as f: f.write(f"--- NUEVA EJECUCIÓN {time.ctime()} ---\n")
+    except: pass
+
     # Parsing manual de args para no depender de argparse complejo
     if "--child" in sys.argv:
         try:

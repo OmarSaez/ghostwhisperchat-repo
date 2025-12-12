@@ -90,6 +90,10 @@ TCP_PORT = 44494
 def send_tcp_packet(ip, data):
     """Envia datos raw via TCP (Reliable)"""
     try:
+        if isinstance(data, bytes): d_str = data.decode('utf-8', errors='ignore')
+        else: d_str = str(data)
+        print(f"[GW_COMM] TCP -> {ip}: {d_str[:100]}") # Log raw packet being sent
+        
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.settimeout(2); s.connect((ip, TCP_PORT))
         if isinstance(data, str): s.send(data.encode())
