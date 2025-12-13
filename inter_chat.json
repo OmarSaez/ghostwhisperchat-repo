@@ -6,9 +6,9 @@
             "t": 1765393203.921489
         },
         "192.168.1.227": {
-            "nick": "Omar-pc",
+            "nick": "omar-pc",
             "status": "En l\u00ednea",
-            "t": 1765602692.1198077
+            "t": 1765606074.2111783
         }
     },
     "nick": "omar-laptop-ubuntu",
@@ -34,7 +34,7 @@
         },
         "192.168.1.1_TP-Link-O": {
             "trusted": true,
-            "last_seen": 1765605325.195259,
+            "last_seen": 1765605941.3934212,
             "name": "192.168.1.1_TP-Link-O"
         }
     },
