@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-APP_VER_NUM = 38.1
-APP_VER_TAG = "Fix Modularization de hijos"
+APP_VER_NUM = 38.2
+APP_VER_TAG = "More Fix Modularization de hijos"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 import os
@@ -72,6 +72,8 @@ CMD_MAP = gw_shared.CMD_MAP
 IPC_PORT = gw_shared.IPC_PORT
 calculate_file_hash = gw_shared.calculate_file_hash
 SEP = gw_comm.SEP
+UDP_PORT = gw_comm.UDP_PORT
+TCP_PORT = gw_comm.TCP_PORT
 
 # ... (Rest of globals) ...
 
@@ -104,8 +106,8 @@ def main():
         run_lobby()
 
 # --- CONFIGURACIÓN ---
-TCP_PORT = 44494
-IPC_PORT = 5000 # Puerto base para IPC (Hijos) -> UDP
+
+
 multicast_group = ('224.0.0.1', 44496) # Multicast opcional (futuro)
 BUFFER, LOG_FILE, CONFIG_FILE = 4096, "cyberdei_history.log", "cyberdei_config.json"
 
