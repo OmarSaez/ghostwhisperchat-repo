@@ -29,10 +29,10 @@ Version: 37.26
 Architecture: all
 Maintainer: Omar Saez <omar.saez@usach.cl>
 Filename: pool/main/g/ghostwhisperchat/ghostwhisperchat_37.26_all.deb
-Size: 31996
-MD5sum: 376e518d66227c9747ef2dfa291550aa
-SHA1: 61c7f3cdbf68bac3ea4bb866dca11333f049902e
-SHA256: 72b937d06d4cf475ad4a7ade48597d8a1ee2f73e6944fab9c25c8b47e2143ce6
+Size: 32940
+MD5sum: 1370e0e33f46b793f28ba7958aab1f8a
+SHA1: 58d4b25362c0a3810dcea7b4f1d64b9f52435989
+SHA256: 6388969dd55ec11d2d89bac78b68ed4558a5c5c1cb451083c5bc70f0f9e640cc
 Section: net
 Priority: optional
 Description: GhostWhisperChat - Chat LAN silencioso para comunicación 1 a 1 y grupos.
