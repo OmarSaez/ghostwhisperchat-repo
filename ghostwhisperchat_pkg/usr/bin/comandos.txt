@@ -33,3 +33,5 @@
    Argumentos: [CHAT_ID]
    Descripción: El hijo notifica al Lobby que el usuario cerró la ventana manualmente o escribió '--exit', para que el Lobby elimine la sesión de su memoria.
 
+
+sudo python3 -u /home/omar/Escritorio/ghostwhisperchat-repo/ghostwhisperchat_pkg/usr/bin/ghostwhisperchat

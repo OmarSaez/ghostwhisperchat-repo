@@ -7,6 +7,10 @@ import socket
 import hashlib
 
 # v38.0: Shared Definitions for Modular Architecture
+APP_VER_NUM = 39.1
+APP_VER_TAG = "Correcion de errores"
+APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
+
 
 # --- UTILS ---
 def calculate_file_hash(path):
