@@ -107,11 +107,7 @@ def process(inp, origin_cid, adapter):
          adapter.show_lobby_summary()
 
     elif cmd_key == 'CONTACTS':
-        users = adapter.get_known_users()
-        adapter.reply(f"{Colors.G}[*] Historial de Sesión ({len(users)}):{Colors.E}", origin_cid)
-        for ip, d in users.items(): 
-            msg = f"   - {d['nick']} ({ip}) [{d['status']}] (Visto: {time.strftime('%H:%M', time.localtime(d['t']))})"
-            adapter.reply(msg, origin_cid)
+        adapter.show_contacts(origin_cid)
 
     elif cmd_key == 'SCAN': adapter.scan_network(origin_cid)
     
@@ -200,7 +196,7 @@ def process(inp, origin_cid, adapter):
         show_shortcuts(adapter, origin_cid)
         
     elif cmd_key == 'GLOBAL_STATUS':
-        show_global_status(adapter, origin_cid)
+        adapter.show_global_status(origin_cid)
 
     elif cmd_key == 'DEBUG':
         is_dbg = adapter.toggle_debug()

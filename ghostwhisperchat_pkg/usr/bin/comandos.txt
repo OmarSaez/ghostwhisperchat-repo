@@ -35,3 +35,5 @@
 
 
 sudo python3 -u /home/omar/Escritorio/ghostwhisperchat-repo/ghostwhisperchat_pkg/usr/bin/ghostwhisperchat
+
+sudo pkill -f ghostwhisperchat

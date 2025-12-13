@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-APP_VER_NUM = 39.1
-APP_VER_TAG = "Correcion de errores en consolas hijo"
+APP_VER_NUM = 39.2
+APP_VER_TAG = "Fix Comando Contactos y Logs IPC"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 import os
@@ -1669,6 +1669,16 @@ class LobbyAdapter:
     def get_active_chats(self): return ACTIVE_CHATS
     def get_version_str(self): return APP_VERSION
     
+    def show_contacts(self, cid):
+        users = self.get_known_users()
+        self.reply(f"{Colors.G}[*] Historial de Sesión ({len(users)}):{Colors.E}", cid)
+        for ip, d in users.items(): 
+            msg = f"   - {d['nick']} ({ip}) [{d['status']}] (Visto: {time.strftime('%H:%M', time.localtime(d['t']))})"
+            self.reply(msg, cid)
+
+    def show_global_status(self, cid):
+        gw_cmd.show_global_status(self, cid)
+
     def toggle_debug(self):
         global DEBUG_MODE
         DEBUG_MODE = not DEBUG_MODE
@@ -1834,7 +1844,7 @@ def ipc_listen_parent():
             elif cmd == "FWD_CMD":
                 if len(p) >= 3:
                      cstr = p[2]
-                     print(f"\\n{Colors.M}[IPC] Ejecutando comando remoto: {cstr}{Colors.E}")
+                     # print(f"\\n{Colors.M}[IPC] Ejecutando comando remoto: {cstr}{Colors.E}")
                      exec_lobby_cmd(cstr, origin_cid=p[1])
 
         except Exception as e:

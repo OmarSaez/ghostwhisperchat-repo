@@ -7,8 +7,8 @@ import socket
 import hashlib
 
 # v38.0: Shared Definitions for Modular Architecture
-APP_VER_NUM = 39.1
-APP_VER_TAG = "Correcion de errores"
+APP_VER_NUM = 39.2
+APP_VER_TAG = "Fix Comando Contactos y Logs IPC"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 

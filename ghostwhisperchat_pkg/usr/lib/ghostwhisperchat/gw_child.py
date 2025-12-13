@@ -204,6 +204,9 @@ class ChildAdapter:
     def get_active_chats(self): return {self.cid: self.get_chat(self.cid)}
     def get_version_str(self): return APP_VERSION
     
+    def show_contacts(self, cid): self.forward("--contactos")
+    def show_global_status(self, cid): self.forward("--estados-globales")
+
     def toggle_debug(self):
         self.debug = not self.debug
         return self.debug
