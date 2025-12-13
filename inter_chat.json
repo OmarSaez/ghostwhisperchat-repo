@@ -11,7 +11,7 @@
             "t": 1765602692.1198077
         }
     },
-    "nick": "",
+    "nick": "omar-laptop-ubuntu",
     "status": "En l\u00ednea-AFK",
     "visible": true,
     "log_on": false,
@@ -34,7 +34,7 @@
         },
         "192.168.1.1_TP-Link-O": {
             "trusted": true,
-            "last_seen": 1765603467.8328009,
+            "last_seen": 1765604570.6020327,
             "name": "192.168.1.1_TP-Link-O"
         }
     },
