@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-APP_VER_NUM = 38.3
-APP_VER_TAG = "More More Fix Modularization de hijos"
+APP_VER_NUM = 38.4
+APP_VER_TAG = "More More More Fix Modularization de hijos"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 import os
@@ -192,8 +192,11 @@ def raw_print(s):
         if threading.current_thread() is threading.main_thread():
              print(s)
         else:
-             sys.stdout.write(f'\r\033[K{s}\n' + PROMPT + (readline.get_line_buffer() if 'readline' in sys.modules else ""))
-             sys.stdout.flush()
+             try:
+                 sys.stdout.write(f'\r\033[K{s}\n' + PROMPT + (readline.get_line_buffer() if 'readline' in sys.modules else ""))
+                 sys.stdout.flush()
+             except:
+                 print(s)
 
 def safe_print(s):
     # Imprime Y guarda en historial (Eventos publicos)
