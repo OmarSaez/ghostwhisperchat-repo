@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-APP_VER_NUM = 38.2
-APP_VER_TAG = "More Fix Modularization de hijos"
+APP_VER_NUM = 38.3
+APP_VER_TAG = "More More Fix Modularization de hijos"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 import os
@@ -74,6 +74,8 @@ calculate_file_hash = gw_shared.calculate_file_hash
 SEP = gw_comm.SEP
 UDP_PORT = gw_comm.UDP_PORT
 TCP_PORT = gw_comm.TCP_PORT
+build_packet = gw_comm.build_packet
+parse_packet = gw_comm.parse_packet
 
 # ... (Rest of globals) ...
 
@@ -2451,7 +2453,7 @@ def main():
             # if "--updates-ok" in sys.argv: SILENT_UPDATES_ALLOWED = True 
             # Deprecated flag logic
 
-            run_child(cid, ctype, remote, passwd, mnick, mstat, port, rnick)
+            gw_child.run(cid, ctype, remote, passwd, mnick, mstat, port, rnick)
         except Exception as e:
             print(f"Error iniciando hijo: {e}")
             time.sleep(5)
