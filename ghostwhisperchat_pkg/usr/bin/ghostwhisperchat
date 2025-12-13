@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-APP_VER_NUM = 38.4
-APP_VER_TAG = "More More More Fix Modularization de hijos"
+APP_VER_NUM = 39.0
+APP_VER_TAG = "Modularizacion de comandos"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 import os
@@ -909,11 +909,12 @@ def join_grp(gid, gp, exclude_ip=None):
     # threading.Thread(target=lambda: (time.sleep(5), try_trigger_updates(list(PEERS.keys())))).start()
     pass
 
-def invite_users(targets_str):
-    if not CURRENT_CHAT_ID or CURRENT_CHAT_ID not in ACTIVE_CHATS:
+def invite_users(targets_str, target_cid=None):
+    cid = target_cid if target_cid else CURRENT_CHAT_ID
+    if not cid or cid not in ACTIVE_CHATS:
         return safe_print(f"{Colors.F}[!] Debes estar en un chat activo.{Colors.E}")
 
-    chat = ACTIVE_CHATS[CURRENT_CHAT_ID]
+    chat = ACTIVE_CHATS[cid]
     if chat['type'] != 'GROUP':
         return safe_print(f"{Colors.F}[!] Solo puedes invitar en grupos.{Colors.E}")
 
@@ -922,7 +923,7 @@ def invite_users(targets_str):
 
     targets = [t.strip() for t in targets_str.split(',')]
 
-    members_list = ", ".join([d['nick'] for d in PEERS.values() if isinstance(d, dict) and CURRENT_CHAT_ID in d.get('chats', [])])
+    members_list = ", ".join([d['nick'] for d in PEERS.values() if isinstance(d, dict) and cid in d.get('chats', [])])
     # payload = f"GRP_INVITE_REQ{SEP}{MY_NICK}{SEP}{gid}{SEP}{gpass}{SEP}{members_list}".encode() # Old
 
     safe_print(f"{Colors.W}[*] Enviando invitaciones...{Colors.E}")
@@ -931,7 +932,7 @@ def invite_users(targets_str):
         ip = find_global(t)
         if ip:
             pdata = PEERS.get(ip)
-            if pdata and isinstance(pdata, dict) and CURRENT_CHAT_ID in pdata.get('chats', []):
+            if pdata and isinstance(pdata, dict) and cid in pdata.get('chats', []):
                  safe_print(f"   > {t}: Ya está en el grupo.")
             else:
                 send_cmd(ip, "INVITE", MY_NICK, "GROUP", gid, gpass, members_list)
@@ -1579,381 +1580,110 @@ Comment=Auto-start InterChat Lobby
 
 # --- COMANDOS LOBBY CENTRALIZADOS ---
 def exec_lobby_cmd(inp, origin_cid=None):
-    global MY_NICK, MY_STATUS, MY_IP, LAST_ACT, PENDING_INVITE, VISIBLE_IN_SCAN, LOG_ON, AUTO_DL, POPUP_ON, USER_OFF
-    global LOBBY_HISTORY, DEBUG_MODE # v36.9 Fix SyntaxError
+    import gw_cmd
+    gw_cmd.process(inp, origin_cid, LOBBY_ADAPTER)
 
-    inp = inp.strip()
-    if not inp: return
+class LobbyAdapter:
+    def reply(self, msg, cid): reply_print(msg, cid)
 
-    parts = inp.split(" ", 1)
-    raw_cmd = parts[0]
-    args = parts[1] if len(parts) > 1 else ""
+    def create_group(self, remote_id, password):
+        cid = str(uuid.uuid4())[:8]
+        cdata = {'type': 'GROUP', 'remote_id': remote_id, 'pass': password, 'created_at': time.time()}
+        ACTIVE_CHATS[cid] = cdata
+        spawn_child_process(cid, cdata)
+
+    def find_global(self, args): return find_global(args)
+
+    def invite_priv(self, ip, nick, status):
+        debug_log(f"[CMD] Enviando comando INVITE a IP={ip}")
+        send_cmd(ip, "INVITE", MY_NICK, "PRIV", status)
+
+    def get_chat(self, cid): return ACTIVE_CHATS.get(cid)
+    def get_my_info(self): return MY_NICK, MY_IP, MY_STATUS
+    def get_peers(self): return PEERS
     
-    # 1. Resolver comando a su KEY interna (v34.0)
-    cmd_key = resolve_cmd(raw_cmd)
-    
-    # Soporte legacy para comandos especiales con espacio (ej: --log on)
-    # Aunque ahora tenemos alias mejores como --log-on
-    if not cmd_key:
-         if inp in ["--log on"]: cmd_key = 'LOG_ON'
-         elif inp in ["--log off"]: cmd_key = 'LOG_OFF'
-
-    # --- COMANDOS DE CREACIÓN DE SESIÓN (Forcan hijos) ---
-    if cmd_key == 'CHAT_GROUP':
-        gp_parts = args.split()
-        if len(gp_parts) == 2:
-            gid, gp = gp_parts[0], gp_parts[1]
-            cid = str(uuid.uuid4())[:8]
-            cdata = {'type': 'GROUP', 'remote_id': gid, 'pass': gp, 'created_at': time.time()}
-            ACTIVE_CHATS[cid] = cdata
-            spawn_child_process(cid, cdata)
-            reply_print(f"{Colors.G}[*] Grupo creado/unido.{Colors.E}", origin_cid) # FIX BUG 1
-        else: reply_print(f"{Colors.F}El formato es ID CLAVE. Ejemplo: --chatgrupal 10 clave123.{Colors.E}", origin_cid)
-
-    elif cmd_key == 'CHAT_PRIV':
-        t = find_global(args)
-        if t:
-            if t == MY_IP: reply_print(f"{Colors.F}Eres tú.{Colors.E}", origin_cid)
-            else:
-                reply_print(f"{Colors.W}[*] Invitando...{Colors.E}", origin_cid)
-                debug_log(f"[CMD] Enviando comando INVITE a IP={t} (Contenido del paquete: MiNick={MY_NICK})")
-                send_cmd(t, "INVITE", MY_NICK, "PRIV", MY_STATUS)
-
-    # --- COMANDOS GLOBALES / UTILIDADES ---
-    elif cmd_key == 'LS':
-         if origin_cid:
-             # Solicitud desde una ventana hija: Listar miembros de ESE chat specificamente
-             cdata = ACTIVE_CHATS.get(origin_cid)
-             if not cdata: return
-             
-             target_port = cdata.get('port')
-             if not target_port: return
-
-             # Construir lista de miembros
-             members = []
-             members.append(f"{Colors.BO}> {MY_NICK} ({MY_IP}) [Tú]{Colors.E}")
-             
-             if cdata['type'] == 'PRIV':
-                 rid = cdata['remote_id']
-                 rnick = cdata.get('remote_nick', '?')
-                 members.append(f"- {rnick} ({rid})")
-             
-             elif cdata['type'] == 'GROUP':
-                 gid = cdata['remote_id']
-                 # Buscar en PEERS quienes están en este chat
-                 count = 1 # Yo
-                 for ip, pdata in PEERS.items():
-                     if isinstance(pdata, dict) and origin_cid in pdata.get('chats', set()):
-                         members.append(f"- {pdata.get('nick', '?')} ({ip})")
-                         count += 1
-                 
-                 # Enviar cabecera con total
-                 msg = f"{Colors.H}--- MIEMBROS DEL GRUPO ({count}) ---{Colors.E}\n" + "\n".join(members)
-                 # Enviar al hijo via IPC
-                 send_ipc(f"MSG_IN{SEP}Sistema{SEP}{msg}{SEP}{Colors.C}", target_port)
-                 return
-
-         # Si estamos en lobby (sin origin_cid), mostrar chats activos y lista de usuarios conocidos
+    def show_lobby_summary(self):
          safe_print(f"{Colors.G}--- RESUMEN DE RED ---{Colors.E}")
-         safe_print(f"Total de Usuarios Conocidos: {len(KNOWN_USERS) + 1}") # +1 soy yo
+         safe_print(f"Total de Usuarios Conocidos: {len(KNOWN_USERS) + 1}")
          safe_print(f"{Colors.BO} > {MY_NICK} ({MY_IP}) [Yo]{Colors.E}")
-         
-         # Listar resto
          for ip, d in KNOWN_USERS.items():
              est = d.get('status','?')
              safe_print(f" - {d['nick']} ({ip}) [{est}]")
-             
          safe_print(f"\n{Colors.G}Sesiones de Chat Activas ({len(ACTIVE_CHATS)}):{Colors.E}")
          for cid, d in ACTIVE_CHATS.items():
              safe_print(f" - [{cid}] {d['type']}: {d.get('remote_nick', d['remote_id'])}")
 
-    elif cmd_key == 'CONTACTS':
-        reply_print(f"{Colors.G}[*] Historial de Sesión ({len(KNOWN_USERS)}):{Colors.E}", origin_cid)
-        for ip, d in KNOWN_USERS.items(): 
-            msg = f"   - {d['nick']} ({ip}) [{d['status']}] (Visto: {time.strftime('%H:%M', time.localtime(d['t']))})"
-            reply_print(msg, origin_cid)
-
-    elif cmd_key == 'SCAN': scan_network(target_cid=origin_cid)
-    elif cmd_key == 'SCAN_VIS_ON':
-        VISIBLE_IN_SCAN=True; save_config()
-        # refresh_ui borra pantalla, eso no se puede redirigir facil al chat, asi que enviamos solo texto
-        if origin_cid: reply_print(f"{Colors.G}[✔] Visible en escáner.{Colors.E}", origin_cid)
-        else: refresh_ui(f"{Colors.G}[✔] Visible en escáner.{Colors.E}")
-        
-    elif cmd_key == 'SCAN_VIS_OFF':
-        VISIBLE_IN_SCAN=False; save_config()
-        if origin_cid: reply_print(f"{Colors.W}[✔] Oculto en escáner.{Colors.E}", origin_cid)
-        else: refresh_ui(f"{Colors.W}[✔] Oculto en escáner.{Colors.E}")
-
-    elif cmd_key == 'STATUS':
-        MY_STATUS = args; save_config()
-        if origin_cid: reply_print(f"{Colors.G}[✔] Estado actualizado.{Colors.E}", origin_cid)
-        else: refresh_ui(f"{Colors.G}[✔] Estado actualizado.{Colors.E}")
-        send_cmd_all("STATUS_UPDATE", MY_NICK, MY_STATUS)
-
-    elif cmd_key == 'NICK':
-        old_nick = MY_NICK
-        MY_NICK = args; save_config()
-        
-        msg = f"{Colors.G}[✔] Nick cambiado de {old_nick} a {MY_NICK}.{Colors.E}"
-        if origin_cid: reply_print(msg, origin_cid)
-        else: refresh_ui(msg)
-        
-        # Broadcast cambio inmediato
-        send_cmd_all("STATUS_UPDATE", MY_NICK, MY_STATUS) # Esto notifica a todos
-        # Y avisar a mis propias ventanas hijas para que sepan el cambio?
-        # Bueno, el refresco de UI lo maneja lobby, pero el title bar...
-        set_terminal_title(f"GWC Lobby - {MY_NICK}")
-
-    elif cmd_key == 'LOG_ON': LOG_ON=True; save_config(); reply_print(f"{Colors.G}LOG ON - Historial activado.{Colors.E}", origin_cid)
-    elif cmd_key == 'LOG_OFF': LOG_ON=False; save_config(); reply_print(f"{Colors.W}LOG OFF - Historial desactivado.{Colors.E}", origin_cid)
-    elif cmd_key == 'POP_OFF': POPUP_ON, USER_OFF = False, True; reply_print(f"{Colors.W}Mute Manual.{Colors.E}", origin_cid)
-    elif cmd_key == 'POP_ON': POPUP_ON, USER_OFF = True, False; reply_print(f"{Colors.G}Popups ON.{Colors.E}", origin_cid)
+    def get_known_users(self): return KNOWN_USERS
+    def scan_network(self, cid): scan_network(target_cid=cid)
     
-    # Auto Download
-    elif cmd_key == 'DL_ON':
-        AUTO_DL = True; save_config()
-        reply_print(f"{Colors.G}[✔] Descarga automática ACTIVADA.{Colors.E}", origin_cid)
-        
-    elif cmd_key == 'DL_OFF':
-        AUTO_DL = False; save_config()
-        reply_print(f"{Colors.W}[✔] Descarga automática DESACTIVADA (Se preguntará).{Colors.E}", origin_cid)
+    def set_config(self, key, val):
+        global VISIBLE_IN_SCAN, MY_STATUS, MY_NICK, LOG_ON, POPUP_ON, AUTO_DL, USER_OFF
+        if key == 'visible': VISIBLE_IN_SCAN = val
+        elif key == 'status': MY_STATUS = val
+        elif key == 'nick': MY_NICK = val
+        elif key == 'log_on': LOG_ON = val
+        elif key == 'pop_on': 
+            POPUP_ON = val
+            if val: USER_OFF = False
+            else: USER_OFF = True
+        elif key == 'auto_dl': AUTO_DL = val
+        save_config()
 
-    # AutoStart Commands
-    elif cmd_key == 'AUTOSTART_ON': toggle_autostart(True, origin_cid)
-    elif cmd_key == 'AUTOSTART_OFF': toggle_autostart(False, origin_cid)
+    def broadcast_status(self, st=None): send_cmd_all("STATUS_UPDATE", MY_NICK, st if st else MY_STATUS)
+    def update_title(self): set_terminal_title(f"GWC Lobby - {MY_NICK}")
+    def toggle_autostart(self, val, cid): toggle_autostart(val, cid)
     
-    elif cmd_key == 'CLEAR':
+    def clear_screen(self, cid):
         global LOBBY_HISTORY
-        LOBBY_HISTORY = [] # Reset total si pide clear manual
-        refresh_ui()
-
-    elif cmd_key == 'INVITE':
-        if not origin_cid:
-             reply_print(f"{Colors.F}[!] Comando disponible solo dentro de una ventana de chat.{Colors.E}", origin_cid)
-        else:
-             # Lógica de invitación desde dentro del chat
-             # --invite A B C ...
-             args_list = [x.strip().replace(',','') for x in args.split()]
-             if not args_list: return
-
-             chat_data = ACTIVE_CHATS.get(origin_cid)
-             if not chat_data: return
-
-             reply_print(f"{Colors.W}[*] Procesando invitaciones para chat {origin_cid}...{Colors.E}", origin_cid)
-
-             targets_map = {} # IP -> Nick (o 'Unknown')
-             unknown_nicks = []
-
-             for arg in args_list:
-                 # Es IP? (regex simple o check de puntos)
-                 is_ip = False
-                 if arg.count('.') == 3 and arg.replace('.','').isdigit():
-                     # Asumimos IP
-                     targets_map[arg] = "Usuario IP"
-                     is_ip = True
-
-                 if not is_ip:
-                     # Es un Nick.
-                     # 1. Buscar en memoria (Rápido)
-                     target_clean = normalize_str(arg)
-                     found = False
-                     
-                     # Check Global Peers
-                     for ip, pdata in PEERS.items():
-                         if isinstance(pdata, dict) and normalize_str(pdata.get('nick', '')) == target_clean:
-                             targets_map[ip] = pdata.get('nick')
-                             found = True
-                             break
-                     
-                     # Check History
-                     if not found:
-                         for ip, d in KNOWN_USERS.items():
-                             if normalize_str(d['nick']) == target_clean:
-                                 targets_map[ip] = d['nick']
-                                 found = True
-                                 break
-                     
-                     if not found:
-                         unknown_nicks.append(arg)
-             
-             # 2. Escaneo Activo para desconocidos (Lento: 2s)
-             if unknown_nicks:
-                 reply_print(f"{Colors.W}[*] Escaneando red para: {', '.join(unknown_nicks)}...{Colors.E}", origin_cid)
-                 global DISC_TEMP
-                 DISC_TEMP = [] # Reset buffer discovery
-
-                 # Enviar WHO a broadcast
-                 with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-                    s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-                    s.settimeout(0.5)
-                    try:
-                        s.sendto(build_packet("WHOIS", MY_NICK), ('255.255.255.255', UDP_PORT))
-                    except: pass
-                 
-                 time.sleep(2) # Esperar respuestas
-                 
-                 # DISC_TEMP se llena en udp_loop
-                 for d_ip, d_nick, d_stat in DISC_TEMP:
-                     update_memory(d_ip, d_nick, d_stat)
-                     # Revisar si coincide con lo que buscabamos
-                     for unick in unknown_nicks:
-                         clean_target = normalize_str(unick)
-                         if normalize_str(d_nick) == clean_target:
-                             targets_map[d_ip] = d_nick
-                             reply_print(f"{Colors.G}[+] Encontrado: {d_nick} ({d_ip}){Colors.E}", origin_cid)
-                             break
-
-             if not targets_map:
-                 reply_print(f"{Colors.F}[!] Ningún objetivo válido encontrado.{Colors.E}", origin_cid)
-                 return
-
-             # Enviar invitaciones finales
-             # Si es Group: Manda INVITE GROUP con ID + PASS
-             # Si es Priv: No se puede "invitar" a 3ro a un priv (sería crear grupo). 
-             gid = chat_data.get('remote_id') if chat_data['type'] == 'GROUP' else None
-             
-             for ip, pdata in PEERS.items():
-                 # Update map con info real si es peer activo
-                 if ip in targets_map:
-                     if isinstance(pdata, dict): targets_map[ip] = pdata.get('nick', targets_map[ip])
-                     elif 'chat' in pdata: 
-                         # Caso donde solo tenemos chat list y no nick (raro)
-                         pass
-             
-             for ip, tnick in targets_map.items():
-                 # Validar que no este ya
-                 if gid:
-                     # Group Logic
-                     send_cmd(ip, "INVITE", MY_NICK, "GROUP", gid, chat_data['pass'], args) # Args aqui no se usa, deberia ser members list
-                     reply_print(f"   > Invitación enviada a {tnick} ({ip}).", origin_cid)
-                 else:
-                     # Priv Logic (Upgrade?)
-                     # No se puede invitar a terceros a un chat privado.
-                     reply_print(f"   [!] No se puede invitar a terceros a un chat privado.", origin_cid)
-             
-             if unknown_nicks:
-                 reply_print(f"   [!] No encontrados: {', '.join(unknown_nicks)}", origin_cid)
-
-    elif cmd_key == 'FILE':
-         if not origin_cid:
-             reply_print(f"{Colors.F}[!] Envío de archivos disponible solo dentro de una ventana de chat.{Colors.E}", origin_cid)
-         else:
-             if args: send_file(args, target_cid=origin_cid)
-             else: reply_print(f"{Colors.F}Falta ruta del archivo.{Colors.E}", origin_cid)
-
-    elif cmd_key == 'EXIT':
-        if origin_cid:
-            # Comando viene de una ventana hija -> Cerrar SOLO esa ventana
-            leave_sess(target_cid=origin_cid)
-        else:
-            # Comando en el Lobby -> Apagar APP
-            shutdown_lobby()
-
-    # --- RESPUESTAS A INVITACIONES ---
-    elif cmd_key == 'ACCEPT':
-        if not PENDING_INVITE:
-            reply_print(f"{Colors.W}No tienes invitaciones pendientes.{Colors.E}", origin_cid)
-        else:
-             reply_print(f"{Colors.G}[*] Aceptando...{Colors.E}", origin_cid)
-             debug_log(f"[CMD] Ejecutando logic ACCEPT para {PENDING_INVITE['ip']}")
-             # PENDING_INVITE: {'ip': ip, 'type': 'GROUP'/'PRIV', 'id': gid/None, 'pass': pass/None}
-             if PENDING_INVITE['type'] == 'GROUP':
-                  exec_lobby_cmd(f"--chatgrupal {PENDING_INVITE['data'][0]} {PENDING_INVITE['data'][1]}")
-             else:
-                  start_private_chat(PENDING_INVITE['ip'], PENDING_INVITE.get('nick','?'))
-             PENDING_INVITE = None
-
-    elif cmd_key == 'DENY':
-        if PENDING_INVITE:
-            reply_print(f"{Colors.W}[*] Invitación rechazada.{Colors.E}", origin_cid)
-            send_cmd(PENDING_INVITE['ip'], "INVITE_REJ", MY_NICK, "Rechazado")
-            PENDING_INVITE = None
-        else:
-            reply_print(f"{Colors.W}Nada que rechazar.{Colors.E}", origin_cid)
-
-    elif cmd_key == 'HELP':
-        show_help(origin_cid)
-
-    elif cmd_key == 'SHORTCUTS':
-        # Nueva funcionalidad v34.0
-        msg_lines = [f"{Colors.H}=== ABREVIACIONES Y ALIAS (v34.x) ==={Colors.E}"]
-        msg_lines.append("") # Spacer
-        
-        # Ordenar keys por nombre
-        for key in sorted(COMMAND_DEFS.keys()):
-            data = COMMAND_DEFS[key]
-            # Mostrar max 5 alias por linea para no saturar
-            aliases = data['aliases']
-            desc = data['desc']
-            msg_lines.append(f"{Colors.BO}● {key}{Colors.E} : {desc}")
-            msg_lines.append(f"   ↳ Variantes: { Colors.C + ', '.join(aliases) + Colors.E }")
-            msg_lines.append("") # Spacer entre comandos para legibilidad
-        
-        full_msg = "\n".join(msg_lines)
-        if origin_cid: reply_print(full_msg, origin_cid)
-        else: safe_print(full_msg)
-
-    elif cmd_key == 'CLEAR':
-        # global LOBBY_HISTORY -> Moved to top
         LOBBY_HISTORY = []
-        os.system('cls' if os.name == 'nt' else 'clear')
-        if origin_cid: reply_print(f"{Colors.G}Pantalla limpiada.{Colors.E}", origin_cid) # Virtual clear msg
-        else: safe_print(f"{Colors.B}Lobby limpiado.{Colors.E}")
-        
-    elif cmd_key == 'DEBUG':
+        if cid: reply_print(f"{Colors.G}Pantalla limpiada.{Colors.E}", cid)
+        else: refresh_ui()
+
+    def invite_users(self, args_str, cid):
+        invite_users(args_str, target_cid=cid)
+
+    def send_file(self, args, cid): send_file(args, target_cid=cid)
+    def leave_sess(self, cid): leave_sess(target_cid=cid)
+    def shutdown_app(self): shutdown_lobby()
+    
+    def handle_accept(self, cid):
+        global PENDING_INVITE
+        if not PENDING_INVITE: return reply_print(f"{Colors.W}No tienes invitaciones pendientes.{Colors.E}", cid)
+        reply_print(f"{Colors.G}[*] Aceptando...{Colors.E}", cid)
+        if PENDING_INVITE['type'] == 'GROUP':
+             self.create_group(PENDING_INVITE['data'][0], PENDING_INVITE['data'][1])
+             self.reply(f"{Colors.G}[*] Grupo creado/unido.{Colors.E}", cid)
+        else:
+             start_private_chat(PENDING_INVITE['ip'], PENDING_INVITE.get('nick','?'))
+        PENDING_INVITE = None
+
+    def handle_deny(self, cid):
+        global PENDING_INVITE
+        if PENDING_INVITE:
+             reply_print(f"{Colors.W}[*] Invitación rechazada.{Colors.E}", cid)
+             send_cmd(PENDING_INVITE['ip'], "INVITE_REJ", MY_NICK, "Rechazado")
+             PENDING_INVITE = None
+        else:
+             reply_print(f"{Colors.W}Nada que rechazar.{Colors.E}", cid)
+
+    def get_var(self, name):
+        if name == 'visible': return VISIBLE_IN_SCAN
+        if name == 'auto_dl': return AUTO_DL
+        if name == 'pop_on': return POPUP_ON
+        if name == 'log_on': return LOG_ON
+        return None
+
+    def get_active_chats(self): return ACTIVE_CHATS
+    def get_version_str(self): return APP_VERSION
+    
+    def toggle_debug(self):
+        global DEBUG_MODE
         DEBUG_MODE = not DEBUG_MODE
-        status = "ACTIVADO" if DEBUG_MODE else "DESACTIVADO"
-        dsk = get_desktop_path()
-        log_path = os.path.join(dsk, "gwc_lobby_debug.log")
-        reply_print(f"{Colors.M}[DEBUG] Modo Debug {status}.{Colors.E}", origin_cid)
-        if DEBUG_MODE:
-            reply_print(f"{Colors.M}[DEBUG] Guardando logs en: {log_path}{Colors.E}", origin_cid)
-            debug_log("--- SESION DE DEBUG INICIADA ---")
+        # Logic from command
+        # dsk = get_desktop_path()... we assume caller handles logging the toggle status via reply
+        return DEBUG_MODE
 
-    elif cmd_key == 'GLOBAL_STATUS':
-        # v35.1 Mejorado
-        lines = [f"{Colors.H}=== ESTADO GLOBAL DEL SISTEMA ==={Colors.E}"]
-        lines.append(f" {Colors.BO}Versión:{Colors.E} {APP_VERSION}")
-        lines.append(f" {Colors.BO}Usuario:{Colors.E} {MY_NICK} ({MY_IP})")
-        lines.append(f" {Colors.BO}Estado:{Colors.E} {MY_STATUS}")
-        lines.append(f" {Colors.BO}Visibilidad Red:{Colors.E} {'VISIBLE' if VISIBLE_IN_SCAN else 'OCULTO (Ghost Mode)'}")
-        lines.append(f" {Colors.BO}Auto-Descargas:{Colors.E} {'ACTIVADAS' if AUTO_DL else 'DESACTIVADAS (Preguntar)'}")
-        lines.append(f" {Colors.BO}Notificaciones:{Colors.E} {'ON' if POPUP_ON else 'OFF (Mute Global)'}")
-        lines.append(f" {Colors.BO}Guardar Historial:{Colors.E} {'ON' if LOG_ON else 'OFF'}")
-        
-        # Determine autostart status on Linux
-        auto_st = "?"
-        if platform.system() == "Linux":
-             p = os.path.expanduser("~/.config/autostart/inter_chat_auto.desktop")
-             auto_st = "ACTIVADO" if os.path.exists(p) else "DESACTIVADO"
-        else: auto_st = "N/A (No Linux)"
-        lines.append(f" {Colors.BO}Auto-Inicio (Linux):{Colors.E} {auto_st}")
-        
-        lines.append("")
-        lines.append(f"{Colors.BO}:: LISTADO DE CONTACTOS Hitoricos (Total: {len(KNOWN_USERS)}) ::{Colors.E}")
-        if not KNOWN_USERS:
-            lines.append(" (Vacío)")
-        else:
-            for ip, d in KNOWN_USERS.items():
-                seen = time.strftime('%H:%M', time.localtime(d['t']))
-                lines.append(f" - {d['nick']} ({ip}) [{d['status']}] (Visto: {seen})")
-        
-        lines.append("")
-        lines.append(f"{Colors.BO}:: CHATS ACTIVOS (Total: {len(ACTIVE_CHATS)}) ::{Colors.E}")
-        if not ACTIVE_CHATS:
-             lines.append(" (Ninguno)")
-        else:
-             for cid, d in ACTIVE_CHATS.items():
-                 lines.append(f" - [{cid}] {d['type']}: {d.get('remote_nick', d['remote_id'])}")
-
-        full_msg = "\n".join(lines)
-        if origin_cid: reply_print(full_msg, origin_cid)
-        else: safe_print(full_msg)
-
-    # Si no matchea nada
-    elif cmd_key is None and raw_cmd.startswith("-"):
-         reply_print(f"{Colors.F}Comando desconocido: {raw_cmd}. Prueba --help o --ab.{Colors.E}", origin_cid)
+LOBBY_ADAPTER = LobbyAdapter()
 
 # --- PROCESOS & LOBBY ---
 
