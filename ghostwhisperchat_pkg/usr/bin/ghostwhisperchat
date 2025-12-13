@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-APP_VER_NUM = 37.22
-APP_VER_TAG = "Fix False Terminal Crash"
+APP_VER_NUM = 37.23
+APP_VER_TAG = "Modularizado & Fix Comm"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 import socket, threading, subprocess, sys, os, time, platform, atexit, re, signal, ctypes, shutil
@@ -740,99 +740,88 @@ def update_memory(ip, nick, status):
              PEERS[ip]['nick'] = nick
     save_config()
 
-def udp_loop():
+def handle_incoming_udp(d, ip):
     global PEERS, DISC_TEMP, PEER_STATUSES, SCAN_RESULTS
-    u = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    u.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1); u.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-    try: u.bind(('', UDP_PORT))
-    except: return
+    
+    msg = d.decode('utf-8', errors='ignore')
+    debug_log(f"[UDP] Recibido de {ip}: {msg[:100]}") # Show first 100 chars
+    
+    if ip == MY_IP: return
 
-    while True:
-        try:
-            d, a = u.recvfrom(4096);
-            if not d: return # Assuming 'data' in instruction refers to 'd'
-            
-            msg, ip = d.decode('utf-8', errors='ignore'), a[0]
-            debug_log(f"[TCP_RAW] Recibido de {ip}: {msg[:100]}") # Show first 100 chars
-            
-            if ip == MY_IP: continue
+    is_cmd, cmd, args = parse_packet(msg)
 
-            is_cmd, cmd, args = parse_packet(msg)
+    if not is_cmd: return # Ignorar mensajes no estructurados en UDP
 
-            if not is_cmd: continue # Ignorar mensajes no estructurados en UDP
+    if cmd == "SEARCH_GROUP":
+        # args: GID, GPASS, NICK, STATUS
+        if len(args) >= 4:
+            gid, gpass, nick, st = args[0], args[1], args[2], args[3]
+            found_chat_id = None
+            for cid, cdata in ACTIVE_CHATS.items():
+                if cdata['type']=='GROUP' and str(cdata['remote_id'])==str(gid) and str(cdata['pass'])==str(gpass):
+                    found_chat_id = cid
+                    break
 
-            if cmd == "SEARCH_GROUP":
-                # args: GID, GPASS, NICK, STATUS
-                if len(args) >= 4:
-                    gid, gpass, nick, st = args[0], args[1], args[2], args[3]
-                    found_chat_id = None
-                    for cid, cdata in ACTIVE_CHATS.items():
-                        if cdata['type']=='GROUP' and str(cdata['remote_id'])==str(gid) and str(cdata['pass'])==str(gpass):
-                            found_chat_id = cid
-                            break
+            if found_chat_id:
+                if ip not in PEERS: PEERS[ip] = {'nick': nick, 'chats': set()}
+                PEERS[ip]['nick'] = nick
+                PEERS[ip]['chats'].add(found_chat_id)
 
-                    if found_chat_id:
-                        if ip not in PEERS: PEERS[ip] = {'nick': nick, 'chats': set()}
-                        PEERS[ip]['nick'] = nick
-                        PEERS[ip]['chats'].add(found_chat_id)
+                PEER_STATUSES[ip] = st
+                update_memory(ip, nick, st)
 
-                        PEER_STATUSES[ip] = st
-                        update_memory(ip, nick, st)
+                if 'port' in ACTIVE_CHATS[found_chat_id]:
+                    send_ipc(f"FWD_PEER{SEP}{ip}{SEP}{nick}{SEP}{st}", ACTIVE_CHATS[found_chat_id]['port'])
 
-                        if 'port' in ACTIVE_CHATS[found_chat_id]:
-                            send_ipc(f"FWD_PEER{SEP}{ip}{SEP}{nick}{SEP}{st}", ACTIVE_CHATS[found_chat_id]['port'])
+                gw_comm.send_udp_cmd(ip, "I_EXIST", gid, gpass, MY_NICK, MY_STATUS)
 
-                        u.sendto(build_packet("I_EXIST", gid, gpass, MY_NICK, MY_STATUS), (ip, UDP_PORT))
+    elif cmd == "I_EXIST":
+        # args: GID, GPASS, NICK, STATUS
+        if len(args) >= 4:
+            gid, gpass, nick, st = args[0], args[1], args[2], args[3]
+            found_chat_id = None
+            for cid, cdata in ACTIVE_CHATS.items():
+                if cdata['type']=='GROUP' and str(cdata['remote_id'])==str(gid) and str(cdata['pass'])==str(gpass):
+                    found_chat_id = cid
+                    break
 
-            elif cmd == "I_EXIST":
-                # args: GID, GPASS, NICK, STATUS
-                if len(args) >= 4:
-                    gid, gpass, nick, st = args[0], args[1], args[2], args[3]
-                    found_chat_id = None
-                    for cid, cdata in ACTIVE_CHATS.items():
-                        if cdata['type']=='GROUP' and str(cdata['remote_id'])==str(gid) and str(cdata['pass'])==str(gpass):
-                            found_chat_id = cid
-                            break
+            if found_chat_id:
+                if ip not in PEERS: PEERS[ip] = {'nick': nick, 'chats': set()}
+                PEERS[ip]['nick'] = nick
+                PEERS[ip]['chats'].add(found_chat_id)
 
-                    if found_chat_id:
-                        if ip not in PEERS: PEERS[ip] = {'nick': nick, 'chats': set()}
-                        PEERS[ip]['nick'] = nick
-                        PEERS[ip]['chats'].add(found_chat_id)
+                PEER_STATUSES[ip] = st
+                update_memory(ip, nick, st)
 
-                        PEER_STATUSES[ip] = st
-                        update_memory(ip, nick, st)
+                if 'port' in ACTIVE_CHATS[found_chat_id]:
+                        send_ipc(f"FWD_PEER{SEP}{ip}{SEP}{nick}{SEP}{st}", ACTIVE_CHATS[found_chat_id]['port'])
 
-                        if 'port' in ACTIVE_CHATS[found_chat_id]:
-                             send_ipc(f"FWD_PEER{SEP}{ip}{SEP}{nick}{SEP}{st}", ACTIVE_CHATS[found_chat_id]['port'])
+    elif cmd == "WHOIS":
+        # args[0] = target_nick (puede ser vacío)
+        target = args[0].strip().lower() if args else ""
 
-            elif cmd == "WHOIS":
-                # args[0] = target_nick (puede ser vacío)
-                target = args[0].strip().lower() if args else ""
+        # Soy yo?
+        if not target or target == MY_NICK.lower():
+            gw_comm.send_udp_cmd(ip, "USER_HERE", MY_NICK, MY_STATUS)
 
-                # Soy yo?
-                if not target or target == MY_NICK.lower():
-                    u.sendto(build_packet("USER_HERE", MY_NICK, MY_STATUS), (ip, UDP_PORT))
+    elif cmd == "USER_HERE":
+        # args: Nick, Status
+        if len(args) >= 2:
+            nick, st = args[0], args[1]
+            # Check duplicate in DISC_TEMP
+            if not any(x[0] == ip for x in DISC_TEMP):
+                DISC_TEMP.append((ip, nick, st))
+            update_memory(ip, nick, st)
 
-            elif cmd == "USER_HERE":
-                # args: Nick, Status
-                if len(args) >= 2:
-                    nick, st = args[0], args[1]
-                    # Check duplicate in DISC_TEMP
-                    if not any(x[0] == ip for x in DISC_TEMP):
-                        DISC_TEMP.append((ip, nick, st))
-                    update_memory(ip, nick, st)
+    elif cmd == "WHO_ALL" and VISIBLE_IN_SCAN:
+        gw_comm.send_udp_cmd(ip, "IAM_HERE", MY_NICK, MY_STATUS)
 
-            elif cmd == "WHO_ALL" and VISIBLE_IN_SCAN:
-                u.sendto(build_packet("IAM_HERE", MY_NICK, MY_STATUS), (ip, UDP_PORT))
-
-            elif cmd == "IAM_HERE":
-                # args: Nick, Status
-                if len(args) >= 2:
-                    nick, st = args[0], args[1]
-                    SCAN_RESULTS.append({'ip': ip, 'nick': nick, 'status': st})
-                    update_memory(ip, nick, st)
-
-        except: pass
+    elif cmd == "IAM_HERE":
+        # args: Nick, Status
+        if len(args) >= 2:
+            nick, st = args[0], args[1]
+            SCAN_RESULTS.append({'ip': ip, 'nick': nick, 'status': st})
+            update_memory(ip, nick, st)
 
 def find_global(t):
     target_clean = normalize_str(t)
@@ -1229,293 +1218,274 @@ def dl_file(name, size, sock, sender, sender_ip=None, expected_hash=None, file_t
                          msg = f"{Colors.C}{sender} envía archivo: {name}. Escribe --aceptar.{Colors.E}"
                          send_ipc(f"FWD_MSG{SEP}{cid}{SEP}{tag}{SEP}{msg}", ACTIVE_CHATS[cid]['port'])
 
-def tcp_loop():
+def handle_incoming_tcp(c, ip, raw):
     global POPUP_ON, LAST_ACT, USER_OFF, PENDING_INVITE
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM); s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    try: s.bind(('0.0.0.0', TCP_PORT)); s.listen(10)
-    except: safe_print(f"{Colors.F}Puerto ocupado.{Colors.E}"); os._exit(1)
 
-    while True:
-        try:
-            c, a = s.accept(); ip = a[0]
-            raw = c.recv(4096).decode('utf-8', errors='ignore')
+    try:
+        if raw:
+            # 1. Intentar parsear como Paquete Estructurado v27
+            is_cmd, cmd, args = parse_packet(raw)
 
-            if raw:
-                # 1. Intentar parsear como Paquete Estructurado v27
-                is_cmd, cmd, args = parse_packet(raw)
+            if is_cmd:
+                # Auto-add to known if interaction happens
+                if ip not in PEERS:
+                    if ip in KNOWN_USERS:
+                        PEERS[ip] = {'nick': KNOWN_USERS[ip]['nick'], 'chats': set()}
+                    else:
+                        PEERS[ip] = {'nick': "...", 'chats': set()}
 
-                if is_cmd:
-                    # Auto-add to known if interaction happens
-                    if ip not in PEERS:
-                        if ip in KNOWN_USERS:
-                            PEERS[ip] = {'nick': KNOWN_USERS[ip]['nick'], 'chats': set()}
-                        else:
-                            PEERS[ip] = {'nick': "...", 'chats': set()}
+                curr_nick = PEERS[ip]['nick']
 
-                    curr_nick = PEERS[ip]['nick']
+                if not USER_OFF:
+                    # Simple logic for popup, ignoring PRIVATE_PEER timeout logic for now
+                    if not POPUP_ON and (time.time()-LAST_ACT > 30): POPUP_ON = True
 
-                    if not USER_OFF:
-                        # Simple logic for popup, ignoring PRIVATE_PEER timeout logic for now
-                        if not POPUP_ON and (time.time()-LAST_ACT > 30): POPUP_ON = True
-                    # elif time.time()-LAST_ACT > TIMEOUTS['MANUAL']: POPUP_ON, USER_OFF = True, False; safe_print(f"{Colors.W}[i] Popups ON.{Colors.E}") # TIMEOUTS not defined
+                # BLOCK MODULAR DE COMANDOS
+                if cmd == "INVITE":
+                    # args: NICK, TYPE, (GID, GPASS, MEMBERS if group)
+                    debug_log(f"[RED] Recibido INVITE de {ip}")
+                    if len(args) >= 2:
+                        nick, type = args[0], args[1]
+                        extra = None
+                        if type == "GROUP" and len(args) >= 5:
+                            extra = (args[2], args[3], args[4]) # gid, pass, members
 
-                    # BLOCK MODULAR DE COMANDOS
-                    if cmd == "INVITE":
-                        # args: NICK, TYPE, (GID, GPASS, MEMBERS if group)
-                        debug_log(f"[RED] Recibido INVITE de {ip}")
-                        if len(args) >= 2:
-                            nick, type = args[0], args[1]
-                            extra = None
-                            if type == "GROUP" and len(args) >= 5:
-                                extra = (args[2], args[3], args[4]) # gid, pass, members
-
-                            PEERS[ip]['nick'] = nick
-                            st = args[len(args)-1] if type == "PRIV" and len(args) >= 3 else "?" # Status is last arg for PRIV
-                            PEER_STATUSES[ip] = st
-                            update_memory(ip, PEERS[ip]['nick'], st) # Sync al recibir
-                            
-                            debug_log(f"[INVITE_LOGIC] Iniciando logica de invitacion para {nick} (Tipo: {type})")
-                            threading.Thread(target=handle_invite_logic, args=(ip, nick, type, extra)).start()
-
-                    elif cmd == "INVITE_ACC":
-                        # args: R_NICK, R_STATUS
-                        debug_log(f"[RED] Recibido INVITE_ACC de {ip}. Procesando aceptación...")
-                        if len(args) >= 2:
-                             r_nick, r_stat = args[0], args[1]
-                             
-                             # Buscar invitacion pendiente mia hacia esa IP?
-                             # Asumimos que si llega INVITE_ACC es porque invitamos.
-                             # Creamos sala PRIV
-                             cid = str(uuid.uuid4())[:8]
-                             cdata = {'type': 'PRIV', 'remote_id': ip, 'pass': None, 'created_at': time.time(), 'remote_nick': r_nick}
-                             ACTIVE_CHATS[cid] = cdata
-                             
-                             # LINK ROUTING
-                             if ip not in PEERS: PEERS[ip] = {'nick': r_nick, 'chats': set()}
-                             if isinstance(PEERS[ip], dict):
-                                 PEERS[ip]['chats'].add(cid)
-                                 debug_log(f"[RED] Vinculada IP {ip} a CID {cid} (INVITE_ACC)")
-                             
-                             # TRUSTED PEERS (Add logic)
-                             TRUSTED_PEERS.add(ip); save_config()
-
-                             # Threading spawn to avoid blocking TCP loop (Fix Slowness)
-                             debug_log(f"[PROCESO] Iniciando consola hija para chat confirmado {cid}")
-                             threading.Thread(target=spawn_child_process, args=(cid, cdata)).start()
-                             refresh_ui(f"{Colors.G}[*] {r_nick} aceptó tu invitación.{Colors.E}")
-                             
-                             # TRIGGER UPDATE CHECK (Private)
-                             # Esperar un poco para estabilidad TCP
-                             # threading.Thread(target=lambda: (time.sleep(3), try_trigger_updates([ip]))).start(); 
-                             write_log(f"Privado ok {r_nick}", "SYS")
-
-                    elif cmd == "INVITE_REJ":
-                        # args: NICK, REASON
-                        reason = args[1] if len(args)>1 else "?"
-                        safe_print(f"{Colors.F}[X] {args[0]} rechazó la invitación ({reason}).{Colors.E}")
-                        if ip in PEERS and isinstance(PEERS[ip], dict) and not PEERS[ip].get('chats'):
-                             del PEERS[ip]
-                             if ip in PEER_STATUSES: del PEER_STATUSES[ip]
-                        PENDING_INVITE = None
-
-                    elif cmd == "INVITE_TOUT":
-                        # args: NICK, STATUS
-                        n = args[0] if len(args)>0 else curr_nick
-                        st = args[1] if len(args)>1 else "AFK"
-                        safe_print(f"{Colors.W}[!] {n} no respondió (Timeout). Estado: {st}{Colors.E}")
-                        update_memory(ip, n, st)
-                        if ip in PEERS and isinstance(PEERS[ip], dict) and not PEERS[ip].get('chats'):
-                             del PEERS[ip]
-                             if ip in PEER_STATUSES: del PEER_STATUSES[ip]
-
-                    elif cmd == "GRP_INVITE_ACC":
-                         # args: NICK
-                         safe_print(f"{Colors.G}[✔] {args[0]} se unió al grupo.{Colors.E}")
-                         # UDP SEARCH_GROUP will handle the actual peer linkage.
-
-                    elif cmd == "JOINED":
-                        # args: NICK, STATUS
-                        PEERS[ip]['nick'] = args[0]
-                        st = args[1] if len(args)>1 else ""
+                        PEERS[ip]['nick'] = nick
+                        st = args[len(args)-1] if type == "PRIV" and len(args) >= 3 else "?" # Status is last arg for PRIV
                         PEER_STATUSES[ip] = st
-                        update_memory(ip, args[0], st)
+                        update_memory(ip, PEERS[ip]['nick'], st) # Sync al recibir
+                        
+                        debug_log(f"[INVITE_LOGIC] Iniciando logica de invitacion para {nick} (Tipo: {type})")
+                        threading.Thread(target=handle_invite_logic, args=(ip, nick, type, extra)).start()
 
+                elif cmd == "INVITE_ACC":
+                    # args: R_NICK, R_STATUS
+                    debug_log(f"[RED] Recibido INVITE_ACC de {ip}. Procesando aceptación...")
+                    if len(args) >= 2:
+                            r_nick, r_stat = args[0], args[1]
+                            
+                            # Buscar invitacion pendiente mia hacia esa IP?
+                            # Asumimos que si llega INVITE_ACC es porque invitamos.
+                            # Creamos sala PRIV
+                            cid = str(uuid.uuid4())[:8]
+                            cdata = {'type': 'PRIV', 'remote_id': ip, 'pass': None, 'created_at': time.time(), 'remote_nick': r_nick}
+                            ACTIVE_CHATS[cid] = cdata
+                            
+                            # LINK ROUTING
+                            if ip not in PEERS: PEERS[ip] = {'nick': r_nick, 'chats': set()}
+                            if isinstance(PEERS[ip], dict):
+                                PEERS[ip]['chats'].add(cid)
+                                debug_log(f"[RED] Vinculada IP {ip} a CID {cid} (INVITE_ACC)")
+                            
+                            # TRUSTED PEERS (Add logic)
+                            TRUSTED_PEERS.add(ip); save_config()
+
+                            # Threading spawn to avoid blocking TCP loop (Fix Slowness)
+                            debug_log(f"[PROCESO] Iniciando consola hija para chat confirmado {cid}")
+                            threading.Thread(target=spawn_child_process, args=(cid, cdata)).start()
+                            refresh_ui(f"{Colors.G}[*] {r_nick} aceptó tu invitación.{Colors.E}")
+                            
+                            # TRIGGER UPDATE CHECK (Private)
+                            # Esperar un poco para estabilidad TCP
+                            # threading.Thread(target=lambda: (time.sleep(3), try_trigger_updates([ip]))).start(); 
+                            write_log(f"Privado ok {r_nick}", "SYS")
+
+                elif cmd == "INVITE_REJ":
+                    # args: NICK, REASON
+                    reason = args[1] if len(args)>1 else "?"
+                    safe_print(f"{Colors.F}[X] {args[0]} rechazó la invitación ({reason}).{Colors.E}")
+                    if ip in PEERS and isinstance(PEERS[ip], dict) and not PEERS[ip].get('chats'):
+                            del PEERS[ip]
+                            if ip in PEER_STATUSES: del PEER_STATUSES[ip]
+                    PENDING_INVITE = None
+
+                elif cmd == "INVITE_TOUT":
+                    # args: NICK, STATUS
+                    n = args[0] if len(args)>0 else curr_nick
+                    st = args[1] if len(args)>1 else "AFK"
+                    safe_print(f"{Colors.W}[!] {n} no respondió (Timeout). Estado: {st}{Colors.E}")
+                    update_memory(ip, n, st)
+                    if ip in PEERS and isinstance(PEERS[ip], dict) and not PEERS[ip].get('chats'):
+                            del PEERS[ip]
+                            if ip in PEER_STATUSES: del PEER_STATUSES[ip]
+
+                elif cmd == "GRP_INVITE_ACC":
+                        # args: NICK
+                        safe_print(f"{Colors.G}[✔] {args[0]} se unió al grupo.{Colors.E}")
+                        # UDP SEARCH_GROUP will handle the actual peer linkage.
+
+                elif cmd == "JOINED":
+                    # args: NICK, STATUS
+                    PEERS[ip]['nick'] = args[0]
+                    st = args[1] if len(args)>1 else ""
+                    PEER_STATUSES[ip] = st
+                    update_memory(ip, args[0], st)
+
+                    pdata = PEERS.get(ip)
+                    if pdata and isinstance(pdata, dict):
+                        for cid in pdata.get('chats', set()):
+                            if cid in ACTIVE_CHATS and 'port' in ACTIVE_CHATS[cid]:
+                                if ACTIVE_CHATS[cid]['type'] == 'GROUP':
+                                    tag = f"[{Colors.F}SYSTEM{Colors.E}]"
+                                    msg = f"{Colors.G}[+] {args[0]} entró al grupo.{Colors.E}"
+                                    send_ipc(f"FWD_MSG{SEP}{cid}{SEP}{tag}{SEP}{msg}", ACTIVE_CHATS[cid]['port'])
+
+                    safe_print(f"{Colors.G}[+] {args[0]} entró.{Colors.E}") # Lobby Log
+
+                elif cmd == "CHILD_EXIT":
+                    cid = args[0]
+                    if cid in ACTIVE_CHATS:
+                        # Clean up
+                        if 'port' in ACTIVE_CHATS[cid]: del ACTIVE_CHATS[cid]
+                        # No borramos de PEERS aqui, solo la sesión activa
+                        pass
+
+                    # Usamos safe_print antes del refresh para historial
+                    safe_print(f"{Colors.G}[*] Chat cerrado (CID: {cid}).{Colors.E}")
+                    refresh_ui()
+
+                elif cmd == "GRP_MSG":
+                    # args: GID, MSG
+                    if len(args) >= 2:
+                        gid, msg_content = args[0], args[1]
+                        # Buscar localmente el chat que tiene remote_id == gid_target
+                        target_cid = None
+                        for cid, cdata in ACTIVE_CHATS.items():
+                            if cdata['type'] == 'GROUP' and cdata['remote_id'] == gid:
+                                target_cid = cid
+                                break
+
+                        if target_cid and 'port' in ACTIVE_CHATS[target_cid]:
+                            curr_nick = PEERS.get(ip, {}).get('nick', '?')
+                            tag = f"[{get_col(curr_nick)}{curr_nick}{Colors.E}]"
+                            send_ipc(f"FWD_MSG{SEP}{target_cid}{SEP}{tag}{SEP}{msg_content}", ACTIVE_CHATS[target_cid]['port'])
+                            write_log(f"[{curr_nick} @ {gid}]: {msg_content}", "CHAT")
+
+                elif cmd == "STATUS_UPDATE":
+                    # args: NICK, STATUS
+                    if len(args) >= 2:
+                        PEERS[ip]['nick'] = args[0]
+                        PEER_STATUSES[ip] = args[1]
+                        update_memory(ip, args[0], args[1])
+                    elif len(args) == 1:
+                        PEER_STATUSES[ip] = args[0]
+                        update_memory(ip, curr_nick, args[0])
+
+                elif cmd == "LEAVE_PRIV":
+                    # args: NICK
+                    safe_print(f"{Colors.W}[!] Un chat privado ha sido cerrado por {args[0]}.{Colors.E}")
+                    to_close = []
+                    for cid, cdata in ACTIVE_CHATS.items():
+                        if cdata['type'] == 'PRIV' and cdata['remote_id'] == ip:
+                            to_close.append(cid)
+
+                    for cid in to_close:
+                        if 'port' in ACTIVE_CHATS[cid]: send_ipc("CMD_CLOSE_NOW", ACTIVE_CHATS[cid]['port'])
+                        del ACTIVE_CHATS[cid]
+                    refresh_ui()
+
+                elif cmd == "LEAVE_GRP":
+                    # args: GID, NICK
+                    if len(args) >= 2:
+                        gid, nick = args[0], args[1]
+                        target_cid = None
+                        for cid, cdata in ACTIVE_CHATS.items():
+                            if cdata['type'] == 'GROUP' and cdata['remote_id'] == gid:
+                                target_cid = cid
+                                break
+
+                        if target_cid:
+                            tag = f"[{Colors.F}SYSTEM{Colors.E}]"
+                            msg = f"{Colors.F}[💔] {nick} salió del grupo.{Colors.E}"
+                            if 'port' in ACTIVE_CHATS[target_cid]:
+                                send_ipc(f"FWD_MSG{SEP}{target_cid}{SEP}{tag}{SEP}{msg}", ACTIVE_CHATS[target_cid]['port'])
+
+                            if ip in PEERS and isinstance(PEERS[ip], dict):
+                                PEERS[ip]['chats'].discard(target_cid)
+                        refresh_ui()
+
+                elif cmd == "DISCONNECT_NOW":
+                    # args: NICK
+                    nick_disc = args[0] if args else "?"
+                    safe_print(f"{Colors.F}[!] {nick_disc} se desconectó globalmente.{Colors.E}")
+
+                    to_close = []
+                    for cid, cdata in ACTIVE_CHATS.items():
+                        if cdata['type'] == 'PRIV' and cdata['remote_id'] == ip:
+                            to_close.append(cid)
+                        elif cdata['type'] == 'GROUP':
+                            pdata = PEERS.get(ip)
+                            if pdata and cid in pdata.get('chats', set()):
+                                    tag = f"[{Colors.F}SYSTEM{Colors.E}]"
+                                    msg = f"{Colors.F}[💔] {nick_disc} se desconectó.{Colors.E}"
+                                    if 'port' in cdata: send_ipc(f"FWD_MSG{SEP}{cid}{SEP}{tag}{SEP}{msg}", cdata['port'])
+
+                    for cid in to_close:
+                        if 'port' in ACTIVE_CHATS[cid]: send_ipc("CMD_CLOSE_NOW", ACTIVE_CHATS[cid]['port'])
+                        del ACTIVE_CHATS[cid]
+
+                    if ip in PEERS: del PEERS[ip]
+                    if ip in PEER_STATUSES: del PEER_STATUSES[ip]
+                    refresh_ui()
+
+                elif cmd == "VER_CHECK" or cmd == "REQ_UPDATE" or cmd == "PUSH_UPDATE" or cmd == "VER_INFO":
+                        pass # Deprecated P2P Update Commands
+                    
+                elif cmd == "WHOIS":
+                    debug_log(f"Received WHOIS from {ip}")
+                    pass
+
+                elif cmd == "FILE_TRANSFER":
+                    # args: FNAME, SIZE, [HASH, TYPE]
+                    if len(args) >= 2:
+                        fname = args[0]
+                        fsize = int(args[1])
+                        fhash = args[2] if len(args) > 2 else None
+                        ftype = args[3] if len(args) > 3 else 'FILE'
+
+                        target_cid = None
                         pdata = PEERS.get(ip)
                         if pdata and isinstance(pdata, dict):
                             for cid in pdata.get('chats', set()):
-                                if cid in ACTIVE_CHATS and 'port' in ACTIVE_CHATS[cid]:
-                                    if ACTIVE_CHATS[cid]['type'] == 'GROUP':
-                                        tag = f"[{Colors.F}SYSTEM{Colors.E}]"
-                                        msg = f"{Colors.G}[+] {args[0]} entró al grupo.{Colors.E}"
-                                        send_ipc(f"FWD_MSG{SEP}{cid}{SEP}{tag}{SEP}{msg}", ACTIVE_CHATS[cid]['port'])
-
-                        safe_print(f"{Colors.G}[+] {args[0]} entró.{Colors.E}") # Lobby Log
-
-                    elif cmd == "CHILD_EXIT":
-                        cid = args[0]
-                        if cid in ACTIVE_CHATS:
-                            # Clean up
-                            if 'port' in ACTIVE_CHATS[cid]: del ACTIVE_CHATS[cid]
-                            # No borramos de PEERS aqui, solo la sesión activa
-                            pass
-
-                        # Usamos safe_print antes del refresh para historial
-                        safe_print(f"{Colors.G}[*] Chat cerrado (CID: {cid}).{Colors.E}")
-                        refresh_ui()
-
-                        # El FIX BUG PROMPT ya está dentro de refresh_ui ahora
-
-                    elif cmd == "GRP_MSG":
-                        # args: GID, MSG
-                        if len(args) >= 2:
-                            gid, msg_content = args[0], args[1]
-                            # Buscar localmente el chat que tiene remote_id == gid_target
-                            target_cid = None
-                            for cid, cdata in ACTIVE_CHATS.items():
-                                if cdata['type'] == 'GROUP' and cdata['remote_id'] == gid:
-                                    target_cid = cid
-                                    break
-
-                            if target_cid and 'port' in ACTIVE_CHATS[target_cid]:
-                                curr_nick = PEERS.get(ip, {}).get('nick', '?')
-                                tag = f"[{get_col(curr_nick)}{curr_nick}{Colors.E}]"
-                                send_ipc(f"FWD_MSG{SEP}{target_cid}{SEP}{tag}{SEP}{msg_content}", ACTIVE_CHATS[target_cid]['port'])
-                                write_log(f"[{curr_nick} @ {gid}]: {msg_content}", "CHAT")
-
-                    elif cmd == "STATUS_UPDATE":
-                        # args: NICK, STATUS
-                        if len(args) >= 2:
-                            PEERS[ip]['nick'] = args[0]
-                            PEER_STATUSES[ip] = args[1]
-                            update_memory(ip, args[0], args[1])
-                        elif len(args) == 1:
-                            PEER_STATUSES[ip] = args[0]
-                            update_memory(ip, curr_nick, args[0])
-
-                    elif cmd == "LEAVE_PRIV":
-                        # args: NICK
-                        safe_print(f"{Colors.W}[!] Un chat privado ha sido cerrado por {args[0]}.{Colors.E}")
-                        to_close = []
-                        for cid, cdata in ACTIVE_CHATS.items():
-                           if cdata['type'] == 'PRIV' and cdata['remote_id'] == ip:
-                               to_close.append(cid)
-
-                        for cid in to_close:
-                           if 'port' in ACTIVE_CHATS[cid]: send_ipc("CMD_CLOSE_NOW", ACTIVE_CHATS[cid]['port'])
-                           del ACTIVE_CHATS[cid]
-                        refresh_ui()
-
-                    elif cmd == "LEAVE_GRP":
-                        # args: GID, NICK
-                        if len(args) >= 2:
-                            gid, nick = args[0], args[1]
-                            target_cid = None
-                            for cid, cdata in ACTIVE_CHATS.items():
-                                if cdata['type'] == 'GROUP' and cdata['remote_id'] == gid:
-                                    target_cid = cid
-                                    break
-
-                            if target_cid:
-                                tag = f"[{Colors.F}SYSTEM{Colors.E}]"
-                                msg = f"{Colors.F}[💔] {nick} salió del grupo.{Colors.E}"
-                                if 'port' in ACTIVE_CHATS[target_cid]:
-                                    send_ipc(f"FWD_MSG{SEP}{target_cid}{SEP}{tag}{SEP}{msg}", ACTIVE_CHATS[target_cid]['port'])
-
-                                if ip in PEERS and isinstance(PEERS[ip], dict):
-                                    PEERS[ip]['chats'].discard(target_cid)
-                            refresh_ui()
-
-                    elif cmd == "DISCONNECT_NOW":
-                        # args: NICK
-                        nick_disc = args[0] if args else "?"
-                        safe_print(f"{Colors.F}[!] {nick_disc} se desconectó globalmente.{Colors.E}")
-
-                        to_close = []
-                        for cid, cdata in ACTIVE_CHATS.items():
-                            if cdata['type'] == 'PRIV' and cdata['remote_id'] == ip:
-                                to_close.append(cid)
-                            elif cdata['type'] == 'GROUP':
-                                pdata = PEERS.get(ip)
-                                if pdata and cid in pdata.get('chats', set()):
-                                     tag = f"[{Colors.F}SYSTEM{Colors.E}]"
-                                     msg = f"{Colors.F}[💔] {nick_disc} se desconectó.{Colors.E}"
-                                     if 'port' in cdata: send_ipc(f"FWD_MSG{SEP}{cid}{SEP}{tag}{SEP}{msg}", cdata['port'])
-
-                        for cid in to_close:
-                            if 'port' in ACTIVE_CHATS[cid]: send_ipc("CMD_CLOSE_NOW", ACTIVE_CHATS[cid]['port'])
-                            del ACTIVE_CHATS[cid]
-
-                        if ip in PEERS: del PEERS[ip]
-                        if ip in PEER_STATUSES: del PEER_STATUSES[ip]
-                        refresh_ui()
-
-                    elif cmd == "VER_CHECK" or cmd == "REQ_UPDATE" or cmd == "PUSH_UPDATE" or cmd == "VER_INFO":
-                         pass # Deprecated P2P Update Commands
+                                    if cid in ACTIVE_CHATS: target_cid = cid; break
                         
-                    elif cmd == "WHOIS":
-                        # args: SENDER_IP (Que debería coincidir con ip)
-                        # v36.11: Manejar WHOIS para evitar que caiga al lobby como texto
-                        debug_log(f"Received WHOIS from {ip}")
-                        # Actualizar nick si viene? No, WHOIS v27 solo trae IP.
-                        # Pero dispara un send_cmd INVITE_ACC?? No.
-                        # El protocolo es: Child sends WHOIS. Peer receives.
-                        # Peer should reply?
-                        # En v27 original: WHOIS -> "ACK_WHOIS"? No, se usa para discovery.
-                        # Solo actualizamos presence.
-                        pass
+                        display_name = fname + " (Carpeta)" if ftype == 'DIR' else fname
+                        safe_print(f"{Colors.W}[⇩] Recibiendo '{display_name}' ({fsize} bytes)...{Colors.E}")
+                        threading.Thread(target=dl_file, args=(fname, fsize, c, get_peer_name(ip), ip, fhash, ftype)).start()
+                        return True # Keep socket open for thread
 
-                    elif cmd == "FILE_TRANSFER":
-                        # args: FNAME, SIZE, [HASH, TYPE]
-                        if len(args) >= 2:
-                            fname = args[0]
-                            fsize = int(args[1])
-                            fhash = args[2] if len(args) > 2 else None
-                            ftype = args[3] if len(args) > 3 else 'FILE'
+            else:
+                # 2. NO ES COMANDO V27 -> Mensaje de Chat Privado (Texto Plano)
+                debug_log(f"[TCP_ROUTING] Recibido mensaje plano de {ip}: '{raw[:20]}...'")
+                
+                target_cid = None
+                pdata = PEERS.get(ip)
+                if pdata:
+                    chats = pdata.get('chats', set())
+                    debug_log(f"[TCP_ROUTING] Chats asociados a IP {ip}: {chats}")
+                    for cid in chats:
+                            if cid in ACTIVE_CHATS and ACTIVE_CHATS[cid]['type'] == 'PRIV':
+                                target_cid = cid
+                                break
+                else:
+                        debug_log(f"[TCP_ROUTING] IP {ip} no encontrada en PEERS.")
+                
+                curr_nick = PEERS.get(ip, {}).get('nick', '?')
+                tag = f"[{get_col(curr_nick)}{curr_nick}{Colors.E}]"
 
-                            target_cid = None
-                            pdata = PEERS.get(ip)
-                            if pdata and isinstance(pdata, dict):
-                                for cid in pdata.get('chats', set()):
-                                     if cid in ACTIVE_CHATS: target_cid = cid; break
-                            
-                            display_name = fname + " (Carpeta)" if ftype == 'DIR' else fname
-                            safe_print(f"{Colors.W}[⇩] Recibiendo '{display_name}' ({fsize} bytes)...{Colors.E}")
-                            threading.Thread(target=dl_file, args=(fname, fsize, c, get_peer_name(ip), ip, fhash, ftype)).start()
-                            c = None # Prevent close in finally
+                if target_cid and 'port' in ACTIVE_CHATS[target_cid]:
+                        debug_log(f"[TCP_ROUTING] Reenviando por IPC a CID {target_cid} (Port {ACTIVE_CHATS[target_cid]['port']})")
+                        send_ipc(f"FWD_MSG{SEP}{target_cid}{SEP}{tag}{SEP}{raw}{SEP}{ip}", ACTIVE_CHATS[target_cid]['port'])
+                        write_log(f"[{curr_nick}] (FWD {target_cid}): {raw}", "CHAT")
+                else:
+                    debug_log(f"[TCP_ROUTING] Fallo de enrutamiento para {ip}: CID={target_cid}")
+                    safe_print(f"{tag}: {raw}"); popup(f"MSG: {curr_nick}", raw, source_ip=ip); write_log(f"[{curr_nick}]: {raw}", "CHAT")
 
-                    else:
-                        # 2. NO ES COMANDO V27 -> Mensaje de Chat Privado (Texto Plano)
-                        debug_log(f"[TCP_ROUTING] Recibido mensaje plano de {ip}: '{msg[:20]}...'")
-                        
-                        target_cid = None
-                        pdata = PEERS.get(ip)
-                        if pdata:
-                            chats = pdata.get('chats', set())
-                            debug_log(f"[TCP_ROUTING] Chats asociados a IP {ip}: {chats}")
-                            for cid in chats:
-                                 if cid in ACTIVE_CHATS and ACTIVE_CHATS[cid]['type'] == 'PRIV':
-                                     target_cid = cid
-                                     break
-                        else:
-                             debug_log(f"[TCP_ROUTING] IP {ip} no encontrada en PEERS.")
-                        
-                        curr_nick = PEERS.get(ip, {}).get('nick', '?')
-                        tag = f"[{get_col(curr_nick)}{curr_nick}{Colors.E}]"
-
-                        if target_cid and 'port' in ACTIVE_CHATS[target_cid]:
-                             debug_log(f"[TCP_ROUTING] Reenviando por IPC a CID {target_cid} (Port {ACTIVE_CHATS[target_cid]['port']})")
-                             send_ipc(f"FWD_MSG{SEP}{target_cid}{SEP}{tag}{SEP}{msg}{SEP}{ip}", ACTIVE_CHATS[target_cid]['port'])
-                             write_log(f"[{curr_nick}] (FWD {target_cid}): {msg}", "CHAT")
-                        else:
-                            debug_log(f"[TCP_ROUTING] Fallo de enrutamiento para {ip}: CID={target_cid}")
-                            if target_cid: debug_log(f"[TCP_ROUTING] Port Info: {ACTIVE_CHATS[target_cid].get('port', 'NO PORT')}")
-                            if target_cid: debug_log(f"Port present: {'port' in ACTIVE_CHATS[target_cid]}")
-                            safe_print(f"{tag}: {raw}"); popup(f"MSG: {curr_nick}", raw, source_ip=ip); write_log(f"[{curr_nick}]: {raw}", "CHAT")
-
-            if c: c.close()
-        except Exception as e:
-            # safe_print(f"Err TCP: {e}")
-            pass
+    except Exception as e:
+        # safe_print(f"Err TCP: {e}")
+        pass
+    
+    return False # Default close
 
 def send_file(arg):
     path = os.path.expanduser(arg.strip().strip("'\""))
@@ -2536,8 +2506,11 @@ def run_lobby():
     setup_autocomplete()
 
     threading.Thread(target=ipc_listen_parent, daemon=True).start()
-    threading.Thread(target=tcp_loop, daemon=True).start() # Para recibir invitaciones
-    threading.Thread(target=udp_loop, daemon=True).start() # Para discovery global
+    
+    # v37.23 Modular Logic - Start Listeners via gw_comm
+    gw_comm.start_tcp_listener(handle_incoming_tcp)
+    gw_comm.start_udp_listener(handle_incoming_udp)
+    
     threading.Thread(target=check_child_health, daemon=True).start() # Health check
     
     check_repo_update()
