@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-APP_VER_NUM = 37.24
-APP_VER_TAG = "Fix Terminal Wait"
+APP_VER_NUM = 37.25
+APP_VER_TAG = "Fix Nick & Disco"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 import socket, threading, subprocess, sys, os, time, platform, atexit, re, signal, ctypes, shutil
@@ -910,7 +910,7 @@ def leave_sess(silent=False, exclude_ip=None, target_cid=None):
                 if c['type'] == 'GROUP':
                     send_cmd(ip, "LEAVE_GRP", c['remote_id'], MY_NICK)
                 else: # PRIV
-                    send_cmd(ip, "LEAVE_PRIV", MY_NICK)
+                    send_cmd(ip, "DISCONNECT_NOW", MY_NICK)
             # Remove chat_id linkage
             pdata['chats'].discard(cid_to_close) # Use discard to be safe
             if not pdata['chats']: # Empty, user gone
@@ -2483,12 +2483,17 @@ def run_lobby():
     global LOBBY_HISTORY, PROMPT
     PROMPT = f"{Colors.B}Lobby > {Colors.E}"
     
+    val_nick = MY_NICK if MY_NICK.strip() else socket.gethostname()
+    
     if not load_config():
         while True:
             try: 
                 if n := input("Tu Nickname: ").strip(): MY_NICK = n; break
             except: sys.exit()
         save_config()
+    else:
+        # Fallback if config loaded empty nick
+        if not MY_NICK.strip(): MY_NICK = socket.gethostname()
     
     # Check Network Security on Startup
     global SILENT_UPDATES_ALLOWED
@@ -2669,15 +2674,14 @@ def run_child(cid, ctype, remote, password, mynick, mystatus, myport, rnick="?")
             # print(f"{Colors.WH}Tú: {inp}{Colors.E}") # Fix double echo
             
             if ctype == 'GROUP':
-                 print(f"{Colors.W}[DEBUG] Enviando mensaje de GRUPO.{Colors.E}")
+                 # print(f"{Colors.W}[DEBUG] Enviando mensaje de GRUPO.{Colors.E}")
                  send_cmd_all("GRP_MSG", remote, inp)
             else:
-                 print(f"{Colors.W}[DEBUG] Intentando enviar mensaje PRIVADO a {remote}...{Colors.E}")
-                 # Debug raw packet
+                 # print(f"{Colors.W}[DEBUG] Intentando enviar mensaje PRIVADO a {remote}...{Colors.E}")
                  try:
-                     print(f"{Colors.W}[DEBUG] Llamando a send_all...{Colors.E}")
+                     # print(f"{Colors.W}[DEBUG] Llamando a send_all...{Colors.E}")
                      send_all(inp.encode())
-                     print(f"{Colors.W}[DEBUG] send_all completado.{Colors.E}")
+                     # print(f"{Colors.W}[DEBUG] send_all completado.{Colors.E}")
                  except Exception as e:
                      print(f"{Colors.F}[DEBUG] ERROR en send_all: {e}{Colors.E}")
 
