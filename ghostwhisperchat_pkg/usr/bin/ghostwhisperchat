@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-APP_VER_NUM = 37.23
-APP_VER_TAG = "Modularizado & Fix Comm"
+APP_VER_NUM = 37.24
+APP_VER_TAG = "Fix Terminal Wait"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 import socket, threading, subprocess, sys, os, time, platform, atexit, re, signal, ctypes, shutil
@@ -2125,11 +2125,12 @@ def spawn_child_process(cid, cdata):
     try:
         terminal_cmd = None
         if shutil.which("gnome-terminal"):
-            terminal_cmd = ["gnome-terminal", "--"] + cmd_args
+            # v37.24 FIX: Use --wait to keep the wrapper process alive until window closes
+            terminal_cmd = ["gnome-terminal", "--wait", "--"] + cmd_args
         elif shutil.which("konsole"):
-            terminal_cmd = ["konsole", "-e"] + cmd_args
+            terminal_cmd = ["konsole", "--nofork", "-e"] + cmd_args
         elif shutil.which("xfce4-terminal"):
-             terminal_cmd = ["xfce4-terminal", "--"] + cmd_args
+             terminal_cmd = ["xfce4-terminal", "--disable-server", "--"] + cmd_args
         elif shutil.which("xterm"):
              terminal_cmd = ["xterm", "-e"] + cmd_args
         elif shutil.which("x-terminal-emulator"):
