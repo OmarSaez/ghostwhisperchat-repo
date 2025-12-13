@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-APP_VER_NUM = 37.28
-APP_VER_TAG = "Fix Graceful Exit & Modularization"
+APP_VER_NUM = 38.0
+APP_VER_TAG = "Modularization de hijos"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 import os
@@ -26,9 +26,41 @@ try:
     import gw_shared
     import gw_child
 except ImportError:
-    # ... (Keep existing robust logic but add new modules) ...
-    # Simplified for brevity in this prompt, but user kept logic.
-    pass
+    # Logic for manual path resolution
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    # 1. Check system install
+    if os.path.exists("/usr/lib/ghostwhisperchat"):
+        sys.path.append("/usr/lib/ghostwhisperchat")
+    
+    # 2. Check repo structure (../lib/ghostwhisperchat relative to bin)
+    # script_dir is ".../usr/bin"
+    # we want ".../usr/lib/ghostwhisperchat"
+    repo_lib = os.path.join(os.path.dirname(script_dir), "lib", "ghostwhisperchat")
+    if os.path.exists(repo_lib):
+        sys.path.append(repo_lib)
+
+    # 3. Check CWD fallback (Dev root)
+    if os.path.exists("ghostwhisperchat_pkg/usr/lib/ghostwhisperchat"):
+        sys.path.append("ghostwhisperchat_pkg/usr/lib/ghostwhisperchat")
+        
+    try:
+        import gw_comm
+        import gw_shared
+        import gw_child
+    except ImportError as e:
+        print(f"CRITICAL ERROR: Could not import gw_comm/gw_shared module. Paths tried: {sys.path}")
+        print(f"Error detail: {e}")
+        # Log to file for child process visibility (Desktop)
+        dsk = os.path.join(os.path.expanduser("~"), "Desktop")
+        if not os.path.exists(dsk): dsk = os.path.join(os.path.expanduser("~"), "Escritorio")
+        
+        try:
+            with open(os.path.join(dsk, "gwc_import_crash.log"), "a") as f:
+                f.write(f"[{time.time()}] CRITICAL: Modules import failed. Env: {os.environ.get('PATH')}\n")
+                f.write(f"Error: {e}\n")
+        except: pass
+        sys.exit(1)
 
 # Aliases for compatibility
 Colors = gw_shared.Colors
