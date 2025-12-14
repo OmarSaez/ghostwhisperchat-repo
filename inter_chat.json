@@ -3,10 +3,10 @@
         "192.168.1.227": {
             "nick": "Omar-pc",
             "status": "En l\u00ednea",
-            "t": 1765751249.465446
+            "t": 1765752737.2240443
         }
     },
-    "nick": "Omar el rey",
+    "nick": "Omar",
     "status": "No comprendo",
     "visible": true,
     "log_on": false,
@@ -15,7 +15,7 @@
     "trusted_nets": {
         "192.168.1.1_TP-Link-O": {
             "trusted": true,
-            "last_seen": 1765751779.598139,
+            "last_seen": 1765752683.0046062,
             "name": "192.168.1.1_TP-Link-O"
         }
     },

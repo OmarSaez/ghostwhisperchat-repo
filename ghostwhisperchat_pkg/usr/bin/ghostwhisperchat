@@ -2227,7 +2227,12 @@ def handle_v2_logic(pkt_type, cmd_name, args, source_ip):
                 # Route to compatible chats
                 for cid, cdata in ACTIVE_CHATS.items():
                     if cdata['type'] == 'GROUP' and cdata['remote_id'] == gid:
-                         # MSG_IN format for Child
+                         # 1. Auto-Add Sender to Peers (Mesh Fix)
+                         if 'port' in cdata:
+                             payload = f"CMD_ADD_PEER{gw_comm.SEP}{source_ip}{gw_comm.SEP}{sender_mpp['nick']}"
+                             send_ipc(payload, cdata['port'])
+
+                         # 2. Forward Message
                          tag = f"[{get_col(sender_mpp['nick'])}{sender_mpp['nick']}{Colors.E}]"
                          ipc_payload = f"MSG_IN{gw_comm.SEP}{cid}{gw_comm.SEP}{tag}{gw_comm.SEP}{text}"
                          if 'port' in cdata:
