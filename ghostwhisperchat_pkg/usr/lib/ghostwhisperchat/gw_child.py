@@ -232,7 +232,7 @@ def ipc_listen_child(my_port, lock_state):
     while True:
         try:
             d, _ = u.recvfrom(8192); msg = d.decode()
-            p = msg.split(SEP)
+            p = msg.split(SEP, 3)
             cmd = p[0]
             
             if cmd == "FWD_MSG":
@@ -335,7 +335,8 @@ def run(cid, ctype, remote, password, mynick, mystatus, myport, rnick="?"):
                  # No, version 37 uses `send_cmd_all` (Broadcast UDP) for GRP_MSG ??
                  # Check original code: `send_cmd_all("GRP_MSG", remote, inp)`
                  # Yes, it broadcasts to everyone "GRP_MSG <GID> <TEXT>". Everyone filters.
-                 gw_comm.send_cmd_all("GRP_MSG", remote, inp)
+                 # V2: GRP_MSG | MPP | GID | TEXT
+                 gw_comm.send_cmd_all("GRP_MSG", adapter.get_mpp(), remote, inp)
             else:
                  # Private Message: TCP
                  # `send_all` in original was complex. It iterated peers.

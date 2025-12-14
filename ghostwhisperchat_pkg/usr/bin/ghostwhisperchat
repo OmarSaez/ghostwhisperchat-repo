@@ -21,6 +21,7 @@ try:
     import gw_comm
     import gw_shared
     import gw_child
+    import gw_pop
 except ImportError:
     # Logic for manual path resolution
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -267,79 +268,12 @@ def send_cmd_all(cmd, *args):
 def send_raw(ip, d):
     gw_comm.send_tcp_packet(ip, d)
 
+# Popup Logic Delegated to gw_pop
 def get_col(n): return Colors.PALETTE[sum(ord(c) for c in n) % len(Colors.PALETTE)] if n else Colors.WH
 
-def popup(t, x, source_ip=None):
-    if not POPUP_ON: return
+# --- CONFIG & STATE ---
     
-    # --- ANTI-SPAM SMART v33.5 ---
-    if source_ip:
-        now = time.time()
-        
-        # 1. Check if Banned
-        if source_ip in BANNED_IPS:
-            if now < BANNED_IPS[source_ip]:
-                return # BANNED -> No Popup (Console already printed)
-            else:
-                del BANNED_IPS[source_ip] # Ban expired
-        
-        # 2. Update History
-        if source_ip not in IP_MSG_HISTORY: IP_MSG_HISTORY[source_ip] = []
-        IP_MSG_HISTORY[source_ip].append(now)
-        
-        # Keep only recent messages (last 3 seconds window is enough for the check)
-        IP_MSG_HISTORY[source_ip] = [ts for ts in IP_MSG_HISTORY[source_ip] if now - ts < 3.0]
-        
-        # 3. Check Burst: 3 messages in less than 2 seconds (User Request)
-        # We need at least 3 messages
-        if len(IP_MSG_HISTORY[source_ip]) >= 3:
-            # Check the span between the last message and the 3rd-to-last
-            # [..., t-2, t-1, t0]
-            t_last = IP_MSG_HISTORY[source_ip][-1]
-            t_start = IP_MSG_HISTORY[source_ip][-3]
-            
-            if (t_last - t_start) < 2.0:
-                 BANNED_IPS[source_ip] = now + TIMERS['BAN'] # Ban configured time
-                 safe_print(f"{Colors.F}[Anti-Spam] 🛡️ IP {source_ip} bloqueada de Popups por {TIMERS['BAN']}s (Burst detectado).{Colors.E}")
-                 return # Block this one too
-    
-    # -----------------------------
-    
-    if platform.system() == "Linux":
-        if HAS_ZENITY: 
-            subprocess.Popen(["zenity", "--info", "--title", t, "--text", x, "--width=350"], stderr=subprocess.DEVNULL)
-            
-    elif platform.system() == "Windows":
-        # PowerShell Balloon Tip nativo
-        # Escapar comillas simples para que no rompa el string de PS
-        t_safe = t.replace("'", "''")
-        x_safe = x.replace("'", "''")
-        
-        ps_script = f"""
-        Add-Type -AssemblyName System.Windows.Forms
-        Add-Type -AssemblyName System.Drawing
-        
-        $notify = New-Object System.Windows.Forms.NotifyIcon
-        $path = (Get-Process -id $pid).Path
-        $notify.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($path)
-        $notify.Visible = $True
-        $notify.ShowBalloonTip(0, '{t_safe}', '{x_safe}', [System.Windows.Forms.ToolTipIcon]::Info)
-        
-        # Necesario para que se procese el evento visual
-        # Mantiene el script vivo unos segundos
-        for ($i=0; $i -lt 40; $i++) {{
-             [System.Windows.Forms.Application]::DoEvents()
-             Start-Sleep -Milliseconds 100
-        }}
-        $notify.Dispose()
-        """
-        # Ejecutar oculto
-        try:
-            # Quitamos creationflags para debug si es necesario, pero mantenemos hidden
-            subprocess.Popen(["powershell", "-WindowStyle", "Hidden", "-Command", ps_script], creationflags=subprocess.CREATE_NO_WINDOW)
-        except Exception as e:
-            safe_print(f"{Colors.F}[!] Error lanzando popup: {e}{Colors.E}")
-            subprocess.Popen(["powershell", "-WindowStyle", "Hidden", "-Command", ps_script])
+
 
 # --- CONFIG & STATE ---
 CONFIG_FILE = "inter_chat.json"
@@ -353,9 +287,7 @@ PEERS = {} # ip -> {nick, chats: {cid1, cid2}}
 PEER_STATUSES = {} # ip -> status_str
 SILENT_UPDATES_ALLOWED = False # Global state
 
-# --- ANTI-SPAM STATE ---
-BANNED_IPS = {} # { ip: timestamp_expiry }
-IP_MSG_HISTORY = {} # { ip: [timestamp1, timestamp2, ...] }
+
 
 def load_config():
     global KNOWN_USERS, MY_NICK, MY_STATUS, VISIBLE_IN_SCAN, LOG_ON, AUTO_DL, TRUSTED_NETS, TRUSTED_PEERS
@@ -368,6 +300,7 @@ def load_config():
                 MY_STATUS = d.get('status', "En línea")
                 VISIBLE_IN_SCAN = d.get('visible', True)
                 LOG_ON = d.get('log_on', True)
+                gw_pop.POP.set_active(d.get('pop_on', True))
                 AUTO_DL = d.get('auto_dl', True)
                 TRUSTED_NETS = d.get('trusted_nets', {})
                 TRUSTED_PEERS = set(d.get('trusted_peers', []))
@@ -384,6 +317,7 @@ def save_config():
                 'status': MY_STATUS,
                 'visible': VISIBLE_IN_SCAN,
                 'log_on': LOG_ON,
+                'pop_on': gw_pop.POP.pop_on,
                 'auto_dl': AUTO_DL,
                 'trusted_nets': TRUSTED_NETS,
                 'trusted_peers': list(TRUSTED_PEERS)
@@ -1664,7 +1598,7 @@ class LobbyAdapter:
             initial_peers = len(PEERS)
             
             # Send Broadcast
-            gw_comm.send_cmd(None, "WHOIS", get_my_mpp())
+            gw_comm.send_cmd_all("WHOIS", get_my_mpp())
             
             # Animation Wait (3s)
             if not cid:
@@ -1690,15 +1624,14 @@ class LobbyAdapter:
         threading.Thread(target=_scan_task, daemon=True).start()
     
     def set_config(self, key, val):
-        global VISIBLE_IN_SCAN, MY_STATUS, MY_NICK, LOG_ON, POPUP_ON, AUTO_DL, USER_OFF
+        global VISIBLE_IN_SCAN, MY_STATUS, MY_NICK, LOG_ON, AUTO_DL, USER_OFF
         if key == 'visible': VISIBLE_IN_SCAN = val
         elif key == 'status': MY_STATUS = val
         elif key == 'nick': MY_NICK = val
         elif key == 'log_on': LOG_ON = val
         elif key == 'pop_on': 
-            POPUP_ON = val
-            if val: USER_OFF = False
-            else: USER_OFF = True
+            gw_pop.POP.set_active(val)
+            return
         elif key == 'auto_dl': AUTO_DL = val
         save_config()
 
@@ -2282,10 +2215,14 @@ def handle_v2_logic(pkt_type, cmd_name, args, source_ip):
                 }
                 
                 txt_type = "Privado" if itype == "PRIV" else f"Grupo {args[2] if len(args)>2 else '?'}"
-                safe_print(f"{Colors.G}[!] Invitación recibida de {sender_mpp['nick']} ({txt_type}). Usa --aceptar.{Colors.E}")
+                msg_text = f"{sender_mpp['nick']} te invita a un Chat {txt_type}"
+                safe_print(f"{Colors.G}[!] {msg_text}. Responde en el popup o usa --aceptar.{Colors.E}")
                 
-                try: popup("Invitación GhostWhisperChat", f"{sender_mpp['nick']} te invita a un Chat {txt_type}")
-                except: pass
+                # Interactive Popup via gw_pop
+                gw_pop.POP.show_question("Invitación Entrante", msg_text,
+                                       lambda: LOBBY_ADAPTER.handle_accept(None) if LOBBY_ADAPTER else None,
+                                       lambda: LOBBY_ADAPTER.handle_deny(None) if LOBBY_ADAPTER else None)
+                
                 sys.stdout.write('\a') # Beep
 
             elif cmd_name == "I_EXIST":
@@ -2298,9 +2235,22 @@ def handle_v2_logic(pkt_type, cmd_name, args, source_ip):
                     if cdata['type'] == 'GROUP' and cdata['remote_id'] == gid:
                         # Found a peer for our group!
                         safe_print(f"{Colors.G}[*] Grupo {gid}: Encontrado peer {sender_mpp['nick']} ({source_ip}){Colors.E}")
-                        # TODO: Add to mesh routing table
                         break
-
+            
+            elif cmd_name == "GRP_MSG":
+                # Args: [MPP], GID, TEXT
+                if len(args) < 3: return
+                gid, text = args[1], args[2]
+                
+                # Route to compatible chats
+                for cid, cdata in ACTIVE_CHATS.items():
+                    if cdata['type'] == 'GROUP' and cdata['remote_id'] == gid:
+                         # MSG_IN format for Child
+                         tag = f"[{get_col(sender_mpp['nick'])}{sender_mpp['nick']}{Colors.E}]"
+                         ipc_payload = f"MSG_IN{gw_comm.SEP}{cid}{gw_comm.SEP}{tag}{gw_comm.SEP}{text}"
+                         if 'port' in cdata:
+                             send_ipc(ipc_payload, cdata['port'])
+                         
             elif cmd_name == "INVITE_ACC":
                 # Args: [MPP]
                 # Invitee accepted. Start chat without sending ACK back.
@@ -2308,8 +2258,9 @@ def handle_v2_logic(pkt_type, cmd_name, args, source_ip):
                 start_private_chat(source_ip, sender_mpp['nick'], sender_mpp['status'], send_ack=False)
 
             elif cmd_name == "WHOIS":
-                 # V2 Scan Request -> Reply IAM_HERE (Unicast)
-                 gw_comm.send_cmd(source_ip, "IAM_HERE", get_my_mpp())
+                 # V2 Scan Request
+                 if VISIBLE_IN_SCAN:
+                     gw_comm.send_cmd(source_ip, "IAM_HERE", get_my_mpp())
 
             elif cmd_name == "IAM_HERE":
                  # Scan Response. MPP Parser already updated PEERS.
@@ -2386,8 +2337,13 @@ def handle_v2_grp(conn, ip, raw):
         handle_v2_logic(parsed[0], parsed[1], parsed[2], ip)
     return False
 
+# --- GLOBALS ---
+LOBBY_ADAPTER = None
+
+
+
 def run_lobby():
-    global MY_NICK, MY_STATUS, MY_IP, LAST_ACT, PENDING_INVITE
+    global MY_NICK, MY_STATUS, MY_IP, LAST_ACT, PENDING_INVITE, LOBBY_ADAPTER
     # atexit.register(lambda: print(f"{Colors.W}Lobby cerrado.{Colors.E}")) # Reemplazado por shutdown manual
     
     # Self-Healing Checks
@@ -2401,8 +2357,9 @@ def run_lobby():
     lazy_import() # Load heavy libraries only when needed (Lobby or Child)
     global hashlib
     import hashlib # v36.0 Integrity check
-
-
+    
+    adapter = LobbyAdapter()
+    LOBBY_ADAPTER = adapter # Expose globally for callbacks
     os.system('cls' if os.name == 'nt' else 'clear'); fw_cfg(); MY_IP = get_ip()
     set_terminal_title(f"GWC Lobby - {MY_NICK}")
     
