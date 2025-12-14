@@ -240,7 +240,7 @@ def send_cmd(ip, cmd_name, *args):
     else:
         # TCP Routing
         target_port = TCP_PORT_PRIV
-        if cmd_name in ["JOIN_GROUP", "WELCOME_GROUP", "LEAVE_GROUP", "I_ANSWER"]:
+        if cmd_name in ["JOIN_GROUP", "WELCOME_GROUP", "LEAVE_GROUP", "I_ANSWER", "GRP_MSG"]:
              target_port = TCP_PORT_GRP # 44496 Mesh Port
              
         send_tcp_packet(ip, pkt, target_port)

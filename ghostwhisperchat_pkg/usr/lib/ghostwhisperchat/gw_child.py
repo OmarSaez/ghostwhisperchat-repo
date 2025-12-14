@@ -331,17 +331,24 @@ def run(cid, ctype, remote, password, mynick, mystatus, myport, rnick="?"):
 
             # --- Chat Messages ---
             if ctype == 'GROUP':
-                 # Use gw_comm.send_cmd_all? No, GRP_MSG is sent to SPECIFIC GROUP ID via Multicast?
-                 # No, version 37 uses `send_cmd_all` (Broadcast UDP) for GRP_MSG ??
-                 # Check original code: `send_cmd_all("GRP_MSG", remote, inp)`
-                 # Yes, it broadcasts to everyone "GRP_MSG <GID> <TEXT>". Everyone filters.
-                 # V2: GRP_MSG | MPP | GID | TEXT
-                 gw_comm.send_cmd_all("GRP_MSG", adapter.get_mpp(), remote, inp)
+                 # V2: MSJ GRUP Unicast Mesh TCP (Port 44496)
+                 mpp = adapter.get_mpp()
+                 gid = remote
+                 pkid = str(int(time.time()))
+                 pkt = gw_comm.build_msj(mpp, "GRUP", [pkid, gid], inp)
+                 
+                 sent_count = 0
+                 for ip, pdata in PEERS.items():
+                      if cid in pdata.get('chats', set()):
+                           gw_comm.send_tcp_packet(ip, pkt, gw_comm.TCP_PORT_GRP)
+                           sent_count += 1
+                 if sent_count == 0:
+                     print(f"{Colors.W}[!] No hay nadie más en el grupo.{Colors.E}")
             else:
                  # Private Message: TCP
-                 # `send_all` in original was complex. It iterated peers.
-                 # Here we just send to `remote` IP.
-                 gw_comm.send_tcp_packet(remote, inp.encode())
+                 mpp = adapter.get_mpp()
+                 pkt = gw_comm.build_msj(mpp, "PRIV", [], inp)
+                 gw_comm.send_tcp_packet(remote, pkt)
 
         except KeyboardInterrupt:
              adapter.leave_sess(cid)

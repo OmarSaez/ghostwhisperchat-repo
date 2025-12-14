@@ -9,8 +9,8 @@ import time
 import hashlib
 
 # v38.0: Shared Definitions for Modular Architecture
-APP_VER_NUM = 41.1
-APP_VER_TAG = "Contador de Contactos arreglado, Autocompletado Inteligente y recarga de lobby"
+APP_VER_NUM = 41.4
+APP_VER_TAG = "Empaquetado Grupal V2"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 
