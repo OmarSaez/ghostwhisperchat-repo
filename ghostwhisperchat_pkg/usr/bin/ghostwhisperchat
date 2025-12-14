@@ -1506,7 +1506,8 @@ class LobbyAdapter:
              # If msg target is Child CID, we IPC to child?
              if cid in ACTIVE_CHATS and 'port' in ACTIVE_CHATS[cid]:
                   # Forward as System Message
-                  send_ipc(f"MSG_IN{gw_comm.SEP}{msg}", ACTIVE_CHATS[cid]['port'])
+                  # Format: MSG_IN | Sender | Text | Color
+                  send_ipc(f"MSG_IN{gw_comm.SEP}Sistema{gw_comm.SEP}{msg}{gw_comm.SEP}{Colors.C}", ACTIVE_CHATS[cid]['port'])
              else:
                   safe_print(msg)
 
@@ -2247,6 +2248,12 @@ def handle_v2_logic(pkt_type, cmd_name, args, source_ip):
                  # Scan Response. MPP Parser already updated PEERS.
                  # Just notify User.
                  msg = f"{Colors.G}[+] Detectado: {sender_mpp['nick']} ({source_ip}){Colors.E}"
+                 
+                 # Broadcast to all children
+                 for c_id, c_data in ACTIVE_CHATS.items():
+                     if 'port' in c_data:
+                          send_ipc(f"CMD_ADD_PEER{gw_comm.SEP}{source_ip}{gw_comm.SEP}{sender_mpp['nick']}", c_data['port'])
+
                  if SCANNING_NOW:
                       SCAN_BUFFER.append(msg)
                  else:

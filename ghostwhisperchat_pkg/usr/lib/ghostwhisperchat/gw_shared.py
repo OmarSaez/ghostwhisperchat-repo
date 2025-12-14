@@ -9,8 +9,8 @@ import time
 import hashlib
 
 # v38.0: Shared Definitions for Modular Architecture
-APP_VER_NUM = 41.5
-APP_VER_TAG = "Soporte Grupo V2 Completo"
+APP_VER_NUM = 41.7
+APP_VER_TAG = "Independencia Hijo y Comandos"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 

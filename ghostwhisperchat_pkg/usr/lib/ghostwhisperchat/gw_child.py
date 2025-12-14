@@ -45,14 +45,44 @@ def send_ipc(msg, port):
     except: pass
 
 class ChildAdapter:
-    def __init__(self, cid, port, remote, ctype, rnick):
+    def __init__(self, cid, port, remote, ctype, rnick, password=None):
         self.cid = cid
         self.port = port
         self.remote = remote
         self.ctype = ctype
         self.remote_nick_init = rnick
+        self.password = password
         self.pop_off = False
         self.debug = False
+
+# ... (Previous methods)
+
+    def invite_users(self, args_str, cid):
+        targets = args_str.replace(",", " ").split()
+        print(f"{Colors.C}[*] Enviando invitaciones...{Colors.E}")
+        
+        for t in targets:
+             target_ip = None
+             if "." in t and len(t.split(".")) == 4: target_ip = t
+             else:
+                 for ip, p in PEERS.items():
+                      if p.get('nick') == t: target_ip = ip; break
+             
+             if target_ip:
+                 inv_type = "PRIV"
+                 extras = []
+                 if self.ctype == 'GROUP':
+                      inv_type = "GROUP"
+                      gid = self.remote
+                      gp = self.password if self.password else ""
+                      extras = [gid, gp]
+                 
+                 # Direct Send
+                 gw_comm.send_cmd(target_ip, "INVITE", self.get_mpp(), inv_type, *extras)
+                 print(f"{Colors.G}[➜] Invitación enviada a {t} ({target_ip}){Colors.E}")
+             else:
+                 print(f"{Colors.R}[X] No encontrado: {t}. (Prueba escanear primero){Colors.E}")
+
 
     def reply(self, msg, cid):
         print(msg)
@@ -79,6 +109,21 @@ class ChildAdapter:
         pass
 
     def invite_priv(self, ip, nick, status): self.forward(f"--chatpersonal {ip}") # Helper
+    
+
+    def scan_network(self, cid):
+        print(f"{Colors.C}[*] Escaneando red...{Colors.E}")
+        gw_comm.send_cmd_all("WHOIS", self.get_mpp())
+        time.sleep(3)
+        self.show_contacts(cid)
+
+    def show_contacts(self, cid):
+        print(f"{Colors.G}--- CONTACTOS LOCALES ---{Colors.E}")
+        if not PEERS:
+             print(f"{Colors.W}No hay contactos detectados.{Colors.E}")
+        for ip, d in PEERS.items():
+            stat = '?' # Child doesn't track status well yet
+            print(f" - {d.get('nick', '?')} ({ip})")
 
     def get_chat(self, cid):
         # Return dict mimicking ACTIVE_CHATS[cid]
@@ -96,7 +141,7 @@ class ChildAdapter:
              ku[ip] = {'nick': d.get('nick','?'), 'status': '?', 't': time.time()}
          return ku
 
-    def scan_network(self, cid): self.forward("--quienes")
+    def show_ls(self, cid): self.show_contacts(cid)
     
     def set_config(self, key, val):
         # Some configs are local (pop_off), others global (nick, status)
@@ -290,7 +335,7 @@ def run(cid, ctype, remote, password, mynick, mystatus, myport, rnick="?"):
     REMOTE_NICK = rnick 
     
     # Adapter
-    adapter = ChildAdapter(cid, myport, remote, ctype, rnick)
+    adapter = ChildAdapter(cid, myport, remote, ctype, rnick, password)
 
     signal.signal(signal.SIGINT, lambda s, f: adapter.leave_sess(cid))
     
