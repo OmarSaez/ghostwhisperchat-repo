@@ -9,8 +9,8 @@ import time
 import hashlib
 
 # v38.0: Shared Definitions for Modular Architecture
-APP_VER_NUM = 40.5
-APP_VER_TAG = "Arreglo de mensajes POP"
+APP_VER_NUM = 40.6
+APP_VER_TAG = "Arreglo --quienes y POPs"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 

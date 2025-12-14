@@ -45,6 +45,7 @@ except ImportError:
         import gw_comm
         import gw_shared
         import gw_child
+        import gw_pop
     except ImportError as e:
         print(f"CRITICAL ERROR: Could not import gw_comm/gw_shared module. Paths tried: {sys.path}")
         print(f"Error detail: {e}")
@@ -154,6 +155,8 @@ ensure_dependencies()
 HAS_ZENITY = shutil.which("zenity") is not None
 AUTO_DL, LOG_ON, PENDING_FILES = True, False, []
 VISIBLE_IN_SCAN = True 
+SCANNING_NOW = False
+SCAN_BUFFER = []
 IS_AFK = False 
 
 
@@ -1595,6 +1598,10 @@ class LobbyAdapter:
 
     def scan_network(self, cid):
         def _scan_task():
+            global SCANNING_NOW, SCAN_BUFFER
+            SCAN_BUFFER = []
+            SCANNING_NOW = True
+            
             initial_peers = len(PEERS)
             
             # Send Broadcast
@@ -1606,6 +1613,13 @@ class LobbyAdapter:
                     time.sleep(3)
             else:
                 time.sleep(3)
+                
+            SCANNING_NOW = False
+            
+            # Flush Buffer
+            for m in SCAN_BUFFER:
+                if cid: self.reply(m, cid)
+                else: safe_print(m)
             
             # Check delta
             final_peers = len(PEERS)
@@ -1614,7 +1628,10 @@ class LobbyAdapter:
             if new_found > 0:
                 self.reply(f"{Colors.G}[✔] Escaneo finalizado. {new_found} nuevos dispositivos detectados.{Colors.E}", cid)
             else:
-                self.reply(f"{Colors.W}[!] Escaneo finalizado. No se detectaron otros nodos activos.{Colors.E}", cid)
+                if len(PEERS) > 0:
+                     self.reply(f"{Colors.G}[✔] Escaneo finalizado. {len(PEERS)} dispositivos activos en lista.{Colors.E}", cid)
+                else:
+                     self.reply(f"{Colors.W}[!] Escaneo finalizado. No se detectaron nodos activos.{Colors.E}", cid)
                 
             # Restore Prompt if in Lobby
             if not cid:
@@ -2163,7 +2180,9 @@ def get_my_mpp():
     return gw_comm.build_mpp(MY_IP, MY_NICK, MY_STATUS, APP_VERSION)
 
 def handle_v2_logic(pkt_type, cmd_name, args, source_ip):
-    """Dispacher central de lógica v2.0"""
+    """Central V2 Logic: Process Parsed Packet"""
+    if source_ip == MY_IP: return # Prevent Self-Loop
+    
     try:
         # Extract MPP if present (Most commands have it as Arg 0)
         sender_mpp = None
@@ -2265,7 +2284,11 @@ def handle_v2_logic(pkt_type, cmd_name, args, source_ip):
             elif cmd_name == "IAM_HERE":
                  # Scan Response. MPP Parser already updated PEERS.
                  # Just notify User.
-                 safe_print(f"{Colors.G}[+] Detectado: {sender_mpp['nick']} ({source_ip}){Colors.E}")
+                 msg = f"{Colors.G}[+] Detectado: {sender_mpp['nick']} ({source_ip}){Colors.E}"
+                 if SCANNING_NOW:
+                      SCAN_BUFFER.append(msg)
+                 else:
+                      safe_print(msg)
 
 
         elif pkt_type == 'MSJ':

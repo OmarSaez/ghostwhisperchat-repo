@@ -1,14 +1,15 @@
 {
     "known_users": {},
-    "nick": "Omar",
+    "nick": "OMar",
     "status": "En l\u00ednea",
     "visible": true,
     "log_on": false,
+    "pop_on": true,
     "auto_dl": true,
     "trusted_nets": {
         "192.168.1.1_TP-Link-O": {
             "trusted": true,
-            "last_seen": 1765683338.2692802,
+            "last_seen": 1765684299.796046,
             "name": "192.168.1.1_TP-Link-O"
         }
     },
