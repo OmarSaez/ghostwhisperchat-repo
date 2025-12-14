@@ -9,8 +9,8 @@ import time
 import hashlib
 
 # v38.0: Shared Definitions for Modular Architecture
-APP_VER_NUM = 41.7
-APP_VER_TAG = "Independencia Hijo y Comandos"
+APP_VER_NUM = 41.8
+APP_VER_TAG = "Comandos Hijo Normalizados"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 
@@ -21,6 +21,12 @@ def calculate_file_hash(path):
         for byte_block in iter(lambda: f.read(4096), b""):
             sha256_hash.update(byte_block)
     return sha256_hash.hexdigest()
+
+def normalize_str(s):
+    if not s: return ""
+    import unicodedata
+    return ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn').lower()
+
 
 # --- CONSTANTS ---
 IPC_PORT = 5000 

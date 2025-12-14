@@ -13,7 +13,7 @@ import threading
 import gw_comm
 from gw_comm import PKT_PREFIX, SEP, TAG_MARK, LEN_MARK, UDP_PORT, TCP_PORT, build_packet
 import gw_shared
-from gw_shared import Colors, COMMAND_DEFS, resolve_cmd, IPC_PORT, get_ip, calculate_file_hash, APP_VERSION
+from gw_shared import Colors, COMMAND_DEFS, resolve_cmd, IPC_PORT, get_ip, calculate_file_hash, APP_VERSION, normalize_str
 import gw_cmd
 
 # --- LOCAL STATE & GLOBALS (Scoped to this process) ---
@@ -60,13 +60,16 @@ class ChildAdapter:
     def invite_users(self, args_str, cid):
         targets = args_str.replace(",", " ").split()
         print(f"{Colors.C}[*] Enviando invitaciones...{Colors.E}")
+        sys.stdout.flush()
         
         for t in targets:
              target_ip = None
              if "." in t and len(t.split(".")) == 4: target_ip = t
              else:
+                 target_norm = normalize_str(t)
                  for ip, p in PEERS.items():
-                      if p.get('nick') == t: target_ip = ip; break
+                      nick = p.get('nick', '')
+                      if normalize_str(nick) == target_norm: target_ip = ip; break
              
              if target_ip:
                  inv_type = "PRIV"
@@ -82,7 +85,7 @@ class ChildAdapter:
                  print(f"{Colors.G}[➜] Invitación enviada a {t} ({target_ip}){Colors.E}")
              else:
                  print(f"{Colors.R}[X] No encontrado: {t}. (Prueba escanear primero){Colors.E}")
-
+        sys.stdout.flush()
 
     def reply(self, msg, cid):
         print(msg)
@@ -113,6 +116,7 @@ class ChildAdapter:
 
     def scan_network(self, cid):
         print(f"{Colors.C}[*] Escaneando red...{Colors.E}")
+        sys.stdout.flush()
         gw_comm.send_cmd_all("WHOIS", self.get_mpp())
         time.sleep(3)
         self.show_contacts(cid)
@@ -122,8 +126,8 @@ class ChildAdapter:
         if not PEERS:
              print(f"{Colors.W}No hay contactos detectados.{Colors.E}")
         for ip, d in PEERS.items():
-            stat = '?' # Child doesn't track status well yet
             print(f" - {d.get('nick', '?')} ({ip})")
+        sys.stdout.flush()
 
     def get_chat(self, cid):
         # Return dict mimicking ACTIVE_CHATS[cid]
