@@ -9,8 +9,8 @@ import time
 import hashlib
 
 # v38.0: Shared Definitions for Modular Architecture
-APP_VER_NUM = 41.9
-APP_VER_TAG = "Conexión Automática Mesh"
+APP_VER_NUM = 41.11
+APP_VER_TAG = "Auto-Sincronización Peers"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 

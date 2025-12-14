@@ -1932,10 +1932,22 @@ def ipc_listen_parent():
                     leave_sess(target_cid=cid, silent=False) 
                     refresh_ui()
             
+            elif cmd == "CMD_SYNC_PEERS":
+                # Child requests sync. Send all known peers.
+                if len(p) >= 2:
+                    req_cid = p[1]
+                    if req_cid in ACTIVE_CHATS and 'port' in ACTIVE_CHATS[req_cid]:
+                         cport = ACTIVE_CHATS[req_cid]['port']
+                         # Send all known peers
+                         for ip, pg in PEERS.items():
+                              nick = pg.get('nick', '?')
+                              payload = f"CMD_ADD_PEER{SEP}{ip}{SEP}{nick}"
+                              send_ipc(payload, cport)
+
             elif cmd == "FWD_CMD":
                 if len(p) >= 3:
                      cstr = p[2]
-                     # print(f"\\n{Colors.M}[IPC] Ejecutando comando remoto: {cstr}{Colors.E}")
+                     # print(f"\n{Colors.M}[IPC] Ejecutando comando remoto: {cstr}{Colors.E}")
                      exec_lobby_cmd(cstr, origin_cid=p[1])
 
         except Exception as e:

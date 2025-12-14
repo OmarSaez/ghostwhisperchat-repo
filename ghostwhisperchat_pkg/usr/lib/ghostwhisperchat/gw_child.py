@@ -9,6 +9,8 @@ import platform
 import subprocess
 import signal
 import threading
+try: import readline
+except: pass
 
 import gw_comm
 from gw_comm import PKT_PREFIX, SEP, TAG_MARK, LEN_MARK, UDP_PORT, TCP_PORT, build_packet
@@ -360,6 +362,9 @@ def run(cid, ctype, remote, password, mynick, mystatus, myport, rnick="?"):
     
     # Start IPC
     threading.Thread(target=ipc_listen_child, args=(myport, pop_state), daemon=True).start()
+    
+    # Request Initial Peer Sync from Lobby (Fix for startup race condition)
+    send_ipc(f"CMD_SYNC_PEERS{SEP}{cid}", IPC_PORT)
     
     # Start Logic
     if ctype == 'GROUP':
