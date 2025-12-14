@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-APP_VER_NUM = 40.1
+APP_VER_NUM = 40.2
 APP_VER_TAG = "Fix Protocol Parsing & IPC"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
@@ -261,6 +261,8 @@ def debug_log(msg):
 # --- PROTOCOLO (Delegado a gw_comm) ---
 # Funciones redirigidas totalmente al módulo
 def send_cmd(ip, cmd, *args):
+    if LOG_ON:
+         debug_log(f"[TX] CMD={cmd} DST={ip if ip else 'BCAST'} ARGS={args}")
     gw_comm.send_cmd(ip, cmd, *args)
 
 def send_cmd_all(cmd, *args):
@@ -844,7 +846,7 @@ def leave_sess(silent=False, exclude_ip=None, target_cid=None):
         
     if not silent: safe_print(f"{Colors.G}[✔] Sesión {cid_to_close} cerrada.{Colors.E}")
 
-def start_private_chat(ip, nick, status="En línea"):
+def start_private_chat(ip, nick, status="En línea", send_ack=True):
     global CURRENT_CHAT_ID
     cid = str(uuid.uuid4())[:8]
     ACTIVE_CHATS[cid] = {'type': 'PRIV', 'remote_id': ip, 'pass': None, 'created_at': time.time(), 'remote_nick': nick}
@@ -858,9 +860,11 @@ def start_private_chat(ip, nick, status="En línea"):
     PEER_STATUSES[ip] = status
     update_memory(ip, nick, status)
     
-    # v36.12 CRITICAL FIX: Send acceptance to inviter so they open their window!
-    debug_log(f"[PROTOCOLO] Enviando INVITE_ACC (Confirmación) a {ip}...")
-    send_cmd(ip, "INVITE_ACC", MY_NICK, MY_STATUS)
+    if send_ack:
+        # v36.12 CRITICAL FIX: Send acceptance to inviter so they open their window!
+        debug_log(f"[PROTOCOLO] Enviando INVITE_ACC (Confirmación) a {ip}...")
+        # V2: INVITE_ACC uses [MPP]
+        send_cmd(ip, "INVITE_ACC", get_my_mpp())
     debug_log(f"[PROTOCOLO] INVITE_ACC enviado. Ahora abriendo mi consola...")
     
     spawn_child_process(cid, ACTIVE_CHATS[cid]) # Spawn child immediately
@@ -2274,10 +2278,38 @@ def handle_v2_logic(pkt_type, cmd_name, args, source_ip):
                 if len(args) < 2: return
                 itype = args[1]
                 
-                # Global PENDING_INVITE logic...
-                # safe_print notification...
-                safe_print(f"{Colors.G}[!] Invitación V2 recibida de {sender_mpp['nick']} ({itype}).{Colors.E}")
-                # (Logic to accept invite remains similar to V1, need adaptation)
+                global PENDING_INVITE
+                PENDING_INVITE = {
+                    'ip': source_ip, 'nick': sender_mpp['nick'], 
+                    'type': 'GROUP' if itype == 'GROUP' else 'PRIV',
+                    'data': args[2:] if len(args)>2 else None
+                }
+                
+                txt_type = "Privado" if itype == "PRIV" else f"Grupo {args[2] if len(args)>2 else '?'}"
+                safe_print(f"{Colors.G}[!] Invitación recibida de {sender_mpp['nick']} ({txt_type}). Usa --aceptar.{Colors.E}")
+                
+                try: popup("Invitación GhostWhisperChat", f"{sender_mpp['nick']} te invita a un Chat {txt_type}")
+                except: pass
+                sys.stdout.write('\a') # Beep
+
+            elif cmd_name == "I_EXIST":
+                # Args: [MPP], GID, PASS, [LS]
+                if len(args) < 3: return
+                gid = args[1]
+                
+                # Check if we are interested in this group
+                for cid, cdata in ACTIVE_CHATS.items():
+                    if cdata['type'] == 'GROUP' and cdata['remote_id'] == gid:
+                        # Found a peer for our group!
+                        safe_print(f"{Colors.G}[*] Grupo {gid}: Encontrado peer {sender_mpp['nick']} ({source_ip}){Colors.E}")
+                        # TODO: Add to mesh routing table
+                        break
+
+            elif cmd_name == "INVITE_ACC":
+                # Args: [MPP]
+                # Invitee accepted. Start chat without sending ACK back.
+                safe_print(f"{Colors.G}[!] {sender_mpp['nick']} aceptó tu invitación.{Colors.E}")
+                start_private_chat(source_ip, sender_mpp['nick'], sender_mpp['status'], send_ack=False)
 
             elif cmd_name == "WHOIS":
                  # V2 Scan Request -> Reply IAM_HERE (Unicast)
@@ -2333,6 +2365,7 @@ def handle_v2_logic(pkt_type, cmd_name, args, source_ip):
 
 def handle_v2_priv(conn, ip, raw):
     """TCP 44494: Privado y Control"""
+    if LOG_ON: debug_log(f"[RX TCP PRIV] {ip}: {raw.strip()}")
     parsed = gw_comm.parse_packet(raw)
     if parsed[0] != 'ERR':
         handle_v2_logic(parsed[0], parsed[1], parsed[2], ip)
@@ -2340,12 +2373,18 @@ def handle_v2_priv(conn, ip, raw):
 
 def handle_v2_disc(data, ip):
     """UDP 44495: Discovery"""
+    if LOG_ON:
+         try: dstr = data.decode('utf-8', errors='ignore').strip()
+         except: dstr = f"<Bytes {len(data)}>"
+         debug_log(f"[RX UDP DISC] {ip}: {dstr}")
+
     parsed = gw_comm.parse_packet(data)
     if parsed[0] != 'ERR':
         handle_v2_logic(parsed[0], parsed[1], parsed[2], ip)
 
 def handle_v2_grp(conn, ip, raw):
     """TCP 44496: Group Mesh"""
+    if LOG_ON: debug_log(f"[RX TCP GRP] {ip}: {raw.strip()}")
     parsed = gw_comm.parse_packet(raw)
     if parsed[0] != 'ERR':
         handle_v2_logic(parsed[0], parsed[1], parsed[2], ip)
