@@ -8,11 +8,11 @@
         "192.168.1.227": {
             "nick": "omar-pc",
             "status": "En l\u00ednea",
-            "t": 1765639435.2822733
+            "t": 1765640612.6021748
         }
     },
-    "nick": "Omar el rey",
-    "status": "En l\u00ednea-AFK",
+    "nick": "Omar",
+    "status": "Trabajando",
     "visible": true,
     "log_on": false,
     "auto_dl": true,
@@ -34,12 +34,12 @@
         },
         "192.168.1.1_TP-Link-O": {
             "trusted": true,
-            "last_seen": 1765640115.004846,
+            "last_seen": 1765640380.3218348,
             "name": "192.168.1.1_TP-Link-O"
         }
     },
     "trusted_peers": [
-        "158.170.12.104",
-        "192.168.1.227"
+        "192.168.1.227",
+        "158.170.12.104"
     ]
 }

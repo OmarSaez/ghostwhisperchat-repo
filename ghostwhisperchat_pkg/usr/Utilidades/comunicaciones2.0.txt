@@ -1,0 +1,86 @@
+========================================================================
+ PROTOCOLO DE COMUNICACIONES GHOSTWHISPERCHAT 2.0 (DRAFT)
+========================================================================
+
+OBJETIVO:
+Protocolo robusto, eficiente y completo para el ciclo de vida del chat.
+
+------------------------------------------------------------------------
+1. MAPA DE PUERTOS
+------------------------------------------------------------------------
+[44494 TCP] -> CHAT PRIVADO
+[44495 UDP] -> CONTROL Y DESCUBRIMIENTO
+[44496 TCP] -> CHAT GRUPAL
+
+------------------------------------------------------------------------
+2. DEFINICIONES BASE
+------------------------------------------------------------------------
+SEPARADOR: "|" (Pipe)
+CIERRE DE BLOQUE: Misma etiqueta que el inicio (ej: [CMD]...[CMD])
+
+A. PERSONAL PACKAGE [MPP]
+   [MPP]N_Args|IP_Origen|Nick|Estado|Version[MPP]
+
+B. LIST PACKAGE [LS]
+   [LS]Total_MPPs|[MPP]User1...[MPP]|[MPP]User2...[MPP][LS]
+   
+C. IDENTIDAD GRUPAL (IMPORTANTE)
+   En un sistema descentralizado, el ID numérico/texto del grupo (GID) NO es único.
+   La identidad única de una sala se compone de: GID + CLAVE.
+   Cualquier comando referido a un grupo debe incluir AMBOS para evitar colisiones
+   (ej: salir de "Sala1/ClaveA" y no de "Sala1/ClaveB").
+
+------------------------------------------------------------------------
+3. ESTRUCTURA DE MENSAJES [MSJ]
+------------------------------------------------------------------------
+[MSJ]Total_Args|PKG_PERSONAL|TIPO|...ARGS...|LARGO_MSG|MENSAJE[MSJ]
+
+A. PRIVADO: (Ver previo)
+B. GRUPAL:  Args: PkgID | GID | G_KEY | DestIP ...
+   * Nota: Aquí ya se incluía G_KEY, correcto.
+
+------------------------------------------------------------------------
+4. ESTRUCTURA DE COMANDOS [CMD]
+------------------------------------------------------------------------
+[CMD]NOMBRE_COMANDO|Total_Args|Arg1|Arg2|...[CMD]
+
+A. INVITACIÓN (INVITE & ACCEPT)
+   - INVITE Grupo: [CMD]INVITE|4|[MPP]|GROUP|GID|PASS[CMD]
+   - ACCEPT: [CMD]INVITE_ACC|2|[MPP]|OK[CMD] (Respuesta contextual al socket TCP)
+
+B. BUSCAR GRUPO (SEARCH_GROUP)
+   [CMD]SEARCH_GROUP|3|[MPP]|GID|PASS[CMD]
+
+C. COORDINACIÓN (I_ANSWER)
+   Se añade PASS para asegurar que coordino la respuesta del grupo correcto.
+   Estructura: [CMD]I_ANSWER|3|IP_BUSCADOR|GID|PASS[CMD]
+
+D. RESPUESTA EXISTENCIA (I_EXIST)
+   [CMD]I_EXIST|4|[MPP]|GID|PASS|[LS][CMD]
+
+E. UNIRSE (JOIN_GROUP)
+   [CMD]JOIN_GROUP|4|[MPP]|GID|PASS|REQ_LS_FLAG[CMD]
+
+F. BIENVENIDA (WELCOME_GROUP)
+   Se añade PASS para validar a qué grupo me están dando la bienvenida.
+   Estructura: [CMD]WELCOME_GROUP|3|GID|PASS|[LS][CMD]
+
+G. DESCONEXIÓN Y SALIDA (LEAVE PROTOCOL)
+
+   1. SALIR DE GRUPO (LEAVE_GROUP)
+      Se añade PASS para ser precisos quirúrgicamente.
+      Estructura: [CMD]LEAVE_GROUP|3|[MPP]|GID|PASS[CMD]
+
+   2. CERRAR PRIVADO (CLOSE_PRIV)
+      [CMD]CLOSE_PRIV|2|[MPP]|REASON[CMD]
+
+   3. DESCONEXIÓN GLOBAL (DISCONNECT_ALL)
+      [CMD]DISCONNECT_ALL|1|[MPP][CMD]
+
+H. MANTENIMIENTO (PING/PONG)
+   Ping: [CMD]PING|1|[MPP][CMD]
+
+------------------------------------------------------------------------
+5. FLUJO DE CONEXIÓN GRUPAL (TCP MESH LOGIC)
+------------------------------------------------------------------------
+(La lógica se mantiene, recordando validar siempre GID+PASS en cada paso).
