@@ -243,10 +243,20 @@ def ipc_listen_child(my_port, lock_state):
                         lock_state['last_rx'] = time.time()
 
             elif cmd == "MSG_IN": # v38.5 support direct msg injection
-                # MSG_IN SEP sender SEP msg SEP color
-                 if len(p) >= 4:
-                     # Just print message
-                     print(f"{p[3]}{p[1]}: {p[2]}{Colors.E}" if len(p)>3 else f"{p[2]}")
+                 # MSG_IN SEP sender SEP msg SEP color
+                  if len(p) >= 4:
+                      # Just print message
+                      print(f"{p[3]}{p[1]}: {p[2]}{Colors.E}" if len(p)>3 else f"{p[2]}")
+
+            elif cmd == "CMD_ADD_PEER":
+                # CMD_ADD_PEER|IP|Nick
+                if len(p) >= 3:
+                    pip, pnick = p[1], p[2]
+                    if pip not in PEERS:
+                        PEERS[pip] = {'nick': pnick, 'chats': {MY_CHILD_ID}}
+                        print(f"{Colors.G}[+] Conectado con {pnick} ({pip}){Colors.E}")
+                    else:
+                         PEERS[pip]['chats'].add(MY_CHILD_ID)
 
             elif cmd == "FWD_FILE":
                 if len(p) >= 4 and p[1] == MY_CHILD_ID:

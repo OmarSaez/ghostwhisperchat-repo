@@ -1513,7 +1513,7 @@ class LobbyAdapter:
     def create_group(self, remote_id, password):
         # UX: Animation "Connecting"
         with Loader(f"{Colors.C}[*] Sincronizando grupo '{remote_id}'{Colors.E}"):
-             time.sleep(2.0)
+             time.sleep(3.5)
              
              # 1. Create Local Session
              cid = str(uuid.uuid4())[:8]
@@ -1693,8 +1693,15 @@ class LobbyAdapter:
                     if p.get('nick') == t: target_ip = ip; break
             
             if target_ip:
-                # Send V2 INVITE
-                gw_comm.send_cmd(target_ip, "INVITE", get_my_mpp(), "PRIV")
+                inv_type = "PRIV"
+                extras = []
+                if cid and cid in ACTIVE_CHATS and ACTIVE_CHATS[cid]['type'] == 'GROUP':
+                     inv_type = "GROUP"
+                     gid = ACTIVE_CHATS[cid]['remote_id']
+                     gp = ACTIVE_CHATS[cid].get('pass', '')
+                     extras = [gid, gp]
+                     
+                gw_comm.send_cmd(target_ip, "INVITE", get_my_mpp(), inv_type, *extras)
                 self.reply(f"{Colors.G}[➜] Invitación enviada a {t} ({target_ip}){Colors.E}", cid)
             else:
                 self.reply(f"{Colors.R}[X] No encontrado: {t}{Colors.E}", cid)
@@ -2204,6 +2211,11 @@ def handle_v2_logic(pkt_type, cmd_name, args, source_ip):
                     if cdata['type'] == 'GROUP' and cdata['remote_id'] == gid:
                         # Found a peer for our group!
                         safe_print(f"{Colors.G}[*] Grupo {gid}: Encontrado peer {sender_mpp['nick']} ({source_ip}){Colors.E}")
+                        
+                        # Notify Child to add peer
+                        if 'port' in cdata:
+                             payload = f"CMD_ADD_PEER{gw_comm.SEP}{source_ip}{gw_comm.SEP}{sender_mpp['nick']}"
+                             send_ipc(payload, cdata['port'])
                         break
             
             elif cmd_name == "GRP_MSG":
