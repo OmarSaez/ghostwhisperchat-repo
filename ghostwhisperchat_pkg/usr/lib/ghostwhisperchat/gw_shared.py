@@ -9,8 +9,8 @@ import time
 import hashlib
 
 # v38.0: Shared Definitions for Modular Architecture
-APP_VER_NUM = 40.1
-APP_VER_TAG = "Fix Protocol Parsing & IPC"
+APP_VER_NUM = 40.4
+APP_VER_TAG = "Correciones de comunicaciones UDP"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 

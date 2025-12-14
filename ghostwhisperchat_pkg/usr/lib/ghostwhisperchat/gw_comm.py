@@ -213,7 +213,7 @@ def send_udp_broadcast(data, port=UDP_PORT_DISC):
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
             s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-            s.sendto(data, ('255.255.255.255', port))
+            s.sendto(data, ('<broadcast>', port))
     except: pass
 
 def send_udp_unicast(ip, data, port=UDP_PORT_DISC):
