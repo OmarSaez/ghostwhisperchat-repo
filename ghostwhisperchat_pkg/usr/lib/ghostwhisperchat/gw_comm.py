@@ -2,192 +2,280 @@ import socket
 import threading
 import sys
 import time
+import errno
 
-# --- CONSTANTS (Recovered from Backup v33.12) ---
-PKT_PREFIX = "[CMD]"
-SEP = "<SEPARATOR>"  # Changed back from "|" to avoid delimiter collision
-TAG_MARK = "<TAG>"
-LEN_MARK = "<LEN>"
+# --- PROTOCOL v2.0 CONSTANTS ---
+PKT_START_CMD = "[CMD]"
+PKT_END_CMD   = "[CMD]"
 
-UDP_PORT = 44495
-TCP_PORT = 44494
+PKT_START_MSJ = "[MSJ]"
+PKT_END_MSJ   = "[MSJ]"
+
+PKT_START_MPP = "[MPP]"
+PKT_END_MPP   = "[MPP]"
+
+PKT_START_LS  = "[LS]"
+PKT_END_LS    = "[LS]"
+
+SEP = "|"
+
+# --- PORT MAP v2.0 ---
+TCP_PORT_PRIV = 44494  # Chat Privado (1 a 1)
+UDP_PORT_DISC = 44495  # Control y Descubrimiento (Broadcast)
+TCP_PORT_GRP  = 44496  # Chat Grupal (Mesh)
+
+# Backward Compatibility Aliases (Deprecated)
+TCP_PORT = TCP_PORT_PRIV
+UDP_PORT = UDP_PORT_DISC
+
+PKT_PREFIX = PKT_START_CMD
+TAG_MARK = "|TAG|" # Dummy
+LEN_MARK = "|LEN|" # Dummy
 
 def build_packet(cmd_name, *args):
+    """Wrapper Legacy -> V2 CMD"""
+    return build_cmd(cmd_name, *args)
+
+BUFFER_SIZE = 8192
+
+# --- BUILDERS (PACKET CONSTRUCTION) ---
+
+def build_mpp(ip, nick, status, version):
     """
-    Construye paquete: [CMD]<TAG>NOMBRE<TAG><LEN>N<LEN><SEP>ARG1<SEP>ARG2...
+    Construye un Personal Package [MPP].
+    [MPP]4|IP|Nick|Estado|Version[MPP]
+    """
+    # Sanitize inputs to prevent pipe injection
+    nick_safe = str(nick).replace(SEP, "")
+    stat_safe = str(status).replace(SEP, "")
+    ver_safe  = str(version).replace(SEP, "")
+    
+    args = [ip, nick_safe, stat_safe, ver_safe]
+    payload = SEP.join(args)
+    return f"{PKT_START_MPP}{len(args)}{SEP}{payload}{PKT_END_MPP}"
+
+def build_ls(mpp_list):
+    """
+    Construye un List Package [LS] a partir de una lista de strings [MPP].
+    [LS]N|[MPP]...|[MPP]...[LS]
+    """
+    count = len(mpp_list)
+    payload = SEP.join(mpp_list) if count > 0 else ""
+    return f"{PKT_START_LS}{count}{SEP}{payload}{PKT_END_LS}"
+
+def build_cmd(cmd_name, *args):
+    """
+    Construye un Comando [CMD].
+    Structure: [CMD]NAME|N|Arg1|Arg2...[CMD]
     """
     valid_args = [str(a) for a in args]
-    # Header format compatible with v33.12
-    # NOTE: Backup included a trailing SEP after header. We replicate that for max compatibility.
-    # Logic: "Header...<SEP>" + "PayloadJoined"
+    payload = SEP.join(valid_args) if valid_args else ""
     
-    header = f"{PKT_PREFIX}{TAG_MARK}{cmd_name}{TAG_MARK}{LEN_MARK}{len(valid_args)}{LEN_MARK}"
-    
-    # We explicitly join with SEP. 
-    # If we want to strictly match backup "header...<SEP>payload":
-    # header += SEP
-    # payload = SEP.join(valid_args)
-    # return (header + payload).encode()
-    
-    # Let's use the explicit robust construction:
-    payload = SEP.join(valid_args)
-    
-    # To ensure 100% match with Backup parser logic:
-    # Backup parser expects lparts[2] to start with SEP (payload starts with SEP).
-    # So we MUST add the SEP acting as boundary.
-    full_pkt_str = f"{header}{SEP}{payload}"
-    return full_pkt_str.encode('utf-8')
+    mid = f"{cmd_name}{SEP}{len(valid_args)}"
+    if valid_args:
+        mid += SEP + payload
+        
+    return f"{PKT_START_CMD}{mid}{PKT_END_CMD}".encode('utf-8')
 
-def parse_packet(raw_str):
+def build_msj(mpp_str, type_str, specific_args_list, msg_content):
     """
-    Parsea un string crudo. 
-    Retorna: (EsComando, NombreCmd, ListaArgs)
+    Construye un Mensaje [MSJ].
+    [MSJ]TotalArgs(Incl.Body)|MPP|TYPE|SPECIFIC...|LEN|MSG[MSJ]
     """
-    if not raw_str.startswith(PKT_PREFIX):
-        return (False, None, None)
+    # 1. Prepare Message Body
+    msg_bytes = msg_content.encode('utf-8')
+    msg_len = len(msg_bytes)
     
+    # 2. Assemble Args
+    # Protocol: MPP | TYPE | SPECIFIC... | LEN | MSG
+    # We treat MSG as the final arg for the "Total Args" count, 
+    # but in the payload construction we append it carefully.
+    
+    pre_args = [mpp_str, type_str] + specific_args_list + [str(msg_len)]
+    
+    # Total args = len(pre_args) + 1 (The Body)
+    count = len(pre_args) + 1
+    
+    pre_payload = SEP.join([str(x) for x in pre_args])
+    
+    # Final Payload = PrePayload + SEP + Body
+    # We construct string header first
+    header_str = f"{PKT_START_MSJ}{count}{SEP}{pre_payload}{SEP}"
+    
+    # Return bytes concatenation
+    return header_str.encode('utf-8') + msg_bytes + PKT_END_MSJ.encode('utf-8')
+
+# --- PARSERS ---
+
+def parse_packet(raw_data):
+    """
+    Analiza bytes o string y retorna estructura.
+    Retorna tupla: (Tipo, Nombre/Subtipo, ArgsList)
+    ArgsList para MSJ incluye el cuerpo como último elemento.
+    """
     try:
-        parts = raw_str.split(TAG_MARK) 
-        if len(parts) < 3: return (False, None, None)
-        cmd_name = parts[1]
-        
-        rest = parts[2]
-        lparts = rest.split(LEN_MARK)
-        if len(lparts) < 3: return (False, None, None)
-        n_args = int(lparts[1])
-        
-        # lparts[2] should be "<SEP>ARG1<SEP>ARG2..."
-        args_payload = lparts[2]
-        
-        # Check boundary
-        if args_payload.startswith(SEP):
-            args_payload = args_payload[len(SEP):]
-            
-        if n_args == 0:
-            args = []
+        # Handle bytes vs str
+        if isinstance(raw_data, bytes):
+            try:
+                raw_str = raw_data.decode('utf-8')
+            except UnicodeDecodeError:
+                return ('ERR', None, [])
         else:
-            args = args_payload.split(SEP)
+            raw_str = raw_data
             
-        return (True, cmd_name, args)
+        raw_str = raw_str.strip()
         
+        # 1. COMMANDS
+        if raw_str.startswith(PKT_START_CMD) and raw_str.endswith(PKT_END_CMD):
+            content = raw_str[len(PKT_START_CMD):-len(PKT_END_CMD)]
+            parts = content.split(SEP)
+            if len(parts) < 2: return ('ERR', None, [])
+            
+            cmd_name = parts[0]
+            try: n_args = int(parts[1])
+            except: return ('ERR', None, [])
+            
+            args = parts[2:]
+            return ('CMD', cmd_name, args)
+
+        # 2. MESSAGES
+        elif raw_str.startswith(PKT_START_MSJ): # Ends check tricky if body has newlines? No strip() removed it?
+            # Re-check endswith using the original raw_str (strip might hurt body?)
+            if not raw_str.endswith(PKT_END_MSJ):
+                 return ('ERR', None, [])
+                 
+            content = raw_str[len(PKT_START_MSJ):-len(PKT_END_MSJ)]
+            
+            # Logic: First field is Total Args
+            # Format: COUNT|MPP|TYPE|...|LEN|BODY
+            
+            first_sep = content.find(SEP)
+            if first_sep == -1: return ('ERR', None, [])
+            
+            try: count = int(content[:first_sep])
+            except: return ('ERR', None, [])
+            
+            remainder = content[first_sep+1:]
+            
+            # Split into exactly 'count' parts
+            # But the last part is the body which might contain SEP.
+            # So we use maxsplit = count - 1
+            parts = remainder.split(SEP, count - 1)
+            
+            if len(parts) != count:
+                return ('ERR', None, [])
+                
+            msg_type = parts[1] # Index 0 is MPP, Index 1 is TYPE
+            return ('MSJ', msg_type, parts)
+
+        else:
+            # Fallback / Raw / Noise
+            return ('RAW', None, [raw_str])
+            
     except Exception as e:
-        return (False, None, None)
+        return ('ERR', None, [])
 
-# --- SENDING UTILS ---
+def extract_mpp(mpp_str):
+    """
+    Parsea un bloque [MPP] y devuelve dict.
+    """
+    if not mpp_str or not mpp_str.startswith(PKT_START_MPP) or not mpp_str.endswith(PKT_END_MPP):
+        return None
+    content = mpp_str[len(PKT_START_MPP):-len(PKT_END_MPP)]
+    parts = content.split(SEP)
+    # Format: N|IP|Nick|Stat|Ver
+    if len(parts) < 5: return None
+    return {'ip': parts[1], 'nick': parts[2], 'status': parts[3], 'ver': parts[4]}
 
-def send_tcp_packet(ip, data):
-    """Envia datos raw via TCP (Reliable)"""
+# --- NETWORK SENDING ---
+
+def send_tcp_packet(ip, data, port=TCP_PORT_PRIV):
     try:
-        if isinstance(data, str): data = data.encode('utf-8')
-        
-        # print(f"[GW_COMM] TCP -> {ip}") 
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.settimeout(2)
-        s.connect((ip, TCP_PORT))
+        s.connect((ip, port))
         s.sendall(data)
         s.close()
-    except Exception as e:
-        # print(f"[GW_COMM] TCP Error to {ip}: {e}")
-        pass
+    except Exception: pass
 
-def send_udp_cmd(ip, cmd, *args):
-    """Envía un comando UDP simple (Fire & Forget)"""
+def send_udp_broadcast(data, port=UDP_PORT_DISC):
     try:
-        data = build_packet(cmd, *args)
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-            s.sendto(data, (ip, UDP_PORT))
-    except: pass
-
-def send_udp_cmd_all(cmd, *args):
-    """Envía un comando UDP a la dirección de broadcast"""
-    try:
-        data = build_packet(cmd, *args)
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
             s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-            s.sendto(data, ('255.255.255.255', UDP_PORT))
+            s.sendto(data, ('255.255.255.255', port))
     except: pass
 
-def send_cmd(ip, cmd, *args):
+def send_udp_unicast(ip, data, port=UDP_PORT_DISC):
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.sendto(data, (ip, port))
+    except: pass
+
+def send_cmd(ip, cmd_name, *args):
     """
-    Wrapper inteligente: Elige TCP o UDP según el tipo de comando.
+    Wrapper inteligente v2.0
+    Decide protocolo y puerto según comando.
     """
-    # Commands that MUST use UDP (Discovery)
-    udp_cmds = ["WHO_ALL", "IAM_HERE", "WHOIS", "USER_HERE", "SEARCH_GROUP", "I_EXIST"]
+    pkt = build_cmd(cmd_name, *args)
     
-    if cmd in udp_cmds:
-        send_udp_cmd(ip, cmd, *args)
+    # UDP COMMANDS (Discovery)
+    udp_cmds = ["SEARCH_GROUP", "I_EXIST", "WHOIS", "IAM_HERE", "DISCONNECT_ALL"]
+    
+    if cmd_name in udp_cmds:
+        if cmd_name == "SEARCH_GROUP" or cmd_name == "DISCONNECT_ALL":
+             send_udp_broadcast(pkt)
+        else:
+             send_udp_unicast(ip, pkt)
     else:
-        # Default TCP (Handshakes, Invites, etc)
-        pkt = build_packet(cmd, *args)
-        send_tcp_packet(ip, pkt)
+        # TCP Routing
+        target_port = TCP_PORT_PRIV
+        if cmd_name in ["JOIN_GROUP", "WELCOME_GROUP", "LEAVE_GROUP", "I_ANSWER"]:
+             target_port = TCP_PORT_GRP # 44496 Mesh Port
+             
+        send_tcp_packet(ip, pkt, target_port)
 
-def send_cmd_all(cmd, *args):
-    # Broadcast is always UDP
-    send_udp_cmd_all(cmd, *args)
+def send_cmd_all(cmd_name, *args):
+    # Forced Broadcast
+    pkt = build_cmd(cmd_name, *args)
+    send_udp_broadcast(pkt)
 
-# --- LISTENER LOGIC (Modularized) ---
+# --- LISTENERS ---
 
-def start_tcp_listener(callback_func):
-    """
-    Starts the TCP listener thread.
-    callback_func(socket_obj, ip_addr, raw_data_str) -> bool
-    Return True to keep socket open (threaded handoff), False to close it.
-    """
+def start_tcp_listener(port, callback_func):
+    """Generic TCP Listener"""
     def _loop():
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         try:
-            s.bind(('0.0.0.0', TCP_PORT))
+            s.bind(('0.0.0.0', port))
             s.listen(10)
-        except Exception as e:
-            print(f"Error binding TCP {TCP_PORT}: {e}")
-            return # Critical failure
+        except: return
 
         while True:
             try:
                 conn, addr = s.accept()
-                ip = addr[0]
-                
-                # Peek or read first chunk? Logic requires reading to know if it's cmd.
-                # Standard logic: read 4096.
-                try:
-                    raw = conn.recv(4096).decode('utf-8', errors='ignore')
-                    if raw:
-                        keep_open = callback_func(conn, ip, raw)
-                        if not keep_open:
-                            conn.close()
-                    else:
-                        conn.close()
-                except:
-                    conn.close()
-            except Exception as e:
-                pass # Accept error
+                # Read specific buffer size
+                raw = conn.recv(BUFFER_SIZE).decode('utf-8', errors='ignore')
+                if raw:
+                    callback_func(conn, addr[0], raw)
+                conn.close()
+            except: pass
+            
+    threading.Thread(target=_loop, daemon=True).start()
 
-    t = threading.Thread(target=_loop, daemon=True)
-    t.start()
-    return t
-
-def start_udp_listener(callback_func):
-    """
-    Starts UDP listener thread.
-    callback_func(raw_data_bytes, ip_addr)
-    """
+def start_udp_listener(port, callback_func):
+    """Generic UDP Listener"""
     def _loop():
         u = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         u.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         u.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        try:
-            u.bind(('', UDP_PORT))
-        except:
-            return
+        try: u.bind(('', port))
+        except: return
 
         while True:
             try:
-                data, addr = u.recvfrom(4096)
-                if not data: continue
+                data, addr = u.recvfrom(BUFFER_SIZE)
                 callback_func(data, addr[0])
             except: pass
             
-    t = threading.Thread(target=_loop, daemon=True)
-    t.start()
-    return t
+    threading.Thread(target=_loop, daemon=True).start()

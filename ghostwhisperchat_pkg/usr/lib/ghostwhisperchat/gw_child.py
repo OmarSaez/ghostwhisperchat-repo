@@ -85,6 +85,7 @@ class ChildAdapter:
         return {'type': self.ctype, 'remote_id': self.remote, 'remote_nick': REMOTE_NICK}
 
     def get_my_info(self): return MY_NICK, MY_IP, MY_STATUS
+    def get_mpp(self): return gw_comm.build_mpp(MY_IP, MY_NICK, MY_STATUS, APP_VERSION)
     def get_peers(self): return PEERS
     def show_lobby_summary(self): pass # No logic for child
     

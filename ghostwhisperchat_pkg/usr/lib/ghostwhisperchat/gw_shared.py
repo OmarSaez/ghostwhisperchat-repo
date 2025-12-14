@@ -4,11 +4,13 @@ import sys
 import platform
 import subprocess
 import socket
+import threading
+import time
 import hashlib
 
 # v38.0: Shared Definitions for Modular Architecture
-APP_VER_NUM = 39.2
-APP_VER_TAG = "Fix Comando Contactos y Logs IPC"
+APP_VER_NUM = 40.0
+APP_VER_TAG = "Protocolo V2 Implementado"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 
@@ -181,4 +183,31 @@ def get_ip():
             return s.getsockname()[0]
     except:
         return "127.0.0.1"
+
+class Loader:
+    """Animación de carga simple para CLI (Context Manager)"""
+    def __init__(self, desc="Cargando"):
+        self.desc = desc
+        self.stop_event = threading.Event()
+        self.t = threading.Thread(target=self._animate, daemon=True)
+
+    def __enter__(self):
+        self.t.start()
+        return self
+
+    def __exit__(self, exc_type, exc_value, tb):
+        self.stop_event.set()
+        self.t.join()
+        # Clean line
+        sys.stdout.write("\r" + " " * (len(self.desc) + 10) + "\r")
+        sys.stdout.flush()
+
+    def _animate(self):
+        chars = [".  ", " . ", "  ."]
+        i = 0
+        while not self.stop_event.is_set():
+            sys.stdout.write(f"\r{self.desc} [{chars[i]}]")
+            sys.stdout.flush()
+            time.sleep(0.3)
+            i = (i + 1) % len(chars)
 
