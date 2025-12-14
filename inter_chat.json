@@ -1,7 +1,13 @@
 {
-    "known_users": {},
-    "nick": "OMar",
-    "status": "En l\u00ednea",
+    "known_users": {
+        "192.168.1.227": {
+            "nick": "Omar-pc",
+            "status": "En l\u00ednea",
+            "t": 1765688611.61315
+        }
+    },
+    "nick": "Omar",
+    "status": "Codeando",
     "visible": true,
     "log_on": false,
     "pop_on": true,
@@ -9,7 +15,7 @@
     "trusted_nets": {
         "192.168.1.1_TP-Link-O": {
             "trusted": true,
-            "last_seen": 1765684299.796046,
+            "last_seen": 1765688606.3182054,
             "name": "192.168.1.1_TP-Link-O"
         }
     },

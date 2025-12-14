@@ -1,0 +1,74 @@
+DOCUMENTACIÓN TÉCNICA: GESTIÓN DE PINTADO Y ESTADO (DISPLAY MANAGER)
+======================================================================
+Fecha: 14 de Diciembre de 2025
+Versión implementada: v41.0
+Módulo principal: gw_display.py
+
+1. INTRODUCCIÓN Y PROBLEMA
+--------------------------
+En versiones anteriores, la consola del Lobby escribía directamente en el flujo de salida (stdout). Esto causaba problemas cuando se necesitaba actualizar información persistente en la parte superior (el "Dashboard" o Banner con IP, Nick, Estado), ya que limpiar la pantalla borraba el historial de mensajes, y no había forma de recuperarlo.
+
+El objetivo fue crear un sistema que permitiera:
+- Actualizar dinámicamente el Banner superior (Nick, conteo de chats, estado) en tiempo real.
+- Mantener intacto el historial de comandos, mensajes y logs de depuración.
+- Unificar la lógica de impresión para evitar duplicidad de código.
+
+2. SOLUCIÓN: ARQUITECTURA DE GESTIÓN DE ESTADO (STATE MANAGEMENT)
+-----------------------------------------------------------------
+Hemos implementado un patrón de "Gestor de Visualización Centralizado". En lugar de que la aplicación "imprima", la aplicación "solicita registrar y refrescar".
+
+Componentes Clave:
+
+A. El Escriba Oficial (`gw_display.py`)
+   Se creó una clase `DisplayManager` que actúa como el único dueño de la verdad visual.
+   - Buffer de Historial (`self.history`): Una lista en memoria que almacena cada línea de texto que alguna vez se debió mostrar.
+   - Lógica de Refresco (`refresh()`): Un método que orquesta el redibujado completo de la interfaz.
+
+B. El Espía de Estado (Callbacks)
+   Para que el `DisplayManager` sea agnóstico (no conozca los detalles internos del Lobby pero pueda mostrarlos), utiliza un sistema de Callbacks.
+   - Al iniciarse en `ghostwhisperchat`, se le inyecta una función `get_lobby_status()`.
+   - Cuando se redibuja la pantalla, el Manager ejecuta esta función para obtener un "snapshot" (foto instantánea) de las variables globales actuales: `MY_NICK`, `ACTIVE_CHATS`, `VISIBLE_IN_SCAN`, etc.
+
+3. FLUJO DE EJECUCIÓN
+---------------------
+
+CASO 1: IMPRIMIR UN MENSAJE (safe_print)
+1. El sistema llama a `safe_print("Hola")`.
+2. Se delega a `DISPLAY.add("Hola")`.
+3. El Manager guarda "Hola" en su lista `history`.
+4. Se imprime "Hola" en la consola para feedback inmediato.
+
+CASO 2: CAMBIO DE ESTADO (Ej: Nuevo Chat o Cambio de Nick)
+1. El usuario cambia su nick o se abre un chat.
+2. El sistema llama a `refresh_ui()`.
+3. Se invoca `DISPLAY.refresh()`.
+4. PASO CRÍTICO (Repintado Relámpago):
+   a. Se ejecuta `clear` (limpiar pantalla).
+   b. Se ejecuta el Callback `get_lobby_status()` para obtener datos frescos.
+   c. Se imprime el Banner/Dashboard con los nuevos datos.
+   d. Se itera sobre `self.history` y se vuelven a imprimir todas las líneas guardadas.
+
+4. BENEFICIOS
+-------------
+- Persistencia Visual: El usuario percibe que el historial es eterno y el banner es dinámico, similar a una aplicación GUI moderna.
+- Robustez: Si se activa el modo Debug, los logs se guardan en el historial y persisten incluso tras refrescar la pantalla.
+- Desacoplamiento: El módulo de visualización no necesita importar variables globales del Lobby, evitando referencias circulares.
+
+5. IMPLEMENTACIÓN EN CÓDIGO
+---------------------------
+Archivo: /usr/lib/ghostwhisperchat/gw_display.py
+
+class DisplayManager:
+    def __init__(self, status_cb):
+        self.history = []
+        self.status_cb = status_cb  # Función que devuelve dict con estado
+    
+    def refresh(self):
+        os.system('clear')
+        st = self.status_cb() # Obtener estado fresco
+        print_dashboard(st)   # Pintar cabecera
+        print_history()       # Repintar todo el log
+
+Integración en ghostwhisperchat:
+- Se reemplazó el uso directo de `LOBBY_HISTORY` por `gw_display.DISPLAY`.
+- Se redefinió `safe_print` para usar `DISPLAY.add()`.

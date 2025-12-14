@@ -84,6 +84,9 @@ def process(inp, origin_cid, adapter):
             else:
                 adapter.reply(f"{Colors.W}[*] Invitando...{Colors.E}", origin_cid)
                 adapter.invite_priv(t, my_nick, my_st)
+        else:
+            if hasattr(adapter, 'suggest_user'): adapter.suggest_user(args)
+            else: adapter.reply(f"{Colors.F}Usuario no encontrado.{Colors.E}", origin_cid)
 
     elif cmd_key == 'LS':
          if origin_cid:
@@ -204,7 +207,10 @@ def process(inp, origin_cid, adapter):
         adapter.reply(f"{Colors.M}[DEBUG] Modo Debug {status}.{Colors.E}", origin_cid)
 
     elif cmd_key is None and raw_cmd.startswith("-"):
-         adapter.reply(f"{Colors.F}Comando desconocido: {raw_cmd}. Prueba --help o --ab.{Colors.E}", origin_cid)
+          if hasattr(adapter, 'suggest_command'):
+               adapter.suggest_command(raw_cmd)
+          else:
+               adapter.reply(f"{Colors.F}Comando desconocido: {raw_cmd}. Prueba --help o --ab.{Colors.E}", origin_cid)
 
 
 # --- HELPERS (Moving from main) ---

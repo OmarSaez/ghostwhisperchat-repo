@@ -46,6 +46,8 @@ except ImportError:
         import gw_shared
         import gw_child
         import gw_pop
+        import gw_display
+        import gw_complete
     except ImportError as e:
         print(f"CRITICAL ERROR: Could not import gw_comm/gw_shared module. Paths tried: {sys.path}")
         print(f"Error detail: {e}")
@@ -193,7 +195,7 @@ def raw_print(s):
 
 def safe_print(s):
     # Imprime Y guarda en historial (Eventos publicos)
-    LOBBY_HISTORY.append(s)
+    if gw_display.DISPLAY: gw_display.DISPLAY.add(s)
     raw_print(s)
 
 def reply_print(msg, target_cid=None):
@@ -233,16 +235,9 @@ def write_log(txt, type="MSG"):
         except: pass
 
 KNOWN_USERS = {} # {ip: {nick, status, t}}
-LOBBY_HISTORY = [] # Buffer para repintar la UI
-DISC_TEMP = [] # Buffer para descubrimiento (Scan)
 DEBUG_MODE = False # v36.8
 
 # --- UTILS VISUALES ---
-def safe_print(msg):
-    """Thread-safe print"""
-    try:
-        sys.stdout.write(msg + '\n')
-    except: pass
 
 def debug_log(msg):
     if DEBUG_MODE:
@@ -469,36 +464,19 @@ def get_peer_name(ip):
 
     """Imprime y guarda en historial para repintado"""
     safe_print(txt)
-    # LOBBY_HISTORY append is handled by safe_print now
-    if len(LOBBY_HISTORY) > 200: LOBBY_HISTORY.pop(0) # v37.13 Increased limit
+
+
+def get_lobby_status():
+    return {
+        'ip': MY_IP, 'nick': MY_NICK, 'visible': VISIBLE_IN_SCAN, 
+        'status': MY_STATUS, 'chats': len(ACTIVE_CHATS), 
+        'contacts': len(KNOWN_USERS),
+        'ver': APP_VERSION
+    }
 
 def refresh_ui(msg=None):
-    os.system('cls' if os.name == 'nt' else 'clear')
-
-    # Dashboard Format
-    vis_txt = f"{Colors.G}SI{Colors.E}" if VISIBLE_IN_SCAN else f"{Colors.F}NO{Colors.E}"
-
-    raw_print(f"{Colors.H}Version: {APP_VERSION}{Colors.E}")
-    raw_print(f"Mi IP: {Colors.BO}{MY_IP}{Colors.E} | Nick: {Colors.BO}{MY_NICK}{Colors.E} | Visible en red: {vis_txt} | Estado: {Colors.C}{MY_STATUS}{Colors.E}")
-    raw_print(f"Total de chats: {Colors.M}{len(ACTIVE_CHATS)}{Colors.E}")
-    raw_print(f"Total de contactos: {Colors.M}{len(KNOWN_USERS)}{Colors.E}")
-    raw_print(f"Puedes poner --help para ver los comandos")
-    raw_print(f"{Colors.G}Bienvenido al lobby{Colors.E}")
-    raw_print("-" * 60)
-
-    # Repintar Historial sin duplicarlo
-    for line in LOBBY_HISTORY:
-        raw_print(line)
-
-    if msg: 
-        safe_print(msg) # Este es nuevo, sí guardar
-    
-    # Force Prompt restore only if Async (refresh inside refresh?)
-    # Actually raw_print handles the logic per line, but for refresh we want clean output.
-    # But for now let's trust it.
-    
-    # If we are async, raw_print appended prompt on the last line.
-    # If we are sync, nobody printed prompt. Correct.
+    if gw_display.DISPLAY: gw_display.DISPLAY.refresh()
+    if msg: safe_print(msg)
 
 # --- RED ---
 def lazy_import():
@@ -778,6 +756,7 @@ def leave_sess(silent=False, exclude_ip=None, target_cid=None):
         CURRENT_CHAT_ID = None
         
     if not silent: safe_print(f"{Colors.G}[✔] Sesión {cid_to_close} cerrada.{Colors.E}")
+    refresh_ui()
 
 def start_private_chat(ip, nick, status="En línea", send_ack=True):
     global CURRENT_CHAT_ID
@@ -801,6 +780,7 @@ def start_private_chat(ip, nick, status="En línea", send_ack=True):
     debug_log(f"[PROTOCOLO] INVITE_ACC enviado. Ahora abriendo mi consola...")
     
     spawn_child_process(cid, ACTIVE_CHATS[cid]) # Spawn child immediately
+    refresh_ui()
     refresh_ui(f"{Colors.G}[*] Chat privado con {nick} iniciado.{Colors.E}")
     return cid
 
@@ -868,6 +848,8 @@ def invite_users(targets_str, target_cid=None):
                 send_cmd(ip, "INVITE", MY_NICK, "GROUP", gid, gpass, members_list)
                 safe_print(f"   > {t}: Invitación enviada.")
                 count += 1
+        else:
+            gw_complete.suggest_user(t) # Added this line
 
     if count > 0:
         send_cmd_all("GRP_MSG", gid, f"[Grupo] {MY_NICK} ha invitado a {count} usuarios.")
@@ -1651,6 +1633,7 @@ class LobbyAdapter:
             return
         elif key == 'auto_dl': AUTO_DL = val
         save_config()
+        refresh_ui()
 
     def broadcast_status(self, st=None): 
         # V2 STATUS_UPDATE: [CMD]STATUS_UPDATE|1|[MPP][CMD]
@@ -1661,10 +1644,25 @@ class LobbyAdapter:
     def toggle_autostart(self, val, cid): toggle_autostart(val, cid)
     
     def clear_screen(self, cid):
-        global LOBBY_HISTORY
-        LOBBY_HISTORY = []
+        if gw_display.DISPLAY: gw_display.DISPLAY.history = []
         if cid: self.reply(f"{Colors.G}Pantalla limpiada.{Colors.E}", cid)
         else: refresh_ui()
+
+    def suggest_command(self, invalid):
+        if gw_complete.COMPLETER:
+             sugs = gw_complete.COMPLETER.suggest_command(invalid)
+             if sugs:
+                 safe_print(f"{Colors.W}Comando no encontrado. Quizás quisiste decir:{Colors.E}")
+                 for s in sugs: safe_print(f"  - {s}")
+             else:
+                 safe_print(f"{Colors.W}Comando no encontrado. Prueba --help.{Colors.E}")
+    
+    def suggest_user(self, invalid):
+        if gw_complete.COMPLETER:
+             sugs = gw_complete.COMPLETER.suggest_user(invalid)
+             if sugs:
+                 safe_print(f"{Colors.W}Usuario no encontrado. Quizás buscas a:{Colors.E}")
+                 for s in sugs: safe_print(f"  - {s}")
 
     def invite_users(self, args_str, cid):
         # Logic V2: Parse args (Nick/IPs) -> Send INVITE
@@ -1700,6 +1698,7 @@ class LobbyAdapter:
                 self.reply(f"{Colors.G}[➜] Invitación enviada a {t} ({target_ip}){Colors.E}", cid)
             else:
                 self.reply(f"{Colors.R}[X] No encontrado: {t}{Colors.E}", cid)
+                self.suggest_user(t)
         
         if not cid:
             loader.__exit__(None, None, None)
@@ -2101,86 +2100,33 @@ def enable_win_visuals():
             kernel32.SetConsoleMode(kernel32.GetStdHandle(-11), 7)
         except: pass
 
-def setup_autocomplete():
-    """Configura el autocompletado para la línea de comandos del lobby."""
-    if platform.system() != "Windows": # Readline no está disponible en Windows por defecto
-        try:
-            import readline
-            
-            # Obtener todos los comandos y sus alias
-            all_commands = []
-            for cmd_key, data in COMMAND_DEFS.items():
-                all_commands.append(f"--{cmd_key.lower()}") # Comando principal
-                for alias in data['aliases']:
-                    if alias.startswith('--'):
-                        all_commands.append(alias)
-            
-            # Función de autocompletado Inteligente
-            def completer(text, state):
-                buffer = readline.get_line_buffer()
-                line_parts = buffer.lstrip().split()
-                
-                options = []
-                
-                # Contexto: ¿Es el inicio de la línea o un comando?
-                # Si estamos escribiendo la primera palabra
-                if not line_parts or (len(line_parts) == 1 and not buffer.endswith(' ')):
-                    options = [i for i in all_commands if i.startswith(text)]
-                
-                else:
-                    # Contexto: Argumentos
-                    cmd_str = line_parts[0]
-                    cmd_key = resolve_cmd(cmd_str)
-                    
-                    # Si el comando es INVITE o CHAT_PRIV, sugerir Usuarios
-                    if cmd_key in ['INVITE', 'CHAT_PRIV']:
-                        # Prioridad 1: Contactos Conocidos (Memoria + Peers)
-                        prio_candidates = set()
-                        for d in KNOWN_USERS.values(): prio_candidates.add(d['nick'])
-                        for p in PEERS.values(): 
-                            if isinstance(p, dict): prio_candidates.add(p.get('nick', '?'))
-                        
-                        options_prio = [n for n in prio_candidates if n.startswith(text)]
-                        
-                        # Prioridad 2: Resultados de Escaneo Reciente (DISC_TEMP)
-                        # "si no encuentra nada similar... busca en listado de quienes interno"
-                        sec_candidates = set()
-                        global DISC_TEMP
-                        for item in DISC_TEMP:
-                            # item structure depends on scan func: (ip, nick, stat)
-                            if len(item) >= 2: sec_candidates.add(item[1])
-                            
-                        options_sec = [n for n in sec_candidates if n.startswith(text) and n not in prio_candidates]
-                        
-                        # Combinar: Primero contactos, luego descubiertos
-                        options = options_prio + options_sec
-                
-                if state < len(options):
-                    return options[state]
-                else:
-                    return None
+# --- CONFIGURACIÓN & MAIN ---
 
-            readline.set_completer(completer)
-            readline.parse_and_bind("tab: complete")
-            # Configurar delimitadores: espacio, tab, salto linea y COMA (para invites multiples)
-            # El guion (-) se quitó para permitir comandos con guiones
-            readline.set_completer_delims(' \t\n,')
-            
-            safe_print(f"{Colors.G}[✔] Autocompletado activado (presiona TAB).{Colors.E}")
-        except ImportError:
-            safe_print(f"{Colors.W}[!] Módulo 'readline' no encontrado. Autocompletado no disponible.{Colors.E}")
-        except Exception as e:
-            safe_print(f"{Colors.F}[!] Error al configurar autocompletado: {e}{Colors.E}")
+def get_complete_ctx():
+    """Context provider for Autocomplete"""
+    return {
+        'known_users': KNOWN_USERS,
+        'peers': PEERS,
+        'scan_buffer': SCAN_BUFFER # v41.0 Buffer de escaneo
+    }
 
-# --- V40 LOGIC HELPERS ---
+def init_completer():
+    """Inicializa autocompletado inteligente v2 (gw_complete)"""
+    if platform.system() != "Windows":
+        if gw_complete.setup(get_complete_ctx):
+             safe_print(f"{Colors.G}[✔] Autocompletado Inteligente activado (TAB).{Colors.E}")
+        else:
+             safe_print(f"{Colors.W}[!] Autocompletado no disponible.{Colors.E}")
 
 def get_my_mpp():
     """Genera mi [MPP] actualizado"""
     # IP, Nick, Status, Version
     return gw_comm.build_mpp(MY_IP, MY_NICK, MY_STATUS, APP_VERSION)
 
+
 def handle_v2_logic(pkt_type, cmd_name, args, source_ip):
     """Central V2 Logic: Process Parsed Packet"""
+    import gw_pop
     if source_ip == MY_IP: return # Prevent Self-Loop
     
     try:
@@ -2191,12 +2137,16 @@ def handle_v2_logic(pkt_type, cmd_name, args, source_ip):
             
         # Update Knowledge Base (Auto-Discovery)
         if sender_mpp:
-            # save/update peer info
-            if source_ip not in PEERS: PEERS[source_ip] = {}
+            # MPP always contains Nick/Status. Update Knowledge.
+            if source_ip not in PEERS: PEERS[source_ip] = {'chats': set()}
             PEERS[source_ip]['nick'] = sender_mpp['nick']
             PEERS[source_ip]['ver']  = sender_mpp['ver']
             PEER_STATUSES[source_ip] = sender_mpp['status']
-            # update_memory(...) # Optional persistence
+            
+            # Persistencia Automática + Refresh solo si es nuevo (evitar parpadeo)
+            is_new = source_ip not in KNOWN_USERS
+            update_memory(source_ip, sender_mpp['nick'], sender_mpp['status'])
+            if is_new: refresh_ui()
             
         if pkt_type == 'CMD':
             debug_log(f"[V2] CMD: {cmd_name} Args: {len(args)}")
@@ -2381,6 +2331,9 @@ def run_lobby():
     global hashlib
     import hashlib # v36.0 Integrity check
     
+    # Init Display Manager
+    gw_display.DISPLAY = gw_display.DisplayManager(get_lobby_status)
+
     adapter = LobbyAdapter()
     LOBBY_ADAPTER = adapter # Expose globally for callbacks
     os.system('cls' if os.name == 'nt' else 'clear'); fw_cfg(); MY_IP = get_ip()
@@ -2393,7 +2346,7 @@ def run_lobby():
          print(f"{Colors.W}[!] La visibilidad en red estará limitada.{Colors.E}")
          time.sleep(3)
     
-    global LOBBY_HISTORY, PROMPT
+    global PROMPT
     PROMPT = f"{Colors.B}Lobby > {Colors.E}"
     
     val_nick = MY_NICK if MY_NICK.strip() else socket.gethostname()
@@ -2419,10 +2372,11 @@ def run_lobby():
     refresh_ui() # Clean start with Dashboard
     
     # Aseguramos limpieza al inicio también por si acaso
+    # Aseguramos limpieza al inicio también por si acaso
     restore_terminal()
     
-    # Setup Autocomplete (v35.0)
-    setup_autocomplete()
+    # Setup Autocomplete (v41.0)
+    init_completer()
 
     threading.Thread(target=ipc_listen_parent, daemon=True).start()
     
@@ -2439,7 +2393,8 @@ def run_lobby():
     while True:
         try:
             inp = input(f"{Colors.B}Lobby > {Colors.E}").strip()
-            if inp: LOBBY_HISTORY.append(f"{Colors.B}Lobby > {Colors.E}{inp}") # Guardar input usuario
+            if inp and gw_display.DISPLAY:
+                 gw_display.DISPLAY.add(f"{Colors.B}Lobby > {Colors.E}{inp}")
             
             restore_from_afk()
             exec_lobby_cmd(inp)
@@ -2489,7 +2444,5 @@ def main():
             time.sleep(5)
     else:
         run_lobby()
-
-if __name__ == "__main__": main()
 
 if __name__ == "__main__": main()
