@@ -18,6 +18,7 @@ PKT_START_LS  = "[LS]"
 PKT_END_LS    = "[LS]"
 
 SEP = "|"
+SUB_SEP = ";"
 
 # --- PORT MAP v2.0 ---
 TCP_PORT_PRIV = 44494  # Chat Privado (1 a 1)
@@ -43,16 +44,16 @@ BUFFER_SIZE = 8192
 def build_mpp(ip, nick, status, version):
     """
     Construye un Personal Package [MPP].
-    [MPP]4|IP|Nick|Estado|Version[MPP]
+    [MPP]4|IP|Nick|Estado|Version[MPP] (Now using SUB_SEP inside)
     """
-    # Sanitize inputs to prevent pipe injection
-    nick_safe = str(nick).replace(SEP, "")
-    stat_safe = str(status).replace(SEP, "")
-    ver_safe  = str(version).replace(SEP, "")
+    # Sanitize inputs to prevent injection
+    nick_safe = str(nick).replace(SEP, "").replace(SUB_SEP, "")
+    stat_safe = str(status).replace(SEP, "").replace(SUB_SEP, "")
+    ver_safe  = str(version).replace(SEP, "").replace(SUB_SEP, "")
     
     args = [ip, nick_safe, stat_safe, ver_safe]
-    payload = SEP.join(args)
-    return f"{PKT_START_MPP}{len(args)}{SEP}{payload}{PKT_END_MPP}"
+    payload = SUB_SEP.join(args)
+    return f"{PKT_START_MPP}{len(args)}{SUB_SEP}{payload}{PKT_END_MPP}"
 
 def build_ls(mpp_list):
     """
@@ -79,24 +80,33 @@ def build_cmd(cmd_name, *args):
 
 def build_msj(mpp_str, type_str, specific_args_list, msg_content):
     """
-    Construye un Mensaje [MSJ].
-    [MSJ]TotalArgs(Incl.Body)|MPP|TYPE|SPECIFIC...|LEN|MSG[MSJ]
+    Construye un MSJ.
+    [MSJ]TotalArgs|MPP|TYPE|...|LEN|BODY[MSJ]
     """
-    # 1. Prepare Message Body
-    msg_bytes = msg_content.encode('utf-8')
-    msg_len = len(msg_bytes)
+    # Args: MPP + TYPE + Specifics + [Msg]
+    # Length passed as separate field prior to Body?
+    # Protocol: 
+    # Arg0: MPP
+    # Arg1: Type
+    # Arg2..N: Specifics
+    # ArgLast-1: LEN(BODY)
+    # ArgLast: BODY
     
-    # 2. Assemble Args
-    # Protocol: MPP | TYPE | SPECIFIC... | LEN | MSG
-    # We treat MSG as the final arg for the "Total Args" count, 
-    # but in the payload construction we append it carefully.
+    # Let's count args.
+    # MPP is 1 arg. Type is 1 arg. Specifics is N args.
+    # LEN is 1 arg. Body is 1 arg.
     
-    pre_args = [mpp_str, type_str] + specific_args_list + [str(msg_len)]
+    s_args = [str(a) for a in specific_args_list]
     
-    # Total args = len(pre_args) + 1 (The Body)
-    count = len(pre_args) + 1
+    pre_payload_parts = [mpp_str, type_str] + s_args + [str(len(msg_content))]
+    pre_payload = SEP.join(pre_payload_parts)
     
-    pre_payload = SEP.join([str(x) for x in pre_args])
+    # Total args count = len(pre_payload_parts) + 1 (Body)
+    count = len(pre_payload_parts) + 1
+    
+    # Encoding Body logic
+    if isinstance(msg_content, str): msg_bytes = msg_content.encode('utf-8')
+    else: msg_bytes = msg_content
     
     # Final Payload = PrePayload + SEP + Body
     # We construct string header first
@@ -158,21 +168,22 @@ def parse_packet(raw_data):
             remainder = content[first_sep+1:]
             
             # Split into exactly 'count' parts
-            # But the last part is the body which might contain SEP.
-            # So we use maxsplit = count - 1
-            parts = remainder.split(SEP, count - 1)
+            # But the last part (BODY) might contain SEP.
+            # So we split count-1 times from left, and the rest is Body.
             
-            if len(parts) != count:
-                return ('ERR', None, [])
-                
-            msg_type = parts[1] # Index 0 is MPP, Index 1 is TYPE
-            return ('MSJ', msg_type, parts)
-
-        else:
-            # Fallback / Raw / Noise
-            return ('RAW', None, [raw_str])
+            payload_parts = remainder.split(SEP, count - 1)
             
-    except Exception as e:
+            # Extract MPP and Type to conform standard return
+            if len(payload_parts) < 2: return ('ERR', None, [])
+            
+            # Return ('MSJ', TYPE, ArgsList)
+            # ArgsList = [MPP, TYPE, ..., BODY]
+            type_str = payload_parts[1]
+            return ('MSJ', type_str, payload_parts)
+            
+        return ('RAW', None, [raw_str])
+        
+    except:
         return ('ERR', None, [])
 
 def extract_mpp(mpp_str):
@@ -182,7 +193,7 @@ def extract_mpp(mpp_str):
     if not mpp_str or not mpp_str.startswith(PKT_START_MPP) or not mpp_str.endswith(PKT_END_MPP):
         return None
     content = mpp_str[len(PKT_START_MPP):-len(PKT_END_MPP)]
-    parts = content.split(SEP)
+    parts = content.split(SUB_SEP)
     # Format: N|IP|Nick|Stat|Ver
     if len(parts) < 5: return None
     return {'ip': parts[1], 'nick': parts[2], 'status': parts[3], 'ver': parts[4]}
