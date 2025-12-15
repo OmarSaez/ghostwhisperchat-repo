@@ -65,7 +65,7 @@ class PopupManager:
 POP = PopupManager()
 
 # Module Level Exports for Ease of Use
-def show(title, text, duration=5):
+def show(title, text, duration=10):
     POP.show_notification(title, text, duration=duration)
 
 def ask(title, text, on_yes, on_no):

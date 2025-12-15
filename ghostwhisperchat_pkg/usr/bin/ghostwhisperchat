@@ -734,7 +734,8 @@ def leave_sess(silent=False, exclude_ip=None, target_cid=None):
                 if c['type'] == 'GROUP':
                     send_cmd(ip, "LEAVE_GRP", c['remote_id'], MY_NICK)
                 else: # PRIV
-                    send_cmd(ip, "DISCONNECT_NOW", MY_NICK)
+                    # Use CLOSE_PRIV instead of DISCONNECT_NOW for safer, granular closing
+                    send_cmd(ip, "CLOSE_PRIV", MY_NICK, str(time.time()))
             # Remove chat_id linkage
             pdata['chats'].discard(cid_to_close) # Use discard to be safe
             if not pdata['chats']: # Empty, user gone
@@ -2322,14 +2323,22 @@ def handle_v2_logic(pkt_type, cmd_name, args, source_ip):
                              send_ipc(f"MSG_IN{gw_comm.SEP}Sistema{gw_comm.SEP}{msg}{gw_comm.SEP}{Colors.F}", cdata['port'])
 
             elif cmd_name == "CLOSE_PRIV" or cmd_name == "DISCONNECT_NOW":
-                # Args: [MPP], REASON
-                # Safe Nick
+                # Args: [MPP], NICK, [TIMESTAMP]
                 snick = sender_mpp['nick'] if sender_mpp else f"? ({source_ip})"
+                
+                # Check Timestamp to avoid killing new sessions with old packets
+                pkt_ts = float(args[1]) if len(args) > 1 and args[1].replace('.','',1).isdigit() else time.time()
                 
                 # Find Priv chat
                 to_remove = []
                 for cid, cdata in ACTIVE_CHATS.items():
                      if cdata['type'] == 'PRIV' and cdata['remote_id'] == source_ip:
+                         # Validating Timing
+                         created_at = cdata.get('created_at', 0)
+                         if pkt_ts < created_at:
+                             debug_log(f"[RACE FIX] Ignorando {cmd_name} viejo de {snick}. PktTs: {pkt_ts} < Created: {created_at}")
+                             continue
+                             
                          safe_print(f"{Colors.F}[!] {snick} cerró el chat privado.{Colors.E}")
                          if 'port' in cdata:
                               send_ipc("CMD_CLOSE_NOW", cdata['port'])
