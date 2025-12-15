@@ -9,7 +9,7 @@ import time
 import hashlib
 
 # v38.0: Shared Definitions for Modular Architecture
-APP_VER_NUM = 41.19
+APP_VER_NUM = 41.20
 APP_VER_TAG = "Unirse/Salir Grupo FIX"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
