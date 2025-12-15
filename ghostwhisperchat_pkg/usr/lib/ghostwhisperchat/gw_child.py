@@ -149,15 +149,40 @@ class ChildAdapter:
     def scan_network(self, cid, silent=False):
         if not silent: print(f"{Colors.C}[*] Escaneando red...{Colors.E}")
         sys.stdout.flush()
-        gw_comm.send_cmd_all("WHOIS", self.get_mpp())  # WHOIS requires sender MPP logic? 
-        # gw_comm.send_cmd_all uses build_packet. 
-        # Checking WHOIS handler in Lobby (Line 2259): 
-        # if cmd_name == "WHOIS": ... send_cmd(source_ip, "IAM_HERE", get_my_mpp())
-        # WHOIS handler doesn't seem to parse args, just source IP? 
-        # Usually WHOIS|SenderMPP.
-
+        # WHOIS sends IAM_HERE response from others.
+        gw_comm.send_cmd_all("WHOIS", self.get_mpp())  
+        
+        # Wait for responses
         time.sleep(3)
-        self.show_contacts(cid)
+        
+        # Only show table if not silent
+        if not silent: self.show_contacts(cid)
+
+    def leave_sess(self, cid):
+        # Implementation of Strict Disconnection Protocols
+        if self.ctype == 'GROUP':
+             # 1. SALIR DE GRUPO (LEAVE_GROUP)
+             # [CMD]LEAVE_GROUP|3|[MPP]|GID|PASS[CMD]
+             gid = str(self.remote)
+             gp = str(self.password) if self.password else ""
+             # Send to Group (Broadcast) or just peers? 
+             # Protocol says UDP Broadcast/Multicast usually for groups.
+             # Using send_cmd_all for simplicity or targeted? 
+             # send_cmd_all("LEAVE_GROUP", self.get_mpp(), gid, gp) 
+             # Better: send to all peers in my list? 
+             # Broadcast is safer for mesh.
+             gw_comm.send_cmd_all("LEAVE_GROUP", self.get_mpp(), gid, gp)
+             
+        elif self.ctype == 'PRIV':
+             # 2. CERRAR PRIVADO (CLOSE_PRIV)
+             # [CMD]CLOSE_PRIV|2|[MPP]|REASON[CMD]
+             # Send to the specific remote peer
+             gw_comm.send_cmd(self.remote, "CLOSE_PRIV", self.get_mpp(), "User Quit")
+
+        print(f"\n{Colors.R}[!] Cerrando sesión...{Colors.E}")
+        sys.stdout.flush()
+        time.sleep(1)
+        os._exit(0)
 
     def show_contacts(self, cid):
         print(f"{Colors.G}--- CONTACTOS LOCALES ---{Colors.E}")
