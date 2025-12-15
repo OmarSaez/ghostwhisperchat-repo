@@ -9,8 +9,8 @@ import time
 import hashlib
 
 # v38.0: Shared Definitions for Modular Architecture
-APP_VER_NUM = 41.22
-APP_VER_TAG = "Smart Pop Anti-Spam"
+APP_VER_NUM = 41.24
+APP_VER_TAG = "Cleanup Popsi/Popno"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 # --- CONFIG POP ANTI-SPAM ---
@@ -100,14 +100,7 @@ COMMAND_DEFS = {
         'aliases': ['--log-off', '--logoff', '--save-off', '-Loff'],
         'desc': 'Desactivar guardado de historial.'
     },
-    'POP_ON': {
-        'aliases': ['--popsi', '--pop-on', '--unmute', '-um', '--noisy'],
-        'desc': 'Activar notificaciones/popups.'
-    },
-    'POP_OFF': {
-        'aliases': ['--popno', '--pop-off', '--mute', '-mu', '--silent'],
-        'desc': 'Desactivar notificaciones/popups.'
-    },
+
     'AUTOSTART_ON': {
         'aliases': ['--autolevantado-si', '--boot-on', '--startup-on'],
         'desc': 'Iniciar app al arrancar sistema (Linux).'

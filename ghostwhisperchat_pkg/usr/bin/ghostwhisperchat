@@ -1629,9 +1629,7 @@ class LobbyAdapter:
         elif key == 'status': MY_STATUS = val
         elif key == 'nick': MY_NICK = val
         elif key == 'log_on': LOG_ON = val
-        elif key == 'pop_on': 
-            gw_pop.POP.set_active(val)
-            return
+
         elif key == 'auto_dl': AUTO_DL = val
         save_config()
         refresh_ui()
@@ -1752,7 +1750,7 @@ class LobbyAdapter:
     def get_var(self, name):
         if name == 'visible': return VISIBLE_IN_SCAN
         if name == 'auto_dl': return AUTO_DL
-        if name == 'pop_on': return POPUP_ON
+
         if name == 'log_on': return LOG_ON
         return None
 

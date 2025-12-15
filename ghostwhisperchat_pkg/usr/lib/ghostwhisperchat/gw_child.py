@@ -213,8 +213,7 @@ class ChildAdapter:
             self.forward(f"--nombre {val}")
         elif key == 'status': 
             self.forward(f"--estado {val}")
-        elif key == 'pop_on':
-            self.pop_off = not val
+
         # For others, forward config change?
         # gw_cmd calls set_config then save_config.
         # Child shouldn't overwrite config file directly usually (race condition).
