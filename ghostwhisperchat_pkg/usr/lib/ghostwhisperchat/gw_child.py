@@ -272,18 +272,16 @@ def join_grp(gid, gp, remote_ip, my_nick, my_status, update_peers_func):
     pkt = build_packet("SEARCH_GROUP", gid, gp, my_nick, my_status)
     u.sendto(pkt, ('255.255.255.255', UDP_PORT)); u.close()
 
-def ipc_listen_child(my_port, lock_state):
+def ipc_listen_child(sock, lock_state):
     global MY_CHILD_ID, PEERS
-    u = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try: u.bind(('127.0.0.1', int(my_port)))
-    except Exception as e: 
-        print(f"Error bind child IPC: {e}")
-        return
+    # Socket already bound in main thread to avoid race condition
+    u = sock
     
     while True:
         try:
             d, _ = u.recvfrom(8192); msg = d.decode()
             p = msg.split(SEP, 3)
+            # ... rest of loop ...
             cmd = p[0]
             
             if cmd == "FWD_MSG":
@@ -294,10 +292,10 @@ def ipc_listen_child(my_port, lock_state):
                         lock_state['last_rx'] = time.time()
 
             elif cmd == "MSG_IN": # v38.5 support direct msg injection
-                 # MSG_IN SEP sender SEP msg SEP color
-                  if len(p) >= 4:
-                      # Just print message
-                      print(f"{p[3]}{p[1]}: {p[2]}{Colors.E}" if len(p)>3 else f"{p[2]}")
+                  # MSG_IN SEP sender SEP msg SEP color
+                   if len(p) >= 4:
+                       # Just print message
+                       print(f"{p[3]}{p[1]}: {p[2]}{Colors.E}" if len(p)>3 else f"{p[2]}")
 
             elif cmd == "CMD_ADD_PEER":
                 # CMD_ADD_PEER|IP|Nick
@@ -345,9 +343,7 @@ def run(cid, ctype, remote, password, mynick, mystatus, myport, rnick="?"):
 
     signal.signal(signal.SIGINT, lambda s, f: adapter.leave_sess(cid))
     
-    # Shared State for Popups (Partial implementation - Popup logic is complex to port fully without `popup` func)
-    # For now we skip the actual Popup execution in this modular version unless we port `popup`.
-    # But we update the state for tracking.
+    # Shared State for Popups
     pop_state = {'last_input': 0, 'last_rx': time.time(), 'pop_off': False, 'type': ctype, 'remote_id': remote, 'remote_nick': rnick}
 
     # Header
@@ -360,10 +356,17 @@ def run(cid, ctype, remote, password, mynick, mystatus, myport, rnick="?"):
         
     print(f"{Colors.H}{header_txt}{Colors.E}")
     
-    # Start IPC
-    threading.Thread(target=ipc_listen_child, args=(myport, pop_state), daemon=True).start()
+    # Start IPC (Bind in Main Thread to catch Sync Response)
+    try:
+        ipc_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        ipc_sock.bind(('127.0.0.1', int(myport)))
+    except Exception as e:
+        print(f"Error fatal IPC bind: {e}")
+        return
+
+    threading.Thread(target=ipc_listen_child, args=(ipc_sock, pop_state), daemon=True).start()
     
-    # Request Initial Peer Sync from Lobby (Fix for startup race condition)
+    # Request Initial Peer Sync from Lobby
     send_ipc(f"CMD_SYNC_PEERS{SEP}{cid}", IPC_PORT)
     
     # Start Logic

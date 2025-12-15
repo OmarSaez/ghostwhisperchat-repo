@@ -9,8 +9,8 @@ import time
 import hashlib
 
 # v38.0: Shared Definitions for Modular Architecture
-APP_VER_NUM = 41.11
-APP_VER_TAG = "Auto-Sincronización Peers"
+APP_VER_NUM = 41.12
+APP_VER_TAG = "Bind Previo y Sync"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 
@@ -25,7 +25,7 @@ def calculate_file_hash(path):
 def normalize_str(s):
     if not s: return ""
     import unicodedata
-    return ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn').lower()
+    return ''.join(c for c in unicodedata.normalize('NFD', s.strip()) if unicodedata.category(c) != 'Mn').lower()
 
 
 # --- CONSTANTS ---
