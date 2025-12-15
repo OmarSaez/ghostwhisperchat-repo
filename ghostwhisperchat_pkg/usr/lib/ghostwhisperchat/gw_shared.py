@@ -9,8 +9,8 @@ import time
 import hashlib
 
 # v38.0: Shared Definitions for Modular Architecture
-APP_VER_NUM = 41.17
-APP_VER_TAG = "Protocolos Desconexión y UI"
+APP_VER_NUM = 41.18
+APP_VER_TAG = "Protoc. Robust & Fixes"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 
