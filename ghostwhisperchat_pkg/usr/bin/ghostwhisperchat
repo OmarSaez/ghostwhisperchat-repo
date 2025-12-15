@@ -1911,6 +1911,37 @@ def spawn_child_process(cid, cdata):
     except Exception as e:
         print(f"{Colors.F}[!] Error lanzando terminal: {e}{Colors.E}")
 
+# --- CONFIG POP ---
+# Limits from gw_shared are used: POP_RESET_TIME, MAX_POPS_BURST
+CHAT_ACTIVITY = {} # cid -> {'last': t, 'pops': n}
+
+def check_pop_allowance(cid):
+    now = time.time()
+    if cid not in CHAT_ACTIVITY:
+         CHAT_ACTIVITY[cid] = {'last': now, 'pops': 0}
+         return True # First ever
+         
+    dt = now - CHAT_ACTIVITY[cid]['last']
+    CHAT_ACTIVITY[cid]['last'] = now # Update activity timestamp
+    
+    if dt > gw_shared.POP_RESET_TIME:
+         # Reset counter
+         CHAT_ACTIVITY[cid]['pops'] = 0
+    
+    if CHAT_ACTIVITY[cid]['pops'] < gw_shared.MAX_POPS_BURST:
+         CHAT_ACTIVITY[cid]['pops'] += 1
+         return True
+    
+    return False
+
+def register_outgoing_activity(cid):
+    # Called when Child sends a msg (via CMD_ACTIVITY)
+    # Simply updates timestamp, keeping conversation "Active"
+    # This suppression prevents pops if I am replying.
+    now = time.time()
+    if cid not in CHAT_ACTIVITY: CHAT_ACTIVITY[cid] = {'last': now, 'pops': gw_shared.MAX_POPS_BURST} # Assume active
+    else: CHAT_ACTIVITY[cid]['last'] = now
+
 def ipc_listen_parent():
     global ACTIVE_CHATS
     u = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -1949,6 +1980,11 @@ def ipc_listen_parent():
                      cstr = p[2]
                      # print(f"\n{Colors.M}[IPC] Ejecutando comando remoto: {cstr}{Colors.E}")
                      exec_lobby_cmd(cstr, origin_cid=p[1])
+            
+            elif cmd == "CMD_ACTIVITY":
+                # Child reporting activity (User Typed)
+                if len(p) >= 2:
+                    register_outgoing_activity(p[1])
 
         except Exception as e:
             debug_log(f"[IPC_ERROR] Error en listener IPC del Lobby: {e}")
@@ -2356,6 +2392,17 @@ def handle_v2_logic(pkt_type, cmd_name, args, source_ip):
                 # Let's reuse FWD_MSG for compatibility with gw_child v39
                 full_ipc = f"FWD_MSG{gw_comm.SEP}{target_cid}{gw_comm.SEP}{tag}{gw_comm.SEP}{msg_body}"
                 send_ipc(full_ipc, ACTIVE_CHATS[target_cid]['port'])
+                
+                # SMART POP LOGIC (User Request: Anti-Spam)
+                if check_pop_allowance(target_cid):
+                     try:
+                         # Show Pop-up
+                         import gw_pop
+                         # Determine context for title
+                         ctx = "Grupo" if msg_type == 'GRUP' else "Privado"
+                         title = f"{ctx}: {sender_mpp['nick']}"
+                         gw_pop.show(title, msg_body, duration=4)
+                     except: pass
             else:
                  debug_log(f"[V2] Drop MSJ: No Chat Found for {source_ip}")
 

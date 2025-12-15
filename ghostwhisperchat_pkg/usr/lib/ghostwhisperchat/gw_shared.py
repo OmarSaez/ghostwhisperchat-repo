@@ -9,9 +9,13 @@ import time
 import hashlib
 
 # v38.0: Shared Definitions for Modular Architecture
-APP_VER_NUM = 41.21
-APP_VER_TAG = "Trasferencia de archivos"
+APP_VER_NUM = 41.22
+APP_VER_TAG = "Smart Pop Anti-Spam"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
+
+# --- CONFIG POP ANTI-SPAM ---
+POP_RESET_TIME = 60   # Seconds of inactivity required to reset pop counter
+MAX_POPS_BURST = 2    # Max pops shown per active conversation burst
 
 
 # --- UTILS ---

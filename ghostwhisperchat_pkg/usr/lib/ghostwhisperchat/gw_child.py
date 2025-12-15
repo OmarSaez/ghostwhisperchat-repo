@@ -460,7 +460,7 @@ def run(cid, ctype, remote, password, mynick, mystatus, myport, rnick="?"):
                  gw_cmd.process(inp, cid, adapter)
                  continue
 
-            # --- Chat Messages ---
+             # --- Chat Messages ---
             if ctype == 'GROUP':
                  # V2: MSJ GRUP Unicast Mesh TCP (Port 44496)
                  mpp = adapter.get_mpp()
@@ -475,11 +475,18 @@ def run(cid, ctype, remote, password, mynick, mystatus, myport, rnick="?"):
                            sent_count += 1
                  if sent_count == 0:
                      print(f"{Colors.W}[!] No hay nadie más en el grupo.{Colors.E}")
+                 
+                 # Notify Lobby of Activity (Smart Pop)
+                 send_ipc(f"CMD_ACTIVITY{SEP}{cid}", IPC_PORT)
+
             else:
                  # Private Message: TCP
                  mpp = adapter.get_mpp()
                  pkt = gw_comm.build_msj(mpp, "PRIV", [], inp)
                  gw_comm.send_tcp_packet(remote, pkt)
+                 
+                 # Notify Lobby of Activity (Smart Pop)
+                 send_ipc(f"CMD_ACTIVITY{SEP}{cid}", IPC_PORT)
 
         except KeyboardInterrupt:
              adapter.leave_sess(cid)
