@@ -268,8 +268,12 @@ def start_tcp_listener(port, callback_func):
                 # Read specific buffer size
                 raw = conn.recv(BUFFER_SIZE).decode('utf-8', errors='ignore')
                 if raw:
-                    callback_func(conn, addr[0], raw)
-                conn.close()
+                    # Callback returns True if it takes ownership of socket (e.g. File Transfer)
+                    keep_open = callback_func(conn, addr[0], raw)
+                    if not keep_open:
+                        conn.close()
+                else:
+                    conn.close()
             except: pass
             
     threading.Thread(target=_loop, daemon=True).start()

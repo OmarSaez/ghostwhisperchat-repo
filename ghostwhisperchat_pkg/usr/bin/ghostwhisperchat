@@ -2363,10 +2363,75 @@ def handle_v2_logic(pkt_type, cmd_name, args, source_ip):
         safe_print(f"Err V2 Logic: {e}")
 
 
+def get_rx_folder():
+    base = os.path.join(os.path.expanduser("~"), "Desktop")
+    if not os.path.exists(base): base = os.path.join(os.path.expanduser("~"), "Escritorio")
+    if not os.path.exists(base): base = os.path.expanduser("~") 
+    
+    rx = os.path.join(base, "GhostWhisper_Recibidos")
+    if not os.path.exists(rx): os.makedirs(rx, exist_ok=True)
+    return rx
+
+def handle_incoming_file(conn, args, source_ip):
+    # Args: Filename, Size, Hash, Type, ...
+    if len(args) < 2: return
+    fname, fsize = args[0], int(args[1])
+    ftype = args[3] if len(args)>3 else 'FILE'
+    
+    # Notify Start logic?
+    safe_print(f"{Colors.C}[⬇] Recibiendo archivo '{fname}' ({fsize} bytes) de {source_ip}...{Colors.E}")
+    
+    dest_path = os.path.join(get_rx_folder(), fname)
+    
+    # Receive Loop
+    recvd = 0
+    try:
+        with open(dest_path, "wb") as f:
+            while recvd < fsize:
+                chunk_size = min(4096, fsize - recvd)
+                data = conn.recv(chunk_size)
+                if not data: break
+                f.write(data)
+                recvd += len(data)
+                
+        safe_print(f"{Colors.G}[✔] Archivo guardado en: {dest_path}{Colors.E}")
+        
+        # Notify Children (via broadcast FWD_FILE?)
+        # Search relevant child to notify?
+        # File transfer is TCP P2P (Priv usually).
+        # We can notify all or search for private chat with source_ip.
+        
+        notify_cid = None
+        sender_nick = "?"
+        # Try to resolve nick
+        if source_ip in PEERS: sender_nick = PEERS[source_ip].get('nick','?')
+
+        # send IPC to all children or specific? 
+        # FWD_FILE format: FWD_FILE | CID(Target) | SenderNick | Filename
+        # Child IPC expects: cmd == "FWD_FILE": if len(p) >= 4 and p[1] == MY_CHILD_ID: ...
+        
+        for cid, cdata in ACTIVE_CHATS.items():
+            if cdata['type'] == 'PRIV' and cdata['remote_id'] == source_ip:
+                 if 'port' in cdata:
+                     # Correct CID found
+                     send_ipc(f"FWD_FILE{gw_comm.SEP}{cid}{gw_comm.SEP}{sender_nick}{gw_comm.SEP}{fname}", cdata['port'])
+                 break
+        
+    except Exception as e:
+        safe_print(f"{Colors.F}[X] Error recibiendo archivo: {e}{Colors.E}")
+
 def handle_v2_priv(conn, ip, raw):
-    """TCP 44494: Privado y Control"""
+    """TCP 44494: Privado, Control y Archivos"""
     if LOG_ON: debug_log(f"[RX TCP PRIV] {ip}: {raw.strip()}")
     parsed = gw_comm.parse_packet(raw)
+    
+    if parsed[0] == 'CMD' and parsed[1] == 'FILE_TRANSFER':
+        # Handover to File Handler
+        # Takes ownership of Stream
+        handle_incoming_file(conn, parsed[2], ip)
+        return False # Listener closes socket after we return?
+        # Our handler consumed the stream. Listener can close safely.
+        
     if parsed[0] != 'ERR':
         handle_v2_logic(parsed[0], parsed[1], parsed[2], ip)
     return False

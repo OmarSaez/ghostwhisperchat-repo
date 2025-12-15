@@ -293,11 +293,7 @@ class ChildAdapter:
         print(f"{Colors.G}[✔] Enviado a {cnt}.{Colors.E}")
         if is_dir and os.path.exists(to_send_path): os.remove(to_send_path)
 
-    def leave_sess(self, cid):
-        print(f"{Colors.W}[*] Saliendo...{Colors.E}")
-        self.forward("--exit") # Notify lobby
-        time.sleep(0.5)
-        os._exit(0)
+
 
     def shutdown_app(self): self.leave_sess(None) # Child exit
 
