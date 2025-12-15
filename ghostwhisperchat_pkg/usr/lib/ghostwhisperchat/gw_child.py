@@ -307,7 +307,7 @@ def join_grp(gid, gp, remote_ip, my_nick, my_status, update_peers_func):
     u.sendto(pkt, ('255.255.255.255', UDP_PORT)); u.close()
 
 def refresh_prompt():
-    sys.stdout.write(f"\n{PROMPT}")
+    sys.stdout.write(f"{PROMPT}")
     sys.stdout.flush()
 
 def ipc_listen_child(sock, lock_state):
@@ -345,8 +345,9 @@ def ipc_listen_child(sock, lock_state):
                     pip, pnick = p[1], p[2]
                     if pip not in PEERS:
                         PEERS[pip] = {'nick': pnick, 'chats': {MY_CHILD_ID}}
-                        print(f"\r{Colors.G}[+] Conectado con {pnick} ({pip}){Colors.E}")
-                        refresh_prompt()
+                        # Silent connection to avoid interrupting user typing
+                        # print(f"\r{Colors.G}[+] Conectado con {pnick} ({pip}){Colors.E}")
+                        # refresh_prompt()
                     else:
                          PEERS[pip]['chats'].add(MY_CHILD_ID)
 

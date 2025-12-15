@@ -15,7 +15,7 @@
     "trusted_nets": {
         "192.168.1.1_TP-Link-O": {
             "trusted": true,
-            "last_seen": 1765766590.5169737,
+            "last_seen": 1765768029.0090122,
             "name": "192.168.1.1_TP-Link-O"
         }
     },
