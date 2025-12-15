@@ -2214,21 +2214,32 @@ def handle_v2_logic(pkt_type, cmd_name, args, source_ip):
                 
                 sys.stdout.write('\a') # Beep
 
-            elif cmd_name == "I_EXIST":
-                # Args: [MPP], GID, PASS, [LS]
-                if len(args) < 3: return
-                gid = args[1]
+            if cmd_name == "SEARCH_GROUP":
+                # Args: [MPP], GID, PASS
+                if len(args) < 2: return
+                gid = args[1]; gp = args[2] if len(args)>2 else ""
                 
-                # Check if we are interested in this group
+                # Check for match in active groups
                 for cid, cdata in ACTIVE_CHATS.items():
-                    if cdata['type'] == 'GROUP' and cdata['remote_id'] == gid:
-                        # Found a peer for our group!
-                        safe_print(f"{Colors.G}[*] Grupo {gid}: Encontrado peer {sender_mpp['nick']} ({source_ip}){Colors.E}")
+                    if cdata['type'] == 'GROUP' and cdata['remote_id'] == gid and cdata.get('pass','') == gp:
+                        # Found match!
                         
-                        # Notify Child to add peer
+                        # 1. Reply I_EXIST (Discovery)
+                        gw_comm.send_cmd(source_ip, "I_EXIST", gid, gp, "LS_DATA?")
+                        
+                        # 2. Add Peer Logic (Mesh)
                         if 'port' in cdata:
                              payload = f"CMD_ADD_PEER{gw_comm.SEP}{source_ip}{gw_comm.SEP}{sender_mpp['nick']}"
                              send_ipc(payload, cdata['port'])
+                             
+                             # 3. Notify User Joined (Chat Event)
+                             # Only if not already known? Or always notify "Activity"?
+                             # User asked for "Nick se a unido al grupo".
+                             # Since sending SEARCH implies they are joining/syncing.
+                             msg = f"[+] {sender_mpp['nick']} se unió al grupo."
+                             send_ipc(f"MSG_IN{gw_comm.SEP}Sistema{gw_comm.SEP}{msg}{gw_comm.SEP}{Colors.G}", cdata['port'])
+
+                        # Only reply for one matching chat
                         break
             
             elif cmd_name == "GRP_MSG":

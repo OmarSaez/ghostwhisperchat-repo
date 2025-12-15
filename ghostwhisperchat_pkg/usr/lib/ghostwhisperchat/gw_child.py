@@ -162,21 +162,18 @@ class ChildAdapter:
         # Implementation of Strict Disconnection Protocols
         if self.ctype == 'GROUP':
              # 1. SALIR DE GRUPO (LEAVE_GROUP)
-             # [CMD]LEAVE_GROUP|3|[MPP]|GID|PASS[CMD]
              gid = str(self.remote)
              gp = str(self.password) if self.password else ""
-             # Send to Group (Broadcast) or just peers? 
-             # Protocol says UDP Broadcast/Multicast usually for groups.
-             # Using send_cmd_all for simplicity or targeted? 
-             # send_cmd_all("LEAVE_GROUP", self.get_mpp(), gid, gp) 
-             # Better: send to all peers in my list? 
-             # Broadcast is safer for mesh.
+             
+             # Broadcast (General)
              gw_comm.send_cmd_all("LEAVE_GROUP", self.get_mpp(), gid, gp)
+             
+             # Redundancy: Unicast to all known peers (Fix for UDP Broadcast drops)
+             for ip in PEERS:
+                 gw_comm.send_cmd(ip, "LEAVE_GROUP", self.get_mpp(), gid, gp)
              
         elif self.ctype == 'PRIV':
              # 2. CERRAR PRIVADO (CLOSE_PRIV)
-             # [CMD]CLOSE_PRIV|2|[MPP]|REASON[CMD]
-             # Send to the specific remote peer
              gw_comm.send_cmd(self.remote, "CLOSE_PRIV", self.get_mpp(), "User Quit")
 
         print(f"\n{Colors.R}[!] Cerrando sesión...{Colors.E}")
