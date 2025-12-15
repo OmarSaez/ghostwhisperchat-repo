@@ -9,8 +9,8 @@ import time
 import hashlib
 
 # v38.0: Shared Definitions for Modular Architecture
-APP_VER_NUM = 41.14
-APP_VER_TAG = "Auto-Scan Smart"
+APP_VER_NUM = 41.15
+APP_VER_TAG = "Fix: MPP Invite & UX"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 

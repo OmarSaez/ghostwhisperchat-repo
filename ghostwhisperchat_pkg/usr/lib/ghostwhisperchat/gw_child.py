@@ -80,7 +80,7 @@ class ChildAdapter:
         # 2. Auto-Scan if needed (Transparent Fix)
         if missing:
              # print(f"{Colors.C}[*] Sincronizando red...{Colors.E}")
-             self.scan_network(cid)
+             self.scan_network(cid, silent=True)
              time.sleep(2.0) # Wait for UDP/IPC
         
         # 3. Final Process
@@ -96,12 +96,26 @@ class ChildAdapter:
                       gp = str(self.password) if self.password else ""
                       extras = [gid, gp]
                  
-                 # Direct Send
-                 # gw_comm auto-appends My MPP? No, gw_cmd.send_cmd does. 
-                 # But gw_child calls gw_comm.send_cmd directly. 
-                 # gw_comm.build_packet adds My MPP.
-                 # So we just pass business args.
-                 gw_comm.send_cmd(target_ip, "INVITE", inv_type, *extras)
+                 # gw_comm expects business args. But build_packet adds My MPP.
+                 # Actually, Lobby usually expects [MPP, Type, Args...]. 
+                 # If gw_comm.send_cmd(ip, CMD, *args) -> build_packet(CMD, *args) -> CMD|MPP|Args.
+                 # So MPP is indeed First Arg.
+                 # Wait. Lobby handler for INVITE (Line 2200 ghostwhisperchat):
+                 # if cmd_name == "INVITE": 
+                 #     itype = args[1]
+                 # Args[0] is MPP (sender).
+                 # So gw_comm.send_cmd(target_ip, "INVITE", inv_type, *extras) RESULTS IN:
+                 # INVITE | SenderMPP | inv_type | extras...
+                 # THIS IS CORRECT structure according to gw_comm.
+                 # SO WHY DID IT FAIL with NoneType?
+                 # Maybe SenderMPP was None? Or args[1] failed?
+                 # If gw_comm.send_cmd adds MPP automatically. 
+                 # Let's check gw_comm.build_packet again (Step 1881):
+                 # return f"{cmd_name}{SEP}{len(valid_args)}" + payload.
+                 # IT DOES NOT ADD MPP!!!!
+                 # I misread Step 1881. Lines 75-79.
+                 # So I MUST parse get_mpp() manually.
+                 gw_comm.send_cmd(target_ip, "INVITE", self.get_mpp(), inv_type, *extras)
                  print(f"{Colors.G}[➜] Invitación enviada a {t} ({target_ip}){Colors.E}")
              else:
                  print(f"{Colors.R}[X] No encontrado: {t}. (Prueba escanear primero){Colors.E}")
@@ -132,10 +146,16 @@ class ChildAdapter:
     def invite_priv(self, ip, nick, status): self.forward(f"--chatpersonal {ip}") # Helper
     
 
-    def scan_network(self, cid):
-        print(f"{Colors.C}[*] Escaneando red...{Colors.E}")
+    def scan_network(self, cid, silent=False):
+        if not silent: print(f"{Colors.C}[*] Escaneando red...{Colors.E}")
         sys.stdout.flush()
-        gw_comm.send_cmd_all("WHOIS", self.get_mpp())
+        gw_comm.send_cmd_all("WHOIS", self.get_mpp())  # WHOIS requires sender MPP logic? 
+        # gw_comm.send_cmd_all uses build_packet. 
+        # Checking WHOIS handler in Lobby (Line 2259): 
+        # if cmd_name == "WHOIS": ... send_cmd(source_ip, "IAM_HERE", get_my_mpp())
+        # WHOIS handler doesn't seem to parse args, just source IP? 
+        # Usually WHOIS|SenderMPP.
+
         time.sleep(3)
         self.show_contacts(cid)
 
@@ -286,6 +306,10 @@ def join_grp(gid, gp, remote_ip, my_nick, my_status, update_peers_func):
     pkt = build_packet("SEARCH_GROUP", gid, gp, my_nick, my_status)
     u.sendto(pkt, ('255.255.255.255', UDP_PORT)); u.close()
 
+def refresh_prompt():
+    sys.stdout.write(f"\n{PROMPT}")
+    sys.stdout.flush()
+
 def ipc_listen_child(sock, lock_state):
     global MY_CHILD_ID, PEERS
     # Socket already bound in main thread to avoid race condition
@@ -302,14 +326,18 @@ def ipc_listen_child(sock, lock_state):
                 if len(p) >= 4:
                     cid, tag, text = p[1], p[2], p[3]
                     if cid == MY_CHILD_ID:
-                        print(f"{tag}: {text}") 
+                        print(f"\r{tag}: {text}") 
+                        refresh_prompt()
                         lock_state['last_rx'] = time.time()
 
             elif cmd == "MSG_IN": # v38.5 support direct msg injection
                   # MSG_IN SEP sender SEP msg SEP color
                    if len(p) >= 4:
                        # Just print message
-                       print(f"{p[3]}{p[1]}: {p[2]}{Colors.E}" if len(p)>3 else f"{p[2]}")
+                       # Use \r to overwrite prompt
+                       print(f"\r{p[3]}{p[1]}: {p[2]}{Colors.E}" if len(p)>3 else f"\r{p[2]}")
+                       refresh_prompt()
+
 
             elif cmd == "CMD_ADD_PEER":
                 # CMD_ADD_PEER|IP|Nick
@@ -317,7 +345,8 @@ def ipc_listen_child(sock, lock_state):
                     pip, pnick = p[1], p[2]
                     if pip not in PEERS:
                         PEERS[pip] = {'nick': pnick, 'chats': {MY_CHILD_ID}}
-                        print(f"{Colors.G}[+] Conectado con {pnick} ({pip}){Colors.E}")
+                        print(f"\r{Colors.G}[+] Conectado con {pnick} ({pip}){Colors.E}")
+                        refresh_prompt()
                     else:
                          PEERS[pip]['chats'].add(MY_CHILD_ID)
 
@@ -388,7 +417,7 @@ def run(cid, ctype, remote, password, mynick, mystatus, myport, rnick="?"):
         # join_grp just sends the SEARCH packet
         threading.Thread(target=join_grp, args=(remote, password, remote, MY_NICK, MY_STATUS, None), daemon=True).start()
         # Auto-Scan network to populate peers immediately (Smart Feature)
-        adapter.scan_network(cid)
+        adapter.scan_network(cid, silent=True)
     elif ctype == 'PRIV':
         if remote not in PEERS: 
              PEERS[remote] = {'nick': rnick, 'chats': {cid}}
