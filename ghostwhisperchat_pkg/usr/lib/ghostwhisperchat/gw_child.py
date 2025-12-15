@@ -59,31 +59,49 @@ class ChildAdapter:
 
 # ... (Previous methods)
 
+    def _resolve_target(self, t):
+        if "." in t and len(t.split(".")) == 4: return t
+        t_norm = normalize_str(t)
+        for ip, p in PEERS.items():
+             if normalize_str(p.get('nick', '')) == t_norm: return ip
+        return None
+
     def invite_users(self, args_str, cid):
         targets = args_str.replace(",", " ").split()
         print(f"{Colors.C}[*] Enviando invitaciones...{Colors.E}")
         sys.stdout.flush()
         
+        # 1. Identify missing targets
+        missing = False
         for t in targets:
-             target_ip = None
-             if "." in t and len(t.split(".")) == 4: target_ip = t
-             else:
-                 target_norm = normalize_str(t)
-                 for ip, p in PEERS.items():
-                      nick = p.get('nick', '')
-                      if normalize_str(nick) == target_norm: target_ip = ip; break
+             if not self._resolve_target(t): 
+                 missing = True; break
+        
+        # 2. Auto-Scan if needed (Transparent Fix)
+        if missing:
+             # print(f"{Colors.C}[*] Sincronizando red...{Colors.E}")
+             self.scan_network(cid)
+             time.sleep(2.0) # Wait for UDP/IPC
+        
+        # 3. Final Process
+        for t in targets:
+             target_ip = self._resolve_target(t)
              
              if target_ip:
                  inv_type = "PRIV"
                  extras = []
                  if self.ctype == 'GROUP':
                       inv_type = "GROUP"
-                      gid = self.remote
-                      gp = self.password if self.password else ""
+                      gid = str(self.remote)
+                      gp = str(self.password) if self.password else ""
                       extras = [gid, gp]
                  
                  # Direct Send
-                 gw_comm.send_cmd(target_ip, "INVITE", self.get_mpp(), inv_type, *extras)
+                 # gw_comm auto-appends My MPP? No, gw_cmd.send_cmd does. 
+                 # But gw_child calls gw_comm.send_cmd directly. 
+                 # gw_comm.build_packet adds My MPP.
+                 # So we just pass business args.
+                 gw_comm.send_cmd(target_ip, "INVITE", inv_type, *extras)
                  print(f"{Colors.G}[➜] Invitación enviada a {t} ({target_ip}){Colors.E}")
              else:
                  print(f"{Colors.R}[X] No encontrado: {t}. (Prueba escanear primero){Colors.E}")
@@ -369,6 +387,8 @@ def run(cid, ctype, remote, password, mynick, mystatus, myport, rnick="?"):
     if ctype == 'GROUP':
         # join_grp just sends the SEARCH packet
         threading.Thread(target=join_grp, args=(remote, password, remote, MY_NICK, MY_STATUS, None), daemon=True).start()
+        # Auto-Scan network to populate peers immediately (Smart Feature)
+        adapter.scan_network(cid)
     elif ctype == 'PRIV':
         if remote not in PEERS: 
              PEERS[remote] = {'nick': rnick, 'chats': {cid}}
