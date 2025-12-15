@@ -100,12 +100,10 @@ class ChildAdapter:
     def create_group(self, id, pas): self.forward(f"--chatgrupal {id} {pas}")
     
     def find_global(self, args):
-        # Simplistic local search for compatibility
-        # Or forward? If we forward, context is lost.
-        # find_global is used by CHAT_PRIV (create new chat).
-        # Child should forward CHAT_PRIV creation.
-        return None # Triggers forward or error in gw_cmd? 
-        # Actually gw_cmd checks if t: ... else reply "Eres tu".
+        t_norm = normalize_str(args)
+        for ip, p in PEERS.items():
+             if normalize_str(p.get('nick', '')) == t_norm: return ip
+        return None# Actually gw_cmd checks if t: ... else reply "Eres tu".
         # If I return None, gw_cmd does nothing?
         # NO, gw_cmd logic for CHAT_PRIV calls find_global.
         # If Child types --chatpersonal, it should probably be forwarded to Lobby which handles window spawning.
@@ -177,9 +175,7 @@ class ChildAdapter:
         os.system('cls' if os.name == 'nt' else 'clear')
         print(f"{Colors.H}--- CHAT {self.ctype} ({self.cid}) ---{Colors.E}")
 
-    def invite_users(self, args_str, cid):
-        # Forward invite to Lobby to handle scanning/inviting properly
-        self.forward(f"--invite {args_str}")
+
 
     def send_file(self, args, cid):
         # Local Send File Implementation
