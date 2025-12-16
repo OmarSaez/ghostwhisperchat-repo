@@ -2228,7 +2228,7 @@ def handle_v2_logic(pkt_type, cmd_name, args, source_ip):
                 
                 sys.stdout.write('\a') # Beep
 
-            if cmd_name == "SEARCH_GROUP":
+            elif cmd_name == "SEARCH_GROUP":
                 # Args: [MPP], GID, PASS
                 if len(args) < 2: return
                 gid = args[1]; gp = args[2] if len(args)>2 else ""
@@ -2247,14 +2247,18 @@ def handle_v2_logic(pkt_type, cmd_name, args, source_ip):
                              send_ipc(payload, cdata['port'])
                              
                              # 3. Notify User Joined (Chat Event)
-                             # Only if not already known? Or always notify "Activity"?
-                             # User asked for "Nick se a unido al grupo".
-                             # Since sending SEARCH implies they are joining/syncing.
                              msg = f"[+] {sender_mpp['nick']} se unió al grupo."
                              send_ipc(f"MSG_IN{gw_comm.SEP}Sistema{gw_comm.SEP}{msg}{gw_comm.SEP}{Colors.G}", cdata['port'])
 
                         # Only reply for one matching chat
                         break
+
+            elif cmd_name == "INVITE_REJ":
+                 # Args: [MPP], Reason
+                 reason = args[1] if len(args) > 1 else "Rechazado"
+                 safe_print(f"{Colors.R}[X] Invitación rechazada por {sender_mpp['nick']}: {reason}{Colors.E}")
+                 # Notificar visualmente
+                 gw_pop.POP.show(f"Invitación Rechazada", f"{sender_mpp['nick']} rechazó:\n{reason}", 5)
             
             elif cmd_name == "GRP_MSG":
                 # Args: [MPP], GID, TEXT
