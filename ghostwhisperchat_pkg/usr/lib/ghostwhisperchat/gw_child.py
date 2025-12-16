@@ -183,11 +183,22 @@ class ChildAdapter:
         os._exit(0)
 
     def show_contacts(self, cid):
-        print(f"{Colors.G}--- CONTACTOS LOCALES ---{Colors.E}")
-        if not PEERS:
-             print(f"{Colors.W}No hay contactos detectados.{Colors.E}")
+        print(f"{Colors.G}--- PARTICIPANTES ({self.ctype}) ---{Colors.E}")
+        found = False
+        
+        # Filter Logic
         for ip, d in PEERS.items():
-            print(f" - {d.get('nick', '?')} ({ip})")
+            # Check if this peer is associated with THIS chat ID
+            if cid in d.get('chats', set()):
+                 print(f" - {d.get('nick', '?')} ({ip})")
+                 found = True
+            # Special Case: Private Chat Remote always show if connected?
+            elif self.ctype == 'PRIV' and ip == self.remote:
+                 print(f" - {d.get('nick', '?')} ({ip}) [Remoto]")
+                 found = True
+
+        if not found:
+             print(f"{Colors.W}Nadie más aquí (sola/o).{Colors.E}")
         sys.stdout.flush()
 
     def get_chat(self, cid):

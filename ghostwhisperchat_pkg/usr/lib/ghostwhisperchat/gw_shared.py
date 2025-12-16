@@ -9,8 +9,8 @@ import time
 import hashlib
 
 # v38.0: Shared Definitions for Modular Architecture
-APP_VER_NUM = 42.14
-APP_VER_TAG = "Fix: Renderizado Seguro de Input 2.0"
+APP_VER_NUM = 42.15
+APP_VER_TAG = "Fix: Bug Visual en Listado de Participantes (--ls)"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 # --- CONFIG POP ANTI-SPAM ---
