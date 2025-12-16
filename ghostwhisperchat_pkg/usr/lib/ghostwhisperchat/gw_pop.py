@@ -22,7 +22,7 @@ class PopupManager:
         args = ["--info", "--text", text, "--title", title, "--width=350", f"--timeout={duration}"]
         self._launch_zenity(args)
 
-    def show_question(self, title, text, on_yes, on_no, force=True, timeout=0):
+    def show_question(self, title, text, on_yes, on_no, on_timeout=None, force=True, timeout=0):
         """
         Muestra pregunta interactiva (Aceptar/Rechazar).
         """
@@ -31,15 +31,24 @@ class PopupManager:
         def _task():
             cmd = ["--question", "--text", text, "--title", title, 
                    "--ok-label=Aceptar", "--cancel-label=Rechazar", "--width=400"]
-            if timeout > 0: cmd.append(f"--timeout={timeout}")
+            if timeout > 0: cmd.append(f"--timeout={int(timeout)}") # Force int
             
+            # Debug Log for Zenity CMD
+            # with open("/tmp/gw_zenity_debug.log", "a") as f: f.write(f"CMD: {cmd}\n")
+
             ret = self._launch_zenity(cmd, wait=True)
             
             if ret == 0:
                 if on_yes: on_yes()
             elif ret == 1:
-                # Zenity returns 1 for Cancel/No
+                # Zenity Cancel/No/Closed
                 if on_no: on_no()
+            elif ret == 5:
+                # Zenity Timeout
+                if on_timeout: on_timeout()
+            else:
+                 # Other error, treat as No
+                 if on_no: on_no()
             else:
                  # Timeout or error
                  if on_no: on_no()
