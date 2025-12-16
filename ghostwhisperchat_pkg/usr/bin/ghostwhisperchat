@@ -1500,10 +1500,16 @@ class LobbyAdapter:
 
     def scan_network(self, cid):
         def _scan_task():
-            global SCANNING_NOW, SCAN_BUFFER
+            global SCANNING_NOW, SCAN_BUFFER, PEERS
             SCAN_BUFFER = []
             SCANNING_NOW = True
             
+            # 1. Purge Ghosts (Fresh Scan Logic)
+            # Remove peers not involved in local chats
+            to_remove = [ip for ip, d in PEERS.items() if not d.get('chats')]
+            for ip in to_remove: 
+                if ip in PEERS: del PEERS[ip]
+
             initial_peers = len(PEERS)
             
             # Send Broadcast
@@ -1523,18 +1529,22 @@ class LobbyAdapter:
                 if cid: self.reply(m, cid)
                 else: safe_print(m)
             
-            # Check delta
+            # SHOW DETAILED LIST
+            if PEERS:
+                msg_list = [f"{Colors.G}--- RESULTADOS EN RED ({len(PEERS)}) ---{Colors.E}"]
+                for ip, d in PEERS.items():
+                    msg_list.append(f" - {d.get('nick','?')} ({ip}) [{d.get('status','?')}]")
+                final_msg = "\n".join(msg_list)
+                self.reply(final_msg, cid)
+            else:
+                self.reply(f"{Colors.W}[!] No se detectaron nodos activos.{Colors.E}", cid)
+            
+            # Check delta (Optional Summary)
             final_peers = len(PEERS)
             new_found = final_peers - initial_peers
-            
             if new_found > 0:
-                self.reply(f"{Colors.G}[✔] Escaneo finalizado. {new_found} nuevos dispositivos detectados.{Colors.E}", cid)
-            else:
-                if len(PEERS) > 0:
-                     self.reply(f"{Colors.G}[✔] Escaneo finalizado. {len(PEERS)} dispositivos activos en lista.{Colors.E}", cid)
-                else:
-                     self.reply(f"{Colors.W}[!] Escaneo finalizado. No se detectaron nodos activos.{Colors.E}", cid)
-                
+                 self.reply(f"{Colors.G}[+] {new_found} nuevos.{Colors.E}", cid)
+
             # Restore Prompt if in Lobby
             if not cid:
                 sys.stdout.write(PROMPT)
