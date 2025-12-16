@@ -391,12 +391,14 @@ def ipc_listen_child(sock, lock_state):
                          PEERS[pip]['chats'].add(MY_CHILD_ID)
             
             elif cmd == "CMD_DEL_PEER":
-                 # CMD_DEL_PEER|IP
+                 # CMD_DEL_PEER|IP|Reason(Optional)
                  if len(p) >= 2:
                      pip = p[1]
                      if pip in PEERS:
+                         pnick = PEERS[pip].get('nick', '?')
                          del PEERS[pip]
-                         # Debug: print_incoming_msg(f"Debug: Removed {pip}")
+                         # Only print IF we actually removed someone (Avoids duplicates)
+                         print_incoming_msg(f"{Colors.R}[-] {pnick} ({pip}) ha salido del grupo.{Colors.E}")
 
             elif cmd == "FWD_FILE":
                 if len(p) >= 4 and p[1] == MY_CHILD_ID:

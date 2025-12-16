@@ -2245,7 +2245,7 @@ def handle_v2_logic(pkt_type, cmd_name, args, source_ip):
                              send_ipc(payload, cdata['port'])
                              
                              # 3. Notify User Joined (Chat Event)
-                             msg = f"[+] {sender_mpp['nick']} se unió al grupo."
+                             msg = f"[+] {sender_mpp['nick']} ({source_ip}) se unió al grupo."
                              send_ipc(f"MSG_IN{gw_comm.SEP}Sistema{gw_comm.SEP}{msg}{gw_comm.SEP}{Colors.G}", cdata['port'])
 
                         # Only reply for one matching chat
@@ -2298,11 +2298,7 @@ def handle_v2_logic(pkt_type, cmd_name, args, source_ip):
                  for cid, cdata in ACTIVE_CHATS.items():
                      if cdata['type'] == 'GROUP' and cdata['remote_id'] == gid:
                           if 'port' in cdata:
-                               # 1. Visual Notification
-                               msg = f"[-] {snick} salió del grupo."
-                               send_ipc(f"MSG_IN{gw_comm.SEP}Sistema{gw_comm.SEP}{msg}{gw_comm.SEP}{Colors.R}", cdata['port'])
-                               
-                               # 2. Logic Removal
+                               # Logic Removal (Printing delegated to Child to avoid duplicates)
                                send_ipc(f"CMD_DEL_PEER{gw_comm.SEP}{source_ip}", cdata['port'])
 
             elif cmd_name == "CLOSE_PRIV" or cmd_name == "DISCONNECT_NOW":
