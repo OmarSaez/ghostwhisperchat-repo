@@ -1,0 +1,16 @@
+#!/bin/bash
+# postinst para ghostwhisperchat
+
+# 1. Crear enlace simbólico gwc -> ghostwhisperchat
+if [ ! -e /usr/bin/gwc ]; then
+    ln -s /usr/bin/ghostwhisperchat /usr/bin/gwc
+    chmod +x /usr/bin/gwc
+fi
+
+# 2. Informar al usuario sobre Systemd (Systemd --user es tricky en postinst root)
+echo "👻 GhostWhisperChat instalado."
+echo "ℹ️  Para activar el inicio automático, ejecuta como TU USUARIO:"
+echo "   systemctl --user enable --now ghostwhisperchat"
+
+# Nota: No podemos ejecutar systemctl --user aquí porque corremos como root (sudo dpkg)
+# y no sabemos cual es el usuario "real" que lo usará.

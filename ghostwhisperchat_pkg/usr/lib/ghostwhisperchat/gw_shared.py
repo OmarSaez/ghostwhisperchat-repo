@@ -9,8 +9,8 @@ import time
 import hashlib
 
 # v38.0: Shared Definitions for Modular Architecture
-APP_VER_NUM = 42.1
-APP_VER_TAG = "Diferenciacion de comandos y new --version"
+APP_VER_NUM = 42.2
+APP_VER_TAG = "Se integro como un servicio!"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 # --- CONFIG POP ANTI-SPAM ---
