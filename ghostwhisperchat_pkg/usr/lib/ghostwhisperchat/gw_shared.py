@@ -9,8 +9,8 @@ import time
 import hashlib
 
 # v38.0: Shared Definitions for Modular Architecture
-APP_VER_NUM = 42.5
-APP_VER_TAG = "Auto AFK, Popups Ricos y Robustez Total"
+APP_VER_NUM = 42.6
+APP_VER_TAG = "AFK Backend + Popups Persistentes Estables"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 # --- CONFIG POP ANTI-SPAM ---

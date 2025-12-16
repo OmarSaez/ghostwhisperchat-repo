@@ -22,7 +22,7 @@ class PopupManager:
         args = ["--info", "--text", text, "--title", title, "--width=350", f"--timeout={duration}"]
         self._launch_zenity(args)
 
-    def show_question(self, title, text, on_yes, on_no, force=True, timeout=0):
+    def show_question(self, title, text, on_yes, on_no, force=True):
         """
         Muestra pregunta interactiva (Aceptar/Rechazar).
         """
@@ -31,8 +31,6 @@ class PopupManager:
         def _task():
             cmd = ["--question", "--text", text, "--title", title, 
                    "--ok-label=Aceptar", "--cancel-label=Rechazar", "--width=400"]
-            if timeout > 0: cmd.append(f"--timeout={timeout}")
-            
             ret = self._launch_zenity(cmd, wait=True)
             
             if ret == 0:

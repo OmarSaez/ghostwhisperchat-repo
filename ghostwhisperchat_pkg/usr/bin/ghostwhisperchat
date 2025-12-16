@@ -2202,8 +2202,7 @@ def handle_v2_logic(pkt_type, cmd_name, args, source_ip):
                 # Interactive Popup via gw_pop
                 gw_pop.POP.show_question("Invitación Entrante", msg_text,
                                        lambda: LOBBY_ADAPTER.handle_accept(None) if LOBBY_ADAPTER else None,
-                                       lambda: LOBBY_ADAPTER.handle_deny(None) if LOBBY_ADAPTER else None,
-                                       timeout=gw_shared.AFK_TIMEOUT)
+                                       lambda: LOBBY_ADAPTER.handle_deny(None) if LOBBY_ADAPTER else None)
                 
                 sys.stdout.write('\a') # Beep
 
