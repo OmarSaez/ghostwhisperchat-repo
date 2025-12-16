@@ -283,7 +283,7 @@ MY_NICK = socket.gethostname()
 ACTIVE_CHATS = {} # cid -> {type, remote_id, pass, process_handle, port}
 PEERS = {} # ip -> {nick, chats: {cid1, cid2}}
 PEER_STATUSES = {} # ip -> status_str
-SILENT_UPDATES_ALLOWED = False # Global state
+# SILENT_UPDATES_ALLOWED removed
 
 
 
@@ -299,9 +299,8 @@ def load_config():
                 VISIBLE_IN_SCAN = d.get('visible', True)
                 LOG_ON = d.get('log_on', True)
                 gw_pop.POP.set_active(d.get('pop_on', True))
+                gw_pop.POP.set_active(d.get('pop_on', True))
                 AUTO_DL = d.get('auto_dl', True)
-                TRUSTED_NETS = d.get('trusted_nets', {})
-                TRUSTED_PEERS = set(d.get('trusted_peers', []))
                 return True
         except: pass
     return False
@@ -316,100 +315,15 @@ def save_config():
                 'visible': VISIBLE_IN_SCAN,
                 'log_on': LOG_ON,
                 'pop_on': gw_pop.POP.pop_on,
-                'auto_dl': AUTO_DL,
-                'trusted_nets': TRUSTED_NETS,
-                'trusted_peers': list(TRUSTED_PEERS)
+                'log_on': LOG_ON,
+                'pop_on': gw_pop.POP.pop_on,
+                'auto_dl': AUTO_DL
             }, f, indent=4)
     except: pass
 
 # --- NETWORK IDENTIFICATION ---
-def get_network_id():
-    """Identifica la red actual (Gateway + SSID/Name)"""
-    gw = "UNK_GW"
-    ssid = "LAN"
-    
-    try:
-        if platform.system() == "Linux":
-            # Gateway
-            r = subprocess.check_output("ip route | grep default", shell=True).decode()
-            gw = r.split()[2] if len(r.split()) > 2 else "UNK"
-            # SSID/Interface
-            try:
-                w = subprocess.check_output("iwgetid -r", shell=True).decode().strip()
-                if w: ssid = w
-            except: pass
-            
-        elif platform.system() == "Windows":
-             # 1. Gateway via Powershell (NextHop)
-             try:
-                 cmd_gw = "Get-NetRoute -DestinationPrefix 0.0.0.0/0 | Select-Object -ExpandProperty NextHop"
-                 r = subprocess.check_output(["powershell", "-Command", cmd_gw], creationflags=0x08000000).decode().strip()
-                 if r: gw = r
-             except: 
-                 # Fallback ipconfig parse
-                 try:
-                     r = subprocess.check_output("ipconfig", creationflags=0x08000000).decode()
-                     # Buscar "Default Gateway . . . : 192..."
-                     m = re.search(r"Default Gateway.*: ([\d\.]+)", r)
-                     if m: gw = m.group(1)
-                 except: pass
-
-             # 2. SSID via netsh
-             try:
-                 r = subprocess.check_output("netsh wlan show interfaces", creationflags=0x08000000).decode()
-                 m = re.search(r"^\s+SSID\s+:\s+(.+)$", r, re.MULTILINE)
-                 if m: ssid = m.group(1).strip()
-             except: pass
-    except: pass
-    
-    return f"{gw}_{ssid}"
-
-def check_network_trust():
-    """Verifica si la red actual es confiable para updates"""
-    net_id = get_network_id()
-    now = time.time()
-    
-    data = TRUSTED_NETS.get(net_id)
-    ask = False
-    
-    if not data:
-        # Nueva red
-        ask = True
-        msg = f"Se ha detectado una nueva red:\n{net_id}\n\n¿Desea activar actualizaciones silenciosas en esta red?"
-    else:
-        # Red conocida, verificar timestamp (3 weeks = 1814400s)
-        if (now - data['last_seen']) > 1814400:
-            ask = True
-            msg = f"No te conectas a esta red ({net_id}) en más de 3 semanas.\n\n¿Mantener actualizaciones silenciosas?"
-        else:
-            # Update timestamp and proceed
-            TRUSTED_NETS[net_id]['last_seen'] = now
-            save_config()
-            return data['trusted']
-
-    if ask:
-        # Popup de pregunta IMPORTANTE
-        is_windows = platform.system() == "Windows"
-        res = False
-        
-        # Reutilizamos logica de popup pero bloqueante y con Yes/No pregunta
-        # Hack simple usando zenity/powershell directo aqui para bloquear
-        try:
-            if platform.system() == "Linux" and shutil.which("zenity"):
-                ret = os.system(f"zenity --question --title='IMPORTANTE: Seguridad' --text='{msg}'")
-                res = (ret == 0)
-            elif is_windows:
-               # Powershell simple
-               script = f"$r=[System.Windows.Forms.MessageBox]::Show('{msg}','Seguridad','YesNo','Question');if($r-eq'Yes'){{exit 0}}else{{exit 1}}"
-               ret = subprocess.call(["powershell", "-Command", f"Add-Type -A System.Windows.Forms; {script}"])
-               res = (ret == 0)
-        except: pass
-        
-        TRUSTED_NETS[net_id] = {'trusted': res, 'last_seen': now, 'name': net_id}
-        save_config()
-        return res
-    
-    return False # Should not reach
+# Funciones get_network_id y check_network_trust ELIMINADAS por solicitud.
+# La aplicación asume un entorno seguro o gestionado por el usuario.
 
 def show_help(target_cid=None):
     lines = []
@@ -1407,42 +1321,37 @@ def perform_system_update():
         safe_print(f"{Colors.F}[X] Error inesperado: {e}{Colors.E}")
 
 def check_repo_update():
-    """Verifica silenciosamente si el repo tiene una versión mayor"""
-    if platform.system() != "Linux": return # Solo apt por ahora
-    
-    # safe_print(f"{Colors.W}[*] Buscando actualizaciones en repositorio...{Colors.E}")
+    """Verifica silenciosamente si el repo tiene una versión mayor (Daemon safe)"""
+    if platform.system() != "Linux": return 
     try:
-        # 1. Bajar el numerito (timeout corto para no congelar la app)
-        # Usamos el alias 'request' cargado por lazy_import
         with request.urlopen(VERSION_URL, timeout=3) as response:
             content = response.read().decode().strip()
-            # Manejar posibles saltos de linea o espacios
             latest_ver = float(content)
-            
-        # 2. Comparar con la constante local
         if latest_ver > APP_VER_NUM:
-            safe_print(f"{Colors.W}[!] Nueva versión disponible: v{latest_ver}{Colors.E}")
-            # Preguntar al usuario - INPUT bloquea?
-            # En run_lobby estamos en hilo principal antes del input loop.
-            # Podemos usar input simple.
-            try:
-                # Flush input buffer
-                if platform.system() == "Linux": subprocess.run("tcflush", shell=True, stderr=subprocess.DEVNULL) 
+            # Notify only
+            msg = f"Nueva versión disponible: v{latest_ver}. Ejecuta 'ghostwhisperchat --update' para instalar."
+            safe_print(f"{Colors.W}[!] {msg}{Colors.E}")
+            # Try to show system notification if possible
+            try: popup("Sistema", msg)
             except: pass
-            
-            raw_print(f"{Colors.G}¿Deseas actualizar ahora? se necesitaran permisos ROOT (sudo) [s/n]: {Colors.E}")
-            # Usamos input builtin directo
-            do_up = input()
-            
-            if do_up.lower().startswith('s'):
-                perform_system_update()
-            else:
-                 safe_print(f"{Colors.W}[*] Actualización pospuesta.{Colors.E}")
+    except: pass
 
+def trigger_manual_update():
+    """Llamado desde CLI --update"""
+    safe_print(f"{Colors.M}[*] Verificando últimas versiones...{Colors.E}")
+    try:
+        with request.urlopen(VERSION_URL, timeout=5) as response:
+            content = response.read().decode().strip()
+            server_ver = float(content)
+            
+        if server_ver > APP_VER_NUM:
+            safe_print(f"{Colors.G}[!] Versión {server_ver} encontrada. Actualizando...{Colors.E}")
+            perform_system_update()
+        else:
+            safe_print(f"{Colors.G}[✔] GhostWhisperChat está actualizado (v{APP_VER_NUM}).{Colors.E}")
+            
     except Exception as e:
-        # Si falla internet o github, no hacemos nada, seguimos normal
-        # safe_print(f"Update Check Fail: {e}")
-        pass
+        safe_print(f"{Colors.F}[X] Error verificando actualizaciones: {e}{Colors.E}")
 
 # ... existing code ...
 
@@ -1501,10 +1410,16 @@ class LobbyAdapter:
         # Lobby context reply
         if not cid: safe_print(msg)
         else:
-             # If target is child, IPC forwarding?
-             # But Adapter.reply usually means "Print to Console or Send to Child Console"
-             # If msg comes from Lobby Logic, we print to Lobby.
-             # If msg target is Child CID, we IPC to child?
+             # Support CLI response
+             if cid.startswith("CLI:"):
+                 try:
+                     _, rip, rport = cid.split(":")
+                     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                     s.sendto(str(msg).encode(), (rip, int(rport)))
+                     s.close()
+                 except: pass
+                 return
+
              if cid in ACTIVE_CHATS and 'port' in ACTIVE_CHATS[cid]:
                   # Forward as System Message
                   # Format: MSG_IN | Sender | Text | Color
@@ -1962,6 +1877,22 @@ def ipc_listen_parent():
                     leave_sess(target_cid=cid, silent=False) 
                     refresh_ui()
             
+            elif cmd == "CLI_CMD":
+                # CLI_CMD | ReturnIP | ReturnPort | CommandStr
+                if len(p) >= 4:
+                    rip, rport, cstr = p[1], p[2], p[3]
+                    # Create a virtual CID for CLI
+                    cli_sig = f"CLI:{rip}:{rport}"
+                    try:
+                        # Ejecutar comando como si fuera el lobby, pero redirigiendo output
+                        exec_lobby_cmd(cstr, origin_cid=cli_sig)
+                        # Opcional: Enviar ACK de fin?
+                    except Exception as e:
+                        try:
+                            s_err = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                            s_err.sendto(f"{Colors.F}Error procesando comando: {e}{Colors.E}".encode(), (rip, int(rport)))
+                        except: pass
+
             elif cmd == "CMD_SYNC_PEERS":
                 # Child requests sync. Send all known peers.
                 if len(p) >= 2:
@@ -2560,13 +2491,8 @@ def run_lobby():
         # Fallback if config loaded empty nick
         if not MY_NICK.strip(): MY_NICK = socket.gethostname()
     
-    # Check Network Security on Startup
-    global SILENT_UPDATES_ALLOWED
-    SILENT_UPDATES_ALLOWED = check_network_trust()
-    if SILENT_UPDATES_ALLOWED:
-        pass # safe_print(f"{Colors.G}[Sec] Actualizaciones silenciosas ACTIVAS en esta red.{Colors.E}")
-    else:
-        pass # safe_print(f"{Colors.W}[Sec] Actualizaciones silenciosas DESACTIVADAS.{Colors.E}")
+    # SILENT_UPDATES_ALLOWED logic removed
+    pass
 
     refresh_ui() # Clean start with Dashboard
     
@@ -2602,18 +2528,143 @@ def run_lobby():
 
 
 
-def main():
-    # v37.18: Clear debug log on startup (Real location)
+
+def is_daemon_alive():
+    """Returns True if Daemon is running (Bind fails), False if not (Bind success)"""
     try:
-        if "--child" not in sys.argv: # Only lobby clears it
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.bind(('127.0.0.1', IPC_PORT))
+        return False # We could bind, so port was free -> Not running
+    except: return True # Port busy -> Running
+
+def launch_daemon_background():
+    # Launch self with --daemon
+    # Detach process
+    # Use setsid to ensure it doesn't get killed when parent exits
+    # We pass 'python3' explicitly or sys.executable
+    script_abs = os.path.abspath(sys.argv[0])
+    cwd_dir = os.path.dirname(script_abs)
+    
+    # Ensure log dir exists for launch errors
+    log_path = os.path.join(os.path.expanduser("~"), ".ghostwhisperchat")
+    if not os.path.exists(log_path): os.makedirs(log_path)
+    
+    # Redirect stderr to launch_log to catch startup errors (e.g. imports)
+    with open(os.path.join(log_path, "launch.err"), "a") as ferr:
+        subprocess.Popen([sys.executable, script_abs, "--daemon"], 
+                         stdout=subprocess.DEVNULL, stderr=ferr,
+                         cwd=cwd_dir,
+                         start_new_session=True)
+
+def run_client(cmd_str):
+    if not cmd_str: cmd_str = "--estados-globales"
+    
+    # 1. Bind Reply Socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.settimeout(5.0) # 5s timeout default
+    
+    # Find free port
+    my_port = 0
+    try:
+        s.bind(('127.0.0.1', 0)) # Ephemeral
+        my_port = s.getsockname()[1]
+    except:
+        print("Error sockets cliente"); return
+
+    # 2. Send Command
+    # CLI_CMD | ReturnIP | ReturnPort | CommandStr
+    payload = f"CLI_CMD{SEP}127.0.0.1{SEP}{my_port}{SEP}{cmd_str}"
+    send_ipc(payload, IPC_PORT)
+    
+    # 3. Listen for replies
+
+    try:
+        while True:
+            d, _ = s.recvfrom(65535)
+            print(d.decode())
+            # For specific commands like --quienes that might have multiple lines, we wait.
+            # But normally we just print one reply.
+            pass
+            
+    except socket.timeout:
+        pass # End of stream implicit
+    except KeyboardInterrupt:
+        pass
+    finally:
+        s.close()
+
+def run_daemon():
+    global MY_NICK, MY_STATUS, MY_IP, LOBBY_ADAPTER, PROMPT
+    
+    # Daemon Hygiene
+    liberate_ports()
+    
+    # Logging
+    log_path = os.path.join(os.path.expanduser("~"), ".ghostwhisperchat")
+    if not os.path.exists(log_path): os.makedirs(log_path)
+    
+    # Redirect Stdout/Stderr to log
+    sys.stdout = open(os.path.join(log_path, "daemon.log"), "a", buffering=1)
+    sys.stderr = open(os.path.join(log_path, "daemon.err"), "a", buffering=1)
+    
+    print(f"[{time.time()}] Daemon Started (PID: {os.getpid()})")
+    
+    # Basic Init (No Display)
+    lazy_import() 
+    global hashlib; import hashlib
+    
+    gw_display.DISPLAY = None # NO TUI
+    
+    adapter = LobbyAdapter()
+    LOBBY_ADAPTER = adapter
+    
+    fw_cfg()
+    MY_IP = get_ip()
+    
+    if not load_config():
+        MY_NICK = socket.gethostname()
+        save_config()
+        
+    init_completer() # Maybe not needed in daemon, but harmless
+    
+    # Listeners
+    threading.Thread(target=ipc_listen_parent, daemon=True).start()
+    
+    gw_comm.start_tcp_listener(gw_comm.TCP_PORT_PRIV, handle_v2_priv)
+    gw_comm.start_udp_listener(gw_comm.UDP_PORT_DISC, handle_v2_disc)
+    gw_comm.start_tcp_listener(gw_comm.TCP_PORT_GRP,  handle_v2_grp)
+    
+    threading.Thread(target=check_child_health, daemon=True).start()
+    
+    # Ensure DISPLAY for Zenity (if available in env)
+    if "DISPLAY" not in os.environ:
+        os.environ["DISPLAY"] = ":0"
+
+    # Infinite Loop
+    while True:
+        time.sleep(1)
+
+def main():
+    # v37.18: Clear debug log on startup (only if Lobby/Daemon)
+    try:
+        if "--child" not in sys.argv and "--daemon" not in sys.argv:
+             # CLI triggers debug clear? No, maybe only Daemon should clear it or Lobby.
+             # Legacy behavior: Lobby cleared it.
+             # Now Daemon clears it.
+             pass
+    except: pass
+
+    # Parsing
+    if "--daemon" in sys.argv:
+        try:
             dsk = get_desktop_path()
             path = os.path.join(dsk, "gwc_lobby_debug.log")
             if os.path.exists(path):
-                with open(path, "w") as f: f.write(f"--- NUEVA EJECUCIÓN {time.ctime()} ---\n")
-    except: pass
+                 with open(path, "w") as f: f.write(f"--- DAEMON START {time.ctime()} ---\n")
+        except: pass
+        run_daemon()
 
-    # Parsing manual de args para no depender de argparse complejo
-    if "--child" in sys.argv:
+    elif "--child" in sys.argv:
         try:
             idx = sys.argv.index("--child")
             cid = sys.argv[idx+1]
@@ -2632,16 +2683,54 @@ def main():
             if "--rnick" in sys.argv:
                  rnick = sys.argv[sys.argv.index("--rnick")+1]
             
-            # Check for silent updates flag passed from parent
             global SILENT_UPDATES_ALLOWED
-            # if "--updates-ok" in sys.argv: SILENT_UPDATES_ALLOWED = True 
-            # Deprecated flag logic
 
             gw_child.run(cid, ctype, remote, passwd, mnick, mstat, port, rnick)
         except Exception as e:
             print(f"Error iniciando hijo: {e}")
             time.sleep(5)
     else:
-        run_lobby()
+        # CLI / AUTO-DAEMON MODE
+        # Check Daemon Status
+        is_running = is_daemon_alive()
+        
+        args = sys.argv[1:]
+        
+        if not args:
+             # DAEMON NO CORRE: INICIARLO
+             if not is_running:
+                 print(f"{Colors.C}[*] Iniciando GhostWhisperChat Daemon...{Colors.E}")
+                 launch_daemon_background()
+                 # Esperar a que arranque
+                 up = False
+                 for _ in range(10):
+                     time.sleep(0.5)
+                     if is_daemon_alive():
+                         up=True; break
+                 
+                 if up:
+                     print(f"{Colors.G}[✔] Daemon iniciado en segundo plano.{Colors.E}")
+                     # Start default interactive client or just show status
+                     args = ["--estados-globales"] 
+                 else:
+                     print(f"{Colors.F}[X] Fallo al iniciar el Daemon.{Colors.E}")
+                     sys.exit(1)
+             else:
+                 # Default command if running
+                 print(f"{Colors.G}[*] Daemon activo. Cliente conectado.{Colors.E}")
+                 args = ["--estados-globales"]
+
+        elif not is_running:
+             # Args provided but Daemon dead?
+             print(f"{Colors.W}[!] Daemon no activo. Iniciando...{Colors.E}")
+             launch_daemon_background()
+             time.sleep(2)
+        
+        elif "--update" in args or "--actualizar" in args:
+             # run update locally
+             trigger_manual_update()
+        else:
+             # Run Client for other commands
+             run_client(" ".join(args))
 
 if __name__ == "__main__": main()

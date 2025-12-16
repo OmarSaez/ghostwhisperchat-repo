@@ -1,0 +1,83 @@
+# PROMPT DE CONTEXTO PARA TRANSICIÓN A ARQUITECTURA DE SERVICIO (DAEMON)
+# =========================================================================
+
+Eres un ingeniero de software experto en Python, Linux y programación de redes. Te estás uniendo a un proyecto llamado "GhostWhisperChat" que acaba de completar una refactorización masiva a una arquitectura modular.
+
+Tu objetivo principal en esta nueva sesión será transformar la aplicación actual (que corre en una terminal dedicada como "Lobby") en un **SERVICIO DE FONDO (Daemon)** que opera de manera invisible, gestionando chats a pedido.
+
+A continuación, te detallo el estado actual, la lógica interna y la hoja de ruta técnica para esta transformación.
+
+---
+
+## 1. Estado Actual: Arquitectura Modular (v41.25)
+
+El sistema ya no es monolítico. Se compone de un núcleo central y módulos especializados ubicados en `/usr/lib/ghostwhisperchat/`.
+
+### Estructura de Archivos Clave:
+DO NOT HALLUCINATE. These are the real file locations you will work with:
+- **Core (Lobby)**: `/usr/bin/ghostwhisperchat`
+  - Actualmente orquesta todo. Mantiene el estado (`ACTIVE_CHATS`, `PEERS`), corre los listeners de red (UDP/TCP) y muestra una interfaz TUI (`Lobby >`).
+  - Lanza procesos hijos para cada chat.
+- **Hijo (Chat)**: `/usr/lib/ghostwhisperchat/gw_child.py`
+  - Maneja una sesión de chat individual (ventana propia).
+- **Red**: `/usr/lib/ghostwhisperchat/gw_comm.py` (UDP Broadcast, TCP Directo, Paquetes).
+- **Comandos**: `/usr/lib/ghostwhisperchat/gw_cmd.py` (Lógica agnóstica de comandos).
+- **Config**: `/usr/lib/ghostwhisperchat/gw_shared.py` (Constantes, Versión).
+- **Popups**: `/usr/lib/ghostwhisperchat/gw_pop.py` (Wrapper de Zenity para notificaciones visuales).
+- **IPC Local**: Comunicación UDP Localhost entre Lobby e Hijos para coordinar acciones.
+
+### Lógica Reciente Implementada (IMPORTANTE NO ROMPER):
+1.  **Smart Pop Anti-Spam**: El Lobby decide cuándo mostrar notificaciones (`gw_pop`) basado en la actividad del chat. No implementar filtros en `gw_pop.py`, el Lobby es el cerebro.
+2.  **Robustez de Desconexión**: Al cerrar un chat, se envía `CLOSE_PRIV` con timestamp. El receptor valida si el timestamp es anterior a la creación de su sesión actual para evitar "Zombie Disconnects".
+3.  **Transferencia de Archivos**: Flujo TCP dedicado donde el Handler del Lobby toma posesión del socket para recibir el stream de datos.
+
+---
+
+## 2. El Objetivo: "GhostWhisperChat Daemon"
+
+Queremos evolucionar a un modelo **Cliente-Servidor Local** (como Docker o MySQL).
+- **El Servicio (Daemon)**: El Lobby actual pasará a ejecutarse en segundo plano (Systemd --user), sin ventana de terminal, siempre encendido.
+- **El Cliente (CLI)**: Cualquier terminal del usuario podrá enviar comandos al Daemon (`ghostwhisperchat --chatpersonal messi`).
+- **Interfaz On-Demand**: Solo se abrirán ventanas de terminal cuando se inicie efectivamente una conversación (invitación aceptada o enviada).
+
+## 3. Hoja de Ruta Técnica (Roadmap)
+
+Tu misión se divide en estos pasos concretos:
+
+### PASO 1: Modo Daemon en el Lobby
+- Modificar `/usr/bin/ghostwhisperchat` para aceptar un flag `--daemon`.
+- Cuando corre como daemon:
+  - **NO** debe iniciar `gw_display` ni pedir `input()` (bucle infinito silencioso).
+  - Debe redirigir `stdout/stderr` a un archivo de log (ej: `~/.ghostwhisperchat/daemon.log`) o a `/dev/null` para no ensuciar.
+  - Debe seguir escuchando en los puertos de Red (4449x) y en el puerto IPC Local.
+
+### PASO 2: Cliente CLI (El "Joystick")
+- Modificar el entry point `/usr/bin/ghostwhisperchat`.
+- Si se ejecuta SIN argumentos (o con comandos normales como `--nick`):
+  1. Detectar si ya existe un Daemon corriendo (check pid / puerto IPC ocupado).
+  2. Si NO existe -> Iniciar el Daemon en background y esperar a que esté listo.
+  3. Si YA existe -> Convertirse en cliente: Enviar el comando al Daemon vía IPC (`127.0.0.1:IPC_PORT`).
+  4. Imprimir la respuesta del Daemon (necesitaremos un mecanismo de IPC de vuelta o simplemente "Comando enviado").
+
+### PASO 3: Lanzamiento de Ventanas Reales
+- Actualmente, el Lobby lanza hijos con `subprocess.Popen([python, gw_child.py...])`. Esto funciona porque hereda la terminal del Lobby.
+- **Cambio Crítico**: Como el Daemon no tiene terminal, `gw_child` fallaría o correría invisible.
+- **Solución**: Modificar la función `spawn_child_process` en el Lobby.
+  - Detectar el entorno (GNOME, XFCE, KDE, etc.) o usar `x-terminal-emulator`.
+  - Lanzar el proceso envolviéndolo en una nueva ventana:
+    `subprocess.Popen(["gnome-terminal", "--", "python3", "gw_child.py", ...])`
+  - Esto garantiza que cuando te invitan, "pop!", aparece una ventana de chat mágicamente en tu escritorio.
+
+### PASO 4: Persistencia Systemd (Opcional pero recomendado)
+- Crear un archivo `ghostwhisperchat.service` para `systemd --user`.
+- Esto asegura que el servicio arranque con el PC y se reinicie si crashea.
+
+---
+
+## Resumen del Flujo Deseado
+1. Enciendo el PC -> Se levanta el Daemon silencioso.
+2. Alguien me invita -> El Daemon recibe el paquete UDP/TCP -> Lanza notificación `gw_pop` (Zenity).
+3. Acepto la invitación -> El Daemon ejecuta `gnome-terminal` -> Se abre la ventana de chat.
+4. Quiero cambiar mi nick -> Abro una terminal cualquiera -> Escribo `ghostwhisperchat --nick Neo` -> El comando viaja por IPC al Daemon -> El Daemon actualiza su estado y lo propaga a la red.
+
+Empieza analizando `/usr/bin/ghostwhisperchat` y cómo separar el bucle de UI (`run_lobby` inputs) de la lógica de red (`ipc_listen_parent` / `handlers`). ¡Suerte!

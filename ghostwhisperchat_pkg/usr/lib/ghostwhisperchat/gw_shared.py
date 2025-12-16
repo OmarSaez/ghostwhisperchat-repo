@@ -148,6 +148,10 @@ COMMAND_DEFS = {
     'DEBUG': {
         'aliases': ['--debug', '--dbg', '-dbg'],
         'desc': 'Activar/Desactivar logs de depuración.'
+    },
+    'UPDATE': {
+        'aliases': ['--update', '--actualizar', '--up'],
+        'desc': 'Buscar e instalar actualizaciones del repositorio.'
     }
 }
 
@@ -194,17 +198,19 @@ class Loader:
         self.desc = desc
         self.stop_event = threading.Event()
         self.t = threading.Thread(target=self._animate, daemon=True)
+        self.is_tty = sys.stdout.isatty()
 
     def __enter__(self):
-        self.t.start()
+        if self.is_tty: self.t.start()
         return self
 
     def __exit__(self, exc_type, exc_value, tb):
         self.stop_event.set()
-        self.t.join()
-        # Clean line
-        sys.stdout.write("\r" + " " * (len(self.desc) + 10) + "\r")
-        sys.stdout.flush()
+        if self.is_tty: 
+             self.t.join()
+             # Clean line
+             sys.stdout.write("\r" + " " * (len(self.desc) + 10) + "\r")
+             sys.stdout.flush()
 
     def _animate(self):
         chars = [".  ", " . ", "  ."]
