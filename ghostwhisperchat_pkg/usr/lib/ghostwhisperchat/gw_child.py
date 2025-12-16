@@ -172,18 +172,26 @@ class ChildAdapter:
 
     def scan_network(self, cid, silent=False):
         if not silent: 
-             # Use animation instead of static print
-             # Non-blocking scan request, but we simulate waiting for results
-             # Send WHOIS
+             # 1. Purge Ghosts (Fresh Scan)
+             # Remove peers not involved in any active chat to clear stale cache
+             to_remove = [ip for ip, d in PEERS.items() if not d.get('chats')]
+             for ip in to_remove: del PEERS[ip]
+
+             # 2. Send WHOIS
              gw_comm.send_cmd_all("WHOIS", self.get_mpp())  
              loading_anim(f"{Colors.C}[*] Escaneando red...{Colors.E}", 3.0)
+             
+             # 3. Show Results (Global)
+             print(f"{Colors.G}--- RED LOCAL (ACTIVOS) ---{Colors.E}")
+             if not PEERS:
+                 print(f"{Colors.W}No se detectaron usuarios.{Colors.E}")
+             for ip, d in PEERS.items():
+                 print(f" - {d.get('nick', '?')} ({ip})")
+             sys.stdout.flush()
+
         else:
-             # Just send request
-             gw_comm.send_cmd_all("WHOIS", self.get_mpp())  
-             # Logic flow already waited in caller (invite_users) or no wait needed
-        
-        # Only show table if not silent
-        if not silent: self.show_contacts(cid)
+             # Just send request (Background sync)
+             gw_comm.send_cmd_all("WHOIS", self.get_mpp())
 
     def leave_sess(self, cid):
         # Implementation of Strict Disconnection Protocols
@@ -433,11 +441,13 @@ def ipc_listen_child(sock, lock_state):
             elif cmd == "FWD_PEER":
                 if len(p) >= 4:
                     rmt_ip, rmt_nick, rmt_stat = p[1], p[2], p[3]
-                    if rmt_ip not in PEERS: PEERS[rmt_ip] = {'nick': rmt_nick, 'chats': {MY_CHILD_ID}}
+                    # Discovery Only (Do not bind to current chat ID automatically)
+                    if rmt_ip not in PEERS: 
+                        PEERS[rmt_ip] = {'nick': rmt_nick, 'chats': set()}
                     else: 
                          if isinstance(PEERS[rmt_ip], dict):
                              PEERS[rmt_ip]['nick'] = rmt_nick
-                             PEERS[rmt_ip]['chats'].add(MY_CHILD_ID)
+                             # Do NOT add MY_CHILD_ID. This is purely visual discovery data.
                     print_incoming_msg(f"{Colors.G}[+] Detectado: {rmt_nick}{Colors.E}")
             
             elif cmd == "CMD_CLOSE_NOW":

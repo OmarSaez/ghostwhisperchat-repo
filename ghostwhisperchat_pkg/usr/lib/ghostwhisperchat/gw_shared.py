@@ -9,8 +9,8 @@ import time
 import hashlib
 
 # v38.0: Shared Definitions for Modular Architecture
-APP_VER_NUM = 42.17
-APP_VER_TAG = "Mejora Visual: Animación de Carga Restaurada"
+APP_VER_NUM = 42.19
+APP_VER_TAG = "Fix: Scopes Separados (Global vs Local)"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 # --- CONFIG POP ANTI-SPAM ---
