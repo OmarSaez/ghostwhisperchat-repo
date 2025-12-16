@@ -9,8 +9,8 @@ import time
 import hashlib
 
 # v38.0: Shared Definitions for Modular Architecture
-APP_VER_NUM = 42.9
-APP_VER_TAG = "Auto AFK y recibiendo invitaciones"
+APP_VER_NUM = 42.10
+APP_VER_TAG = "Hotfix Syntax Error & AFK Event-Driven"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 # --- CONFIG POP ANTI-SPAM ---

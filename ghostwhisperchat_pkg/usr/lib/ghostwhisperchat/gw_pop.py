@@ -49,9 +49,6 @@ class PopupManager:
             else:
                  # Other error, treat as No
                  if on_no: on_no()
-            else:
-                 # Timeout or error
-                 if on_no: on_no()
                 
         threading.Thread(target=_task, daemon=True).start()
 
