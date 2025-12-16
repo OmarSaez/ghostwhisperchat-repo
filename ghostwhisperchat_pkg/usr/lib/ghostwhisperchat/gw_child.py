@@ -376,6 +376,14 @@ def ipc_listen_child(sock, lock_state):
                         # refresh_prompt()
                     else:
                          PEERS[pip]['chats'].add(MY_CHILD_ID)
+            
+            elif cmd == "CMD_DEL_PEER":
+                 # CMD_DEL_PEER|IP
+                 if len(p) >= 2:
+                     pip = p[1]
+                     if pip in PEERS:
+                         del PEERS[pip]
+                         # Debug: print_incoming_msg(f"Debug: Removed {pip}")
 
             elif cmd == "FWD_FILE":
                 if len(p) >= 4 and p[1] == MY_CHILD_ID:

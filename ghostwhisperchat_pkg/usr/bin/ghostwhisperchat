@@ -2294,14 +2294,16 @@ def handle_v2_logic(pkt_type, cmd_name, args, source_ip):
                  gid = args[1]
                  # Safe Nick
                  snick = sender_mpp['nick'] if sender_mpp else f"? ({source_ip})"
-                 
                  # Notify relevant group chats
                  for cid, cdata in ACTIVE_CHATS.items():
                      if cdata['type'] == 'GROUP' and cdata['remote_id'] == gid:
-                         msg = f"[💔] {snick} salió del grupo."
-                         if 'port' in cdata:
-                             # Use MSG_IN with Red Color
-                             send_ipc(f"MSG_IN{gw_comm.SEP}Sistema{gw_comm.SEP}{msg}{gw_comm.SEP}{Colors.F}", cdata['port'])
+                          if 'port' in cdata:
+                               # 1. Visual Notification
+                               msg = f"[-] {snick} salió del grupo."
+                               send_ipc(f"MSG_IN{gw_comm.SEP}Sistema{gw_comm.SEP}{msg}{gw_comm.SEP}{Colors.R}", cdata['port'])
+                               
+                               # 2. Logic Removal
+                               send_ipc(f"CMD_DEL_PEER{gw_comm.SEP}{source_ip}", cdata['port'])
 
             elif cmd_name == "CLOSE_PRIV" or cmd_name == "DISCONNECT_NOW":
                 # Args: [MPP], NICK, [TIMESTAMP]
