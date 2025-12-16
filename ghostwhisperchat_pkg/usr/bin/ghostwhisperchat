@@ -2174,9 +2174,15 @@ def handle_v2_logic(pkt_type, cmd_name, args, source_ip):
                     'data': args[2:] if len(args)>2 else None
                 }
                 
-                txt_type = "Privado" if itype == "PRIV" else f"Grupo {args[2] if len(args)>2 else '?'}"
-                msg_text = f"{sender_mpp['nick']} te invita a un Chat {txt_type}"
-                safe_print(f"{Colors.G}[!] {msg_text}. Responde en el popup o usa --aceptar.{Colors.E}")
+                if itype == "PRIV":
+                    msg_text = f"💬 ¡Hey! {sender_mpp['nick']} ({source_ip}) quiere iniciar una conversación contigo.\n\n¿Te gustaría aceptar la conexión?"
+                    log_text = f"{sender_mpp['nick']} te invita a un Chat Privado"
+                else:
+                    gid = args[2] if len(args)>2 else '?'
+                    msg_text = f"📢 {sender_mpp['nick']} quiere que formes parte del grupo \"{gid}\".\n\n¿Te unes a la conversación?"
+                    log_text = f"{sender_mpp['nick']} te invita a un Chat Grupal '{gid}'"
+
+                safe_print(f"{Colors.G}[!] {log_text}. Responde en el popup o usa --aceptar.{Colors.E}")
                 
                 # Interactive Popup via gw_pop
                 gw_pop.POP.show_question("Invitación Entrante", msg_text,

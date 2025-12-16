@@ -9,8 +9,8 @@ import time
 import hashlib
 
 # v38.0: Shared Definitions for Modular Architecture
-APP_VER_NUM = 42.3
-APP_VER_TAG = "Mejora de actualizacion y dependencias"
+APP_VER_NUM = 42.4
+APP_VER_TAG = "Mejora visual de Popups y Robustez"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 # --- CONFIG POP ANTI-SPAM ---
