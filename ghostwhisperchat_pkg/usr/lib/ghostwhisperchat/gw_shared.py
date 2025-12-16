@@ -9,8 +9,8 @@ import time
 import hashlib
 
 # v38.0: Shared Definitions for Modular Architecture
-APP_VER_NUM = 42.19
-APP_VER_TAG = "Fix: Scopes Separados (Global vs Local)"
+APP_VER_NUM = 42.20
+APP_VER_TAG = "Fix: Historial de Contactos (--contactos)"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 # --- CONFIG POP ANTI-SPAM ---

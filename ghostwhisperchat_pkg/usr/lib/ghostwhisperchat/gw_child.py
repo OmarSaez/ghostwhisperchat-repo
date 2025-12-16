@@ -217,23 +217,13 @@ class ChildAdapter:
         os._exit(0)
 
     def show_contacts(self, cid):
-        print(f"{Colors.G}--- PARTICIPANTES ({self.ctype}) ---{Colors.E}")
-        found = False
-        
-        # Filter Logic
-        for ip, d in PEERS.items():
-            # Check if this peer is associated with THIS chat ID
-            if cid in d.get('chats', set()):
-                 print(f" - {d.get('nick', '?')} ({ip})")
-                 found = True
-            # Special Case: Private Chat Remote always show if connected?
-            elif self.ctype == 'PRIV' and ip == self.remote:
-                 print(f" - {d.get('nick', '?')} ({ip}) [Remoto]")
-                 found = True
+        # HISTORICAL CONTACTS (Ask Lobby/Daemon)
+        # The daemon maintains the KNOWN_USERS persistent DB.
+        self.forward("--contactos")
 
-        if not found:
-             print(f"{Colors.W}Nadie más aquí (sola/o).{Colors.E}")
-        sys.stdout.flush()
+    def show_ls_local(self, cid):
+        # Used by manual calls if needed, but 'LS' command is handled by gw_cmd logic via get_peers()
+        pass
 
     def get_chat(self, cid):
         # Return dict mimicking ACTIVE_CHATS[cid]
