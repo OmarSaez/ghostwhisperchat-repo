@@ -9,6 +9,31 @@ fi
 
 # 2. Informar al usuario sobre Systemd (Systemd --user es tricky en postinst root)
 echo "👻 GhostWhisperChat instalado."
+# 3. Configurar Firewall (Puertos 44494, 44495, 44496)
+echo "🔒 Configurando Firewall..."
+
+# Detectar UFW
+if command -v ufw >/dev/null; then
+    ufw allow 44494/udp >/dev/null 2>&1
+    ufw allow 44495/udp >/dev/null 2>&1
+    ufw allow 44496/tcp >/dev/null 2>&1
+    echo "   [UFW] Reglas añadidas."
+fi
+
+# Detectar IPTABLES (Backup o Principal en Kali/Server)
+if command -v iptables >/dev/null; then
+    # Evitar duplicados checkeando primero
+    iptables -C INPUT -p udp --dport 44494 -j ACCEPT 2>/dev/null || iptables -A INPUT -p udp --dport 44494 -j ACCEPT
+    iptables -C INPUT -p udp --dport 44495 -j ACCEPT 2>/dev/null || iptables -A INPUT -p udp --dport 44495 -j ACCEPT
+    iptables -C INPUT -p tcp --dport 44496 -j ACCEPT 2>/dev/null || iptables -A INPUT -p tcp --dport 44496 -j ACCEPT
+    echo "   [IPTABLES] Reglas añadidas (Runtime)."
+    
+    # Intento de persistencia basica
+    if command -v netfilter-persistent >/dev/null; then
+        netfilter-persistent save >/dev/null 2>&1
+    fi
+fi
+
 echo "ℹ️  Para activar el inicio automático, ejecuta como TU USUARIO:"
 echo "   systemctl --user enable --now ghostwhisperchat"
 

@@ -1311,8 +1311,13 @@ def perform_system_update():
         
         subprocess.run(cmd, shell=True, check=True)
         
-        safe_print(f"{Colors.G}[✔] Actualización lista. Reiniciando...{Colors.E}")
-        # Reiniciar el script automáticamente
+        safe_print(f"{Colors.G}[✔] Actualización lista. Reiniciando servicio...{Colors.E}")
+        
+        # v42.3: Force Service Restart to load new code
+        subprocess.run("systemctl --user restart ghostwhisperchat", shell=True)
+        time.sleep(2) # Esperar un poco a que el daemon arranque
+        
+        # Reiniciar el script automáticamente (CLI)
         os.execv(sys.executable, ['python3'] + sys.argv)
         
     except subprocess.CalledProcessError:
