@@ -28,6 +28,7 @@ MY_CHILD_ID = None
 PROMPT = f"\001{Colors.B}\002Tú: \001{Colors.E}\002"
 REMOTE_NICK = "?"
 PEERS = {} # Local peers store for child context {ip: {nick, chats}}
+PRINT_LOCK = threading.Lock()
 
 BUFFER = 4096
 
@@ -325,18 +326,19 @@ def join_grp(gid, gp, remote_ip, my_nick, my_status, update_peers_func):
 
 def print_incoming_msg(msg):
     """Prints a message while preserving the user's current input line"""
-    buf = ""
-    try:
-        if 'readline' in sys.modules:
-            buf = readline.get_line_buffer()
-    except: pass
-    
-    # CR + Clear Line + Msg + NL
-    sys.stdout.write(f"\r\033[K{msg}\n")
-    
-    # Restore Prompt + Buffer
-    sys.stdout.write(f"{PROMPT}{buf}")
-    sys.stdout.flush()
+    with PRINT_LOCK:
+        buf = ""
+        try:
+            if 'readline' in sys.modules:
+                buf = readline.get_line_buffer()
+        except: pass
+        
+        # CR + Clear Line + Msg + NL
+        sys.stdout.write(f"\r\033[K{msg}\n")
+        
+        # Restore Prompt + Buffer
+        sys.stdout.write(f"{PROMPT}{buf}")
+        sys.stdout.flush()
 
 def ipc_listen_child(sock, lock_state):
     global MY_CHILD_ID, PEERS
