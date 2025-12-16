@@ -9,8 +9,8 @@ import time
 import hashlib
 
 # v38.0: Shared Definitions for Modular Architecture
-APP_VER_NUM = 42.21
-APP_VER_TAG = "Fix: Lista Detallada en Escaneo desde Lobby"
+APP_VER_NUM = 42.22
+APP_VER_TAG = "Feature: Test Integridad + Fix Status en Scan"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 # --- CONFIG POP ANTI-SPAM ---
@@ -159,6 +159,10 @@ COMMAND_DEFS = {
     'VERSION': {
         'aliases': ['--version', '--ver', '-v'],
         'desc': 'Mostrar la versión actual instalada.'
+    },
+    'INTEGRITY': {
+        'aliases': ['--integridad', '--integrity', '--check', '--test', '-t'],
+        'desc': 'Realizar autodiagnóstico de integridad del sistema.'
     }
 }
 

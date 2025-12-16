@@ -168,6 +168,12 @@ def process(inp, origin_cid, adapter):
         ver_str = gw_shared.APP_VERSION
         adapter.reply(f"{Colors.G}GhostWhisperChat {ver_str}{Colors.E}", origin_cid)
 
+    elif cmd_key == 'INTEGRITY':
+        if hasattr(adapter, 'check_integrity'):
+            adapter.check_integrity(origin_cid)
+        else:
+            adapter.reply(f"{Colors.F}Este entorno no soporta test de integridad.{Colors.E}", origin_cid)
+
     elif cmd_key == 'CLEAR':
         adapter.clear_screen(origin_cid)
 

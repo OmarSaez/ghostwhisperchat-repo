@@ -1551,6 +1551,56 @@ class LobbyAdapter:
                 sys.stdout.flush()
         
         threading.Thread(target=_scan_task, daemon=True).start()
+
+    def check_integrity(self, cid):
+        report = []
+        report.append(f"{Colors.H}=== REPORTE DE INTEGRIDAD ({APP_VERSION}) ==={Colors.E}")
+        
+        # 1. DEPENDENCIAS
+        deps = [("zenity", "Interfaz de Ventanas"), ("python3", "Motor Python"), ("fuser", "Gestor Procesos")]
+        report.append(f"\n{Colors.BO}:: Dependencias del Sistema ::{Colors.E}")
+        for bin_name, desc in deps:
+            found = shutil.which(bin_name)
+            st = f"{Colors.G}OK{Colors.E}" if found else f"{Colors.F}⚠️ FALTA{Colors.E}"
+            report.append(f" - {desc} ({bin_name}): {st}")
+
+        # 2. PUERTOS (Daemon Health)
+        report.append(f"\n{Colors.BO}:: Estado de Puertos (Daemon) ::{Colors.E}")
+        ports = [
+            (gw_comm.TCP_PORT_PRIV, "TCP Privado (Mensajería)"),
+            (gw_comm.UDP_PORT_DISC, "UDP Discovery (Escaneo)"),
+            (gw_comm.TCP_PORT_GRP,  "TCP Mesh (Grupos)")
+        ]
+        
+        for p, d in ports:
+             report.append(f" - Puerto {p} ({d}): {Colors.G}EN ESCUCHA{Colors.E}")
+
+        # 3. INTERNALS
+        report.append(f"\n{Colors.BO}:: Subsistema IPC & Hijos ::{Colors.E}")
+        report.append(f" - IPC Port: {IPC_PORT}")
+        
+        child_ok_count = 0
+        for xcid, xcdata in ACTIVE_CHATS.items():
+            if 'pid' in xcdata:
+                 try: 
+                     os.kill(xcdata['pid'], 0)
+                     child_ok_count += 1
+                 except: pass
+        
+        st_child = f"{Colors.G}OK{Colors.E}" if child_ok_count == len(ACTIVE_CHATS) else f"{Colors.W}Mismatch{Colors.E}"
+        report.append(f" - Hijos Activos: {len(ACTIVE_CHATS)} (Vivos: {child_ok_count})")
+        report.append(f" - Estado General Hijos: {st_child}")
+
+        # 4. CAPACIDADES
+        report.append(f"\n{Colors.BO}:: Capacidades ::{Colors.E}")
+        
+        terms = ["gnome-terminal", "konsole", "xfce4-terminal", "xterm", "x-terminal-emulator"]
+        found_term = [t for t in terms if shutil.which(t)]
+        
+        can_spawn = f"{Colors.G}SI ({found_term[0]}){Colors.E}" if found_term else f"{Colors.F}NO (Falta Terminal){Colors.E}"
+        report.append(f" - Creación de Ventanas: {can_spawn}")
+        
+        self.reply("\n".join(report), cid)
     
     def set_config(self, key, val):
         global VISIBLE_IN_SCAN, MY_STATUS, MY_NICK, LOG_ON, AUTO_DL, USER_OFF
@@ -2174,6 +2224,7 @@ def handle_v2_logic(pkt_type, cmd_name, args, source_ip):
             if source_ip not in PEERS: PEERS[source_ip] = {'chats': set()}
             PEERS[source_ip]['nick'] = sender_mpp['nick']
             PEERS[source_ip]['ver']  = sender_mpp['ver']
+            PEERS[source_ip]['status'] = sender_mpp['status'] # Fix [?] in scan
             PEER_STATUSES[source_ip] = sender_mpp['status']
             
             # Persistencia Automática + Refresh solo si es nuevo (evitar parpadeo)

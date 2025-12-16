@@ -221,6 +221,10 @@ class ChildAdapter:
         # The daemon maintains the KNOWN_USERS persistent DB.
         self.forward("--contactos")
 
+    def check_integrity(self, cid):
+        # Forward Integrity Check to Daemon
+        self.forward("--integridad")
+
     def show_ls_local(self, cid):
         # Used by manual calls if needed, but 'LS' command is handled by gw_cmd logic via get_peers()
         pass
