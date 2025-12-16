@@ -164,6 +164,10 @@ def process(inp, origin_cid, adapter):
     elif cmd_key == 'AUTOSTART_ON': adapter.toggle_autostart(True, origin_cid)
     elif cmd_key == 'AUTOSTART_OFF': adapter.toggle_autostart(False, origin_cid)
     
+    elif cmd_key == 'VERSION':
+        ver_str = gw_shared.APP_VERSION
+        adapter.reply(f"{Colors.G}GhostWhisperChat {ver_str}{Colors.E}", origin_cid)
+
     elif cmd_key == 'CLEAR':
         adapter.clear_screen(origin_cid)
 

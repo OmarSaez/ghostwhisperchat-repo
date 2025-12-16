@@ -2726,11 +2726,28 @@ def main():
              launch_daemon_background()
              time.sleep(2)
         
-        elif "--update" in args or "--actualizar" in args:
+        if "--update" in args or "--actualizar" in args or "update" in args or "actualizar" in args:
              # run update locally
              trigger_manual_update()
         else:
              # Run Client for other commands
-             run_client(" ".join(args))
+             # Pre-process args to support dashless commands (Sugar)
+             # E.g. gwc scan -> gwc --scan
+             # Only applied in CLI mode, safe for Chat logic.
+             new_args = []
+             import gw_shared
+             for a in args:
+                 if not a.startswith("-"):
+                     # Try finding canonical command
+                     if f"--{a}" in gw_shared.CMD_MAP:
+                         new_args.append(f"--{a}")
+                     elif f"-{a}" in gw_shared.CMD_MAP:
+                         new_args.append(f"-{a}")
+                     else:
+                         new_args.append(a) # Pass through (e.g. arguments like IP or Nick)
+                 else:
+                     new_args.append(a)
+                     
+             run_client(" ".join(new_args))
 
 if __name__ == "__main__": main()

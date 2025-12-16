@@ -152,6 +152,10 @@ COMMAND_DEFS = {
     'UPDATE': {
         'aliases': ['--update', '--actualizar', '--up'],
         'desc': 'Buscar e instalar actualizaciones del repositorio.'
+    },
+    'VERSION': {
+        'aliases': ['--version', '--ver', '-v'],
+        'desc': 'Mostrar la versión actual instalada.'
     }
 }
 
