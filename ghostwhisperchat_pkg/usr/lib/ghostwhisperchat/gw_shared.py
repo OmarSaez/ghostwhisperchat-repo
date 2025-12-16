@@ -9,13 +9,16 @@ import time
 import hashlib
 
 # v38.0: Shared Definitions for Modular Architecture
-APP_VER_NUM = 42.4
-APP_VER_TAG = "Mejora visual de Popups y Robustez"
+APP_VER_NUM = 42.5
+APP_VER_TAG = "Auto AFK, Popups Ricos y Robustez Total"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 # --- CONFIG POP ANTI-SPAM ---
 POP_RESET_TIME = 60   # Seconds of inactivity required to reset pop counter
 MAX_POPS_BURST = 2    # Max pops shown per active conversation burst
+
+# --- AFK LOGIC ---
+AFK_TIMEOUT = 30      # Seconds to auto-mark as AFK if invite ignored
 
 
 # --- UTILS ---

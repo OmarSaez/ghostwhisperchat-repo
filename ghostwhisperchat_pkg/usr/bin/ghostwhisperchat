@@ -1640,6 +1640,8 @@ class LobbyAdapter:
         global PENDING_INVITE
         if not PENDING_INVITE: return reply_print(f"{Colors.W}No tienes invitaciones pendientes.{Colors.E}", cid)
         
+        restore_from_afk() # Restore status if we were AFK
+        
         # UX Animation (Only if Lobby)
         if not cid:
             with Loader(f"{Colors.C}[*] Sincronizando sesión{Colors.E}"):
@@ -2115,6 +2117,18 @@ def get_my_mpp():
     return gw_comm.build_mpp(MY_IP, MY_NICK, MY_STATUS, APP_VERSION)
 
 
+def restore_from_afk():
+    """Checks if we are AFK and restores original status on activity"""
+    global MY_STATUS
+    if "-AFK" in MY_STATUS:
+        original = MY_STATUS.replace("-AFK", "").replace("Ausente", "En línea") 
+        # Si era "Ausente-AFK", restauramos a "En línea" por defecto, o limpiamos el suffix
+        
+        LOBBY_ADAPTER.set_config('status', original)
+        LOBBY_ADAPTER.broadcast_status(original)
+        safe_print(f"{Colors.G}[AFK] Actividad detectada. Estado restaurado a '{original}'.{Colors.E}")
+
+
 def handle_v2_logic(pkt_type, cmd_name, args, source_ip):
     """Central V2 Logic: Process Parsed Packet"""
     import gw_pop
@@ -2171,7 +2185,8 @@ def handle_v2_logic(pkt_type, cmd_name, args, source_ip):
                 PENDING_INVITE = {
                     'ip': source_ip, 'nick': sender_mpp['nick'], 
                     'type': 'GROUP' if itype == 'GROUP' else 'PRIV',
-                    'data': args[2:] if len(args)>2 else None
+                    'data': args[2:] if len(args)>2 else None,
+                    'ts': time.time()
                 }
                 
                 if itype == "PRIV":
@@ -2187,7 +2202,8 @@ def handle_v2_logic(pkt_type, cmd_name, args, source_ip):
                 # Interactive Popup via gw_pop
                 gw_pop.POP.show_question("Invitación Entrante", msg_text,
                                        lambda: LOBBY_ADAPTER.handle_accept(None) if LOBBY_ADAPTER else None,
-                                       lambda: LOBBY_ADAPTER.handle_deny(None) if LOBBY_ADAPTER else None)
+                                       lambda: LOBBY_ADAPTER.handle_deny(None) if LOBBY_ADAPTER else None,
+                                       timeout=gw_shared.AFK_TIMEOUT)
                 
                 sys.stdout.write('\a') # Beep
 
@@ -2568,6 +2584,7 @@ def launch_daemon_background():
                          start_new_session=True)
 
 def run_client(cmd_str):
+    restore_from_afk() # Any CLI interaction implies activity
     if not cmd_str: cmd_str = "--estados-globales"
     
     # 1. Bind Reply Socket
@@ -2653,6 +2670,32 @@ def run_daemon():
 
     # Infinite Loop
     while True:
+        # Check Pending Invite Timeout
+        if PENDING_INVITE:
+            try:
+                # Add timestamp if missing (Legacy support)
+                if 'ts' not in PENDING_INVITE: PENDING_INVITE['ts'] = time.time()
+                
+                # Check Timeout
+                if (time.time() - PENDING_INVITE['ts']) > gw_shared.AFK_TIMEOUT:
+                    # TIME EXPIRED!
+                    safe_print(f"{Colors.W}[AFK] Invitación expirada por inactividad.{Colors.E}")
+                    
+                    # 2. Set AFK Status
+                    reason = "Ausente"
+                    adapter.set_config('status', f"{reason}-AFK")
+                    adapter.broadcast_status(f"{reason}-AFK")
+                    
+                    # 3. Clear Invite
+                    # Call handle_deny to clean up and notify sender if needed (though deny sends nothing back usually)
+                    # We manually clear it to avoid loop
+                    PENDING_INVITE = None
+                    
+                    # Notify user only in CLI/Log
+                    safe_print(f"{Colors.F}[AFK] Estado cambiado a 'Ausente-AFK'.{Colors.E}")
+            except Exception as e:
+                debug_log(f"AFK Error: {e}")
+                
         time.sleep(1)
 
 def main():
