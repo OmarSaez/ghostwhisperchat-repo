@@ -9,8 +9,8 @@ import time
 import hashlib
 
 # v38.0: Shared Definitions for Modular Architecture
-APP_VER_NUM = 42.22
-APP_VER_TAG = "Feature: Test Integridad + Fix Status en Scan"
+APP_VER_NUM = 42.23
+APP_VER_TAG = "Fix: Soporte MATE Terminal/Parrot + Test de Ventana"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 # --- CONFIG POP ANTI-SPAM ---

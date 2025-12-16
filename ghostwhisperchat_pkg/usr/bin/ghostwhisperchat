@@ -1591,14 +1591,59 @@ class LobbyAdapter:
         report.append(f" - Hijos Activos: {len(ACTIVE_CHATS)} (Vivos: {child_ok_count})")
         report.append(f" - Estado General Hijos: {st_child}")
 
-        # 4. CAPACIDADES
+        # 4. CAPACIDADES & ENTORNO GRÁFICO
         report.append(f"\n{Colors.BO}:: Capacidades ::{Colors.E}")
         
-        terms = ["gnome-terminal", "konsole", "xfce4-terminal", "xterm", "x-terminal-emulator"]
-        found_term = [t for t in terms if shutil.which(t)]
+        terms = ["gnome-terminal", "mate-terminal", "tilix", "terminator", "konsole", "xfce4-terminal", "qterminal", "xterm", "x-terminal-emulator"]
+        found_term = None
+        for t in terms:
+            if shutil.which(t):
+                 found_term = t
+                 break
         
-        can_spawn = f"{Colors.G}SI ({found_term[0]}){Colors.E}" if found_term else f"{Colors.F}NO (Falta Terminal){Colors.E}"
-        report.append(f" - Creación de Ventanas: {can_spawn}")
+        if found_term:
+             report.append(f" - Terminal Detectada: {Colors.G}{found_term}{Colors.E}")
+             st_spawn = f"{Colors.H}Probando...{Colors.E}"
+             
+             try:
+                 # TEST LIVE: Intentar abrir una ventana que no haga nada y ver si crashea
+                 cmd_test = []
+                 # Configurar argumentos según terminal detectada
+                 if found_term in ["gnome-terminal", "mate-terminal", "xfce4-terminal"]:
+                     cmd_test = [found_term, "--", "sh", "-c", "exit 0"]
+                 elif found_term == "konsole":
+                      cmd_test = [found_term, "-e", "sh", "-c", "exit 0"]
+                 elif found_term == "terminator":
+                      cmd_test = [found_term, "-x", "sh", "-c", "exit 0"]
+                 else: # xterm, etc
+                      cmd_test = [found_term, "-e", "sh -c 'exit 0'"]
+                 
+                 # Ejecutar test
+                 p = subprocess.Popen(cmd_test, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                 
+                 # Dar tiempo al sistema de ventanas (1s)
+                 time.sleep(1.0) 
+                 
+                 ret = p.poll()
+                 if ret is not None:
+                     # El proceso terminó. Si es 0 es OK. Si es != 0 falló (ej: no display)
+                     if ret == 0: st_spawn = f"{Colors.G}OK (Prueba exitosa){Colors.E}"
+                     else: st_spawn = f"{Colors.F}FALLO (Exit Code {ret}){Colors.E}"
+                 else:
+                     # Sigue corriendo (la ventana se quedó abierta o colgando). Es buena señal (no crash inmediato).
+                     p.kill() # Limpiar
+                     st_spawn = f"{Colors.G}OK (Ventana creada){Colors.E}"
+
+             except Exception as e:
+                 st_spawn = f"{Colors.F}ERROR ({e}){Colors.E}"
+
+             report.append(f" - Test de Consola Hija: {st_spawn}")
+             if "FALLO" in st_spawn or "ERROR" in st_spawn:
+                 report.append(f"   {Colors.W}↳ Sugerencia: Faltan librerías gráficas o DISPLAY mal configurado.{Colors.E}")
+             
+        else:
+             report.append(f" - Terminal: {Colors.F}NO DETECTADA{Colors.E}")
+             report.append(f"   {Colors.W}↳ Instala: sudo apt install gnome-terminal (o mate-terminal / xterm){Colors.E}")
         
         self.reply("\n".join(report), cid)
     
@@ -1842,10 +1887,19 @@ def spawn_child_process(cid, cdata):
         if shutil.which("gnome-terminal"):
             # v37.24 FIX: Use --wait
             terminal_cmd = ["gnome-terminal", "--wait", "--"] + cmd_args
+        elif shutil.which("mate-terminal"):
+             # Parrot OS / MATE Desktop Support
+             terminal_cmd = ["mate-terminal", "--disable-factory", "--"] + cmd_args
+        elif shutil.which("tilix"):
+             terminal_cmd = ["tilix", "-e"] + cmd_args
+        elif shutil.which("terminator"):
+             terminal_cmd = ["terminator", "-x"] + cmd_args
         elif shutil.which("konsole"):
             terminal_cmd = ["konsole", "--nofork", "-e"] + cmd_args
         elif shutil.which("xfce4-terminal"):
              terminal_cmd = ["xfce4-terminal", "--disable-server", "--"] + cmd_args
+        elif shutil.which("qterminal"):
+             terminal_cmd = ["qterminal", "-e"] + cmd_args
         elif shutil.which("xterm"):
              terminal_cmd = ["xterm", "-e"] + cmd_args
         elif shutil.which("x-terminal-emulator"):
