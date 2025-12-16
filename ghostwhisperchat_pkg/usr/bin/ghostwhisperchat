@@ -1879,31 +1879,38 @@ def spawn_child_process(cid, cdata):
         "--port", str(child_port),
         "--rnick", rnick
     ]
-    debug_log(f"Spawn start ({time.time()}) CMD: {cmd_args}")
+    
+    # CRITICAL FIX for Parrot/MATE & Others: Wrap in shell to handle args correctly
+    import shlex
+    inner_cmd = " ".join([shlex.quote(str(x)) for x in cmd_args])
+    shell_wrapper = ["sh", "-c", f"exec {inner_cmd}"] # exec to replace shell pid
+
+    debug_log(f"Spawn start ({time.time()}) CMD: {inner_cmd}")
     
     # Detectar terminal
     try:
         terminal_cmd = None
         if shutil.which("gnome-terminal"):
-            # v37.24 FIX: Use --wait
-            terminal_cmd = ["gnome-terminal", "--wait", "--"] + cmd_args
+            terminal_cmd = ["gnome-terminal", "--wait", "--"] + shell_wrapper
         elif shutil.which("mate-terminal"):
              # Parrot OS / MATE Desktop Support
-             terminal_cmd = ["mate-terminal", "--disable-factory", "--"] + cmd_args
+             terminal_cmd = ["mate-terminal", "--disable-factory", "--"] + shell_wrapper
         elif shutil.which("tilix"):
-             terminal_cmd = ["tilix", "-e"] + cmd_args
+             terminal_cmd = ["tilix", "-e"] + shell_wrapper
         elif shutil.which("terminator"):
-             terminal_cmd = ["terminator", "-x"] + cmd_args
+             # Terminator -x expects string if simple, but list works often. Safe bet implies -x "cmd".
+             # But here we use list structure compatibility.
+             terminal_cmd = ["terminator", "-x", "sh", "-c", inner_cmd]
         elif shutil.which("konsole"):
-            terminal_cmd = ["konsole", "--nofork", "-e"] + cmd_args
+            terminal_cmd = ["konsole", "--nofork", "-e"] + shell_wrapper
         elif shutil.which("xfce4-terminal"):
-             terminal_cmd = ["xfce4-terminal", "--disable-server", "--"] + cmd_args
+             terminal_cmd = ["xfce4-terminal", "--disable-server", "--"] + shell_wrapper
         elif shutil.which("qterminal"):
-             terminal_cmd = ["qterminal", "-e"] + cmd_args
+             terminal_cmd = ["qterminal", "-e"] + shell_wrapper
         elif shutil.which("xterm"):
-             terminal_cmd = ["xterm", "-e"] + cmd_args
+             terminal_cmd = ["xterm", "-e"] + shell_wrapper
         elif shutil.which("x-terminal-emulator"):
-             terminal_cmd = ["x-terminal-emulator", "-e"] + cmd_args
+             terminal_cmd = ["x-terminal-emulator", "-e"] + shell_wrapper
         
         if terminal_cmd:
             log_path = os.path.join(get_desktop_path(), "gwc_child_error.log")
