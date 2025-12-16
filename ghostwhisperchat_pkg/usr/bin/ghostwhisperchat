@@ -1606,33 +1606,39 @@ class LobbyAdapter:
              st_spawn = f"{Colors.H}Probando...{Colors.E}"
              
              try:
-                 # TEST LIVE: Intentar abrir una ventana que no haga nada y ver si crashea
+             try:
+                 # TEST LIVE: Intentar abrir una ventana que sobreviva 3 segundos
                  cmd_test = []
-                 # Configurar argumentos según terminal detectada
-                 if found_term in ["gnome-terminal", "mate-terminal", "xfce4-terminal"]:
-                     cmd_test = [found_term, "--", "sh", "-c", "exit 0"]
-                 elif found_term == "konsole":
-                      cmd_test = [found_term, "-e", "sh", "-c", "exit 0"]
-                 elif found_term == "terminator":
-                      cmd_test = [found_term, "-x", "sh", "-c", "exit 0"]
-                 else: # xterm, etc
-                      cmd_test = [found_term, "-e", "sh -c 'exit 0'"]
+                 sleep_cmd = "sleep 3" 
                  
+                 if found_term in ["gnome-terminal", "mate-terminal", "xfce4-terminal"]:
+                     cmd_test = [found_term, "--", "sh", "-c", sleep_cmd]
+                 elif found_term == "konsole":
+                      cmd_test = [found_term, "-e", "sh", "-c", sleep_cmd]
+                 elif found_term == "terminator":
+                      cmd_test = [found_term, "-x", "sh", "-c", sleep_cmd]
+                 else: # xterm, etc
+                      cmd_test = [found_term, "-e", f"sh -c '{sleep_cmd}'"]
+                 
+                 report.append(f"   ↳ Tecnología: {found_term}")
+                 report.append(f"   ↳ Comando: {' '.join(cmd_test)}") # Raw info for debug
+
                  # Ejecutar test
                  p = subprocess.Popen(cmd_test, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                  
-                 # Dar tiempo al sistema de ventanas (1s)
-                 time.sleep(1.0) 
+                 # Dar tiempo visible (2s)
+                 time.sleep(2.0) 
                  
                  ret = p.poll()
                  if ret is not None:
-                     # El proceso terminó. Si es 0 es OK. Si es != 0 falló (ej: no display)
-                     if ret == 0: st_spawn = f"{Colors.G}OK (Prueba exitosa){Colors.E}"
-                     else: st_spawn = f"{Colors.F}FALLO (Exit Code {ret}){Colors.E}"
+                     # El proceso terminó ANTES de los 3 segundos? Malo (crash o cierre rapido)
+                     # O quizas 'sleep' no func?
+                     if ret != 0: st_spawn = f"{Colors.F}FALLO (Exit Code {ret}){Colors.E}"
+                     else: st_spawn = f"{Colors.W}OK? (Cerró rápido, code 0){Colors.E}"
                  else:
-                     # Sigue corriendo (la ventana se quedó abierta o colgando). Es buena señal (no crash inmediato).
+                     # Sigue corriendo. Es lo esperado (sleep 3).
                      p.kill() # Limpiar
-                     st_spawn = f"{Colors.G}OK (Ventana creada){Colors.E}"
+                     st_spawn = f"{Colors.G}EXITOSO (Ventana activa detectada){Colors.E}"
 
              except Exception as e:
                  st_spawn = f"{Colors.F}ERROR ({e}){Colors.E}"
