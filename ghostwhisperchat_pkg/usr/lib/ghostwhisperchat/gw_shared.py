@@ -9,8 +9,8 @@ import time
 import hashlib
 
 # v38.0: Shared Definitions for Modular Architecture
-APP_VER_NUM = 42.11
-APP_VER_TAG = "AFK Completo con Feedback de Rechazo"
+APP_VER_NUM = 42.12
+APP_VER_TAG = "Actualizacion en comandos HELP"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 # --- CONFIG POP ANTI-SPAM ---

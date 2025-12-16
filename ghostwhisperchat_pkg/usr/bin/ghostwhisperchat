@@ -344,18 +344,16 @@ def show_help(target_cid=None):
             ("--quienes-si / --quienes-no", "Visibilidad en escáner.")
         ],
         "UTILIDADES Y ARCHIVOS": [
-            ("--archivo (Archivo.ext y/o Ruta)", "Enviar archivo."),
+            ("--archivo (Ruta)", "Enviar archivo."),
             ("--nombre (NuevoNick)", "Cambiar tu nombre visible."),
             ("--estado (Texto)", "Cambiar estado."),
-            ("--descarga-si / --descarga-no", "Control descarga automática."),
             ("--estados-globales", "Ver resumen de configuración."),
             ("--abreviaciones", "Ver todos los formatos aceptados por cada comando."),
             ("--limpiar", "Limpiar pantalla.")
         ],
         "SISTEMA Y CONFIGURACIÓN": [
-             ("--log on / off", "Guardar historial."), 
-             ("--popno / --popsi", "Control Notificaciones."), 
-             ("--autolevantado-si/no", "Iniciar app al encender PC (Linux).")
+             ("--log on / off", "Guardar historial."),
+             ("--descarga-si / --descarga-no", "Control descarga automática.")
         ]
     }
 
