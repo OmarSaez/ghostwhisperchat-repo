@@ -2202,7 +2202,8 @@ def handle_v2_logic(pkt_type, cmd_name, args, source_ip):
                 # Interactive Popup via gw_pop
                 gw_pop.POP.show_question("Invitación Entrante", msg_text,
                                        lambda: LOBBY_ADAPTER.handle_accept(None) if LOBBY_ADAPTER else None,
-                                       lambda: LOBBY_ADAPTER.handle_deny(None) if LOBBY_ADAPTER else None)
+                                       lambda: LOBBY_ADAPTER.handle_deny(None) if LOBBY_ADAPTER else None,
+                                       timeout=gw_shared.AFK_TIMEOUT)
                 
                 sys.stdout.write('\a') # Beep
 
@@ -2670,18 +2671,37 @@ def run_daemon():
     # Infinite Loop
     while True:
         # Check Pending Invite Timeout
-        # (Disabled in v42.7 to debug Pop closing issue)
-        # if PENDING_INVITE:
-        #    try:
-        #        if 'ts' not in PENDING_INVITE: PENDING_INVITE['ts'] = time.time()
-        #        if (time.time() - PENDING_INVITE['ts']) > gw_shared.AFK_TIMEOUT:
-        #            safe_print(f"{Colors.W}[AFK] Invitación expirada.{Colors.E}")
-        #            adapter.set_config('status', "Ausente-AFK")
-        #            adapter.broadcast_status("Ausente-AFK")
-        #            PENDING_INVITE = None
-        #            safe_print(f"{Colors.F}[AFK] Estado cambiado a 'Ausente-AFK'.{Colors.E}")
-        #    except Exception as e:
-        #        debug_log(f"AFK Error: {e}")
+        if PENDING_INVITE:
+            try:
+                # Ensure timestamp exists
+                if 'ts' not in PENDING_INVITE: 
+                    PENDING_INVITE['ts'] = time.time()
+                
+                # Validation: Don't kill it if we are already AFK (avoid loop spam)
+                if "-AFK" in MY_STATUS: 
+                    # If we are already AFK, we can clear the invite immediately or keep ignoring it.
+                    # Let's clear it to keep memory clean.
+                    PENDING_INVITE = None
+                    continue
+
+                # Check Timeout strictly
+                elapsed = time.time() - PENDING_INVITE['ts']
+                if elapsed > gw_shared.AFK_TIMEOUT:
+                    # TIME EXPIRED!
+                    safe_print(f"{Colors.W}[AFK] Invitación expirada por inactividad ({int(elapsed)}s).{Colors.E}")
+                    
+                    # 2. Set AFK Status
+                    reason = "Ausente"
+                    adapter.set_config('status', f"{reason}-AFK")
+                    adapter.broadcast_status(f"{reason}-AFK")
+                    
+                    # 3. Clear Invite
+                    PENDING_INVITE = None
+                    
+                    safe_print(f"{Colors.F}[AFK] Estado cambiado a 'Ausente-AFK'.{Colors.E}")
+
+            except Exception as e:
+                debug_log(f"AFK Error: {e}")
                 
         time.sleep(1)
 

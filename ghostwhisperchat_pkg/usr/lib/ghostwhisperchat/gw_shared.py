@@ -9,8 +9,8 @@ import time
 import hashlib
 
 # v38.0: Shared Definitions for Modular Architecture
-APP_VER_NUM = 42.7
-APP_VER_TAG = "Debugging AFK pop closure (Loop Disabled)"
+APP_VER_NUM = 42.8
+APP_VER_TAG = "AFK Seguro y Pops Auto-Cierre"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 # --- CONFIG POP ANTI-SPAM ---
