@@ -323,8 +323,19 @@ def join_grp(gid, gp, remote_ip, my_nick, my_status, update_peers_func):
     pkt = build_packet("SEARCH_GROUP", gid, gp, my_nick, my_status)
     u.sendto(pkt, ('255.255.255.255', UDP_PORT)); u.close()
 
-def refresh_prompt():
-    sys.stdout.write(f"{PROMPT}")
+def print_incoming_msg(msg):
+    """Prints a message while preserving the user's current input line"""
+    buf = ""
+    try:
+        if 'readline' in sys.modules:
+            buf = readline.get_line_buffer()
+    except: pass
+    
+    # CR + Clear Line + Msg + NL
+    sys.stdout.write(f"\r\033[K{msg}\n")
+    
+    # Restore Prompt + Buffer
+    sys.stdout.write(f"{PROMPT}{buf}")
     sys.stdout.flush()
 
 def ipc_listen_child(sock, lock_state):
@@ -343,17 +354,15 @@ def ipc_listen_child(sock, lock_state):
                 if len(p) >= 4:
                     cid, tag, text = p[1], p[2], p[3]
                     if cid == MY_CHILD_ID:
-                        print(f"\r{tag}: {text}") 
-                        refresh_prompt()
+                        print_incoming_msg(f"{tag}: {text}")
                         lock_state['last_rx'] = time.time()
 
             elif cmd == "MSG_IN": # v38.5 support direct msg injection
                   # MSG_IN SEP sender SEP msg SEP color
-                   if len(p) >= 4:
-                       # Just print message
-                       # Use \r to overwrite prompt
-                       print(f"\r{p[3]}{p[1]}: {p[2]}{Colors.E}" if len(p)>3 else f"\r{p[2]}")
-                       refresh_prompt()
+                   if len(p) >= 3:
+                       # Build Message String
+                       msg_str = f"{p[3]}{p[1]}: {p[2]}{Colors.E}" if len(p) > 3 else f"{p[2]}"
+                       print_incoming_msg(msg_str)
 
 
             elif cmd == "CMD_ADD_PEER":
@@ -370,7 +379,7 @@ def ipc_listen_child(sock, lock_state):
 
             elif cmd == "FWD_FILE":
                 if len(p) >= 4 and p[1] == MY_CHILD_ID:
-                    print(f"{Colors.W}[⇩] Archivo '{p[3]}' de {p[2]} recibido en Lobby.{Colors.E}")
+                    print_incoming_msg(f"{Colors.W}[⇩] Archivo '{p[3]}' de {p[2]} recibido en Lobby.{Colors.E}")
             
             elif cmd == "FWD_PEER":
                 if len(p) >= 4:
@@ -380,7 +389,7 @@ def ipc_listen_child(sock, lock_state):
                          if isinstance(PEERS[rmt_ip], dict):
                              PEERS[rmt_ip]['nick'] = rmt_nick
                              PEERS[rmt_ip]['chats'].add(MY_CHILD_ID)
-                    print(f"{Colors.G}[+] Detectado: {rmt_nick}{Colors.E}")
+                    print_incoming_msg(f"{Colors.G}[+] Detectado: {rmt_nick}{Colors.E}")
             
             elif cmd == "CMD_CLOSE_NOW":
                 print(f"\n{Colors.F}[💔] {lock_state.get('remote_nick','?')} ha abandonado el chat.{Colors.E}")
