@@ -9,8 +9,8 @@ import time
 import hashlib
 
 # v38.0: Shared Definitions for Modular Architecture
-APP_VER_NUM = 42.16
-APP_VER_TAG = "Fix: Mensajes de Grupo (Unión con IP y Salida Deduplicada)"
+APP_VER_NUM = 42.17
+APP_VER_TAG = "Mejora Visual: Animación de Carga Restaurada"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 # --- CONFIG POP ANTI-SPAM ---

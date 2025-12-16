@@ -40,6 +40,30 @@ def set_terminal_title(title):
         sys.stdout.write(f"\x1b]2;{title}\x07")
         sys.stdout.flush()
 
+def loading_anim(desc, duration=2.0):
+    frames = [
+        ".  ",
+        " . ",
+        "  .",
+        " . "
+    ]
+    end_time = time.time() + duration
+    idx = 0
+    # Hide Cursor
+    sys.stdout.write("\033[?25l")
+    try:
+        while time.time() < end_time:
+             # Print Frame
+             sys.stdout.write(f"\r{desc} {frames[idx % len(frames)]}")
+             sys.stdout.flush()
+             idx += 1
+             time.sleep(0.2)
+    finally:
+        # Show Cursor
+        sys.stdout.write("\033[?25h")
+        sys.stdout.write("\r\033[K") # Clear line logic
+        sys.stdout.flush()
+
 def send_ipc(msg, port):
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -69,8 +93,6 @@ class ChildAdapter:
 
     def invite_users(self, args_str, cid):
         targets = args_str.replace(",", " ").split()
-        print(f"{Colors.C}[*] Enviando invitaciones...{Colors.E}")
-        sys.stdout.flush()
         
         # 1. Identify missing targets
         missing = False
@@ -80,9 +102,10 @@ class ChildAdapter:
         
         # 2. Auto-Scan if needed (Transparent Fix)
         if missing:
-             # print(f"{Colors.C}[*] Sincronizando red...{Colors.E}")
+             loading_anim(f"{Colors.C}[*] Sincronizando red...{Colors.E}", 2.0)
              self.scan_network(cid, silent=True)
-             time.sleep(2.0) # Wait for UDP/IPC
+             
+        loading_anim(f"{Colors.C}[*] Enviando invitaciones...{Colors.E}", 1.5)
         
         # 3. Final Process
         for t in targets:
@@ -148,13 +171,16 @@ class ChildAdapter:
     
 
     def scan_network(self, cid, silent=False):
-        if not silent: print(f"{Colors.C}[*] Escaneando red...{Colors.E}")
-        sys.stdout.flush()
-        # WHOIS sends IAM_HERE response from others.
-        gw_comm.send_cmd_all("WHOIS", self.get_mpp())  
-        
-        # Wait for responses
-        time.sleep(3)
+        if not silent: 
+             # Use animation instead of static print
+             # Non-blocking scan request, but we simulate waiting for results
+             # Send WHOIS
+             gw_comm.send_cmd_all("WHOIS", self.get_mpp())  
+             loading_anim(f"{Colors.C}[*] Escaneando red...{Colors.E}", 3.0)
+        else:
+             # Just send request
+             gw_comm.send_cmd_all("WHOIS", self.get_mpp())  
+             # Logic flow already waited in caller (invite_users) or no wait needed
         
         # Only show table if not silent
         if not silent: self.show_contacts(cid)
