@@ -2670,30 +2670,18 @@ def run_daemon():
     # Infinite Loop
     while True:
         # Check Pending Invite Timeout
-        if PENDING_INVITE:
-            try:
-                # Add timestamp if missing (Legacy support)
-                if 'ts' not in PENDING_INVITE: PENDING_INVITE['ts'] = time.time()
-                
-                # Check Timeout
-                if (time.time() - PENDING_INVITE['ts']) > gw_shared.AFK_TIMEOUT:
-                    # TIME EXPIRED!
-                    safe_print(f"{Colors.W}[AFK] Invitación expirada por inactividad.{Colors.E}")
-                    
-                    # 2. Set AFK Status
-                    reason = "Ausente"
-                    adapter.set_config('status', f"{reason}-AFK")
-                    adapter.broadcast_status(f"{reason}-AFK")
-                    
-                    # 3. Clear Invite
-                    # Call handle_deny to clean up and notify sender if needed (though deny sends nothing back usually)
-                    # We manually clear it to avoid loop
-                    PENDING_INVITE = None
-                    
-                    # Notify user only in CLI/Log
-                    safe_print(f"{Colors.F}[AFK] Estado cambiado a 'Ausente-AFK'.{Colors.E}")
-            except Exception as e:
-                debug_log(f"AFK Error: {e}")
+        # (Disabled in v42.7 to debug Pop closing issue)
+        # if PENDING_INVITE:
+        #    try:
+        #        if 'ts' not in PENDING_INVITE: PENDING_INVITE['ts'] = time.time()
+        #        if (time.time() - PENDING_INVITE['ts']) > gw_shared.AFK_TIMEOUT:
+        #            safe_print(f"{Colors.W}[AFK] Invitación expirada.{Colors.E}")
+        #            adapter.set_config('status', "Ausente-AFK")
+        #            adapter.broadcast_status("Ausente-AFK")
+        #            PENDING_INVITE = None
+        #            safe_print(f"{Colors.F}[AFK] Estado cambiado a 'Ausente-AFK'.{Colors.E}")
+        #    except Exception as e:
+        #        debug_log(f"AFK Error: {e}")
                 
         time.sleep(1)
 
