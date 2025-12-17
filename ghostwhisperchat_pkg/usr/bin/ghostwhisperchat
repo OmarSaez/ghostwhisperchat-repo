@@ -2088,13 +2088,6 @@ def handle_v2_logic(pkt_type, cmd_name, args, source_ip):
                  if VISIBLE_IN_SCAN:
                      gw_comm.send_cmd(source_ip, "IAM_HERE", get_my_mpp())
 
-            elif cmd_name == "IAM_HERE":
-                 # Forward discovery result to all active children (for --quienes)
-                 for cid, cdata in ACTIVE_CHATS.items():
-                     if 'port' in cdata:
-                          p = f"FWD_PEER{gw_comm.SEP}{source_ip}{gw_comm.SEP}{sender_mpp['nick']}{gw_comm.SEP}{sender_mpp['status']}"
-                          send_ipc(p, cdata['port'])
-
             elif cmd_name == "LEAVE_GROUP":
                  # Args: [MPP], GID, PASS
                  if len(args) < 2: return
