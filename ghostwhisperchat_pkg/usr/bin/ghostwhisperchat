@@ -1591,28 +1591,36 @@ class LobbyAdapter:
         report.append(f" - Hijos Activos: {len(ACTIVE_CHATS)} (Vivos: {child_ok_count})")
         report.append(f" - Estado General Hijos: {st_child}")
 
-        # 2. SISTEMA DE ARCHIVOS (Nuevo)
+        # 2. SISTEMA DE ARCHIVOS
         report.append(f"\n{Colors.BO}:: Sistema de Archivos ::{Colors.E}")
-        log_dir = os.path.join(os.path.expanduser("~"), ".ghostwhisperchat")
         
+        # Config Dir
+        log_dir = os.path.join(os.path.expanduser("~"), ".ghostwhisperchat")
         if not os.path.exists(log_dir):
-            try: 
-                os.makedirs(log_dir)
-                st_fs = f"{Colors.G}OK (Creado){Colors.E}"
+            try: os.makedirs(log_dir); st_fs = f"{Colors.G}OK (Creado){Colors.E}"
             except: st_fs = f"{Colors.F}ERROR (No se pudo crear){Colors.E}"
         else:
-            if os.access(log_dir, os.W_OK): st_fs = f"{Colors.G}OK (Escritura permitida){Colors.E}"
-            else: st_fs = f"{Colors.F}FALLO (Permisos denegados){Colors.E}"
-            
-        report.append(f" - Config Folder (~/.ghostwhisperchat): {st_fs}")
+            if os.access(log_dir, os.W_OK): st_fs = f"{Colors.G}OK (W){Colors.E}"
+            else: st_fs = f"{Colors.F}FALLO (R-O){Colors.E}"
+        report.append(f" - Config (~/.ghostwhisperchat): {st_fs}")
 
-        # 3. RED (Nuevo)
+        # Downloads Dir
+        dl_dir = os.path.join(get_desktop_path(), "GhostWhisperChat_Descargas")
+        if not os.path.exists(dl_dir):
+             try: os.makedirs(dl_dir); st_dl = f"{Colors.G}OK (Creada){Colors.E}"
+             except: st_dl = f"{Colors.F}ERROR (No se pudo crear){Colors.E}"
+        else:
+             if os.access(dl_dir, os.W_OK): st_dl = f"{Colors.G}OK (W){Colors.E}"
+             else: st_dl = f"{Colors.F}FALLO (Solo Lectura){Colors.E}"
+        report.append(f" - Descargas (~/Escritorio/GhostWhisperChat_Descargas): {st_dl}")
+
+        # 3. RED
         report.append(f"\n{Colors.BO}:: Estado de Red ::{Colors.E}")
         my_ip_detected = get_ip()
         if my_ip_detected == "127.0.0.1": 
-             st_net = f"{Colors.W}ALERTA (Loopback - Posiblemente desconectado){Colors.E}"
+             st_net = f"{Colors.W}ALERTA (Loopback){Colors.E}"
         else:
-             st_net = f"{Colors.G}OK (Interfaz Externa){Colors.E}"
+             st_net = f"{Colors.G}OK{Colors.E}"
         report.append(f" - IP Detectada: {my_ip_detected} -> {st_net}")
 
         # 4. ENTORNO GRÁFICO & TERMINAL
@@ -1623,7 +1631,23 @@ class LobbyAdapter:
              zver = subprocess.check_output(["zenity", "--version"], stderr=subprocess.DEVNULL).decode().strip()
              report.append(f" - Zenity: {Colors.G}OK (v{zver}){Colors.E}")
         except:
-             report.append(f" - Zenity: {Colors.F}FALLO (Binario existe pero no ejecuta){Colors.E}")
+             report.append(f" - Zenity: {Colors.F}FALLO{Colors.E}")
+
+        # Popup Test
+        try:
+            import gw_pop
+            # Quick async popup test implies launching checking return
+            # We can't easily wait for it without blocking 3s, but let's try
+            # launching a thread that shows it.
+            def _test_pop():
+                 gw_pop.show_popup("GWC Test", "Prueba de Integridad: Notificaciones OK", duration=3)
+            
+            threading.Thread(target=_test_pop, daemon=True).start()
+            st_pop = f"{Colors.G}OK (Enviada){Colors.E}"
+        except Exception as e:
+            st_pop = f"{Colors.F}FALLO ({e}){Colors.E}"
+        
+        report.append(f" - Notificaciones (Popup): {st_pop}")
         
         
         terms = ["gnome-terminal", "mate-terminal", "tilix", "terminator", "konsole", "xfce4-terminal", "qterminal", "xterm", "x-terminal-emulator"]
