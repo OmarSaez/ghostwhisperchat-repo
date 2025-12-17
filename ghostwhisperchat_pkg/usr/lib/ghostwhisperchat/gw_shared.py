@@ -9,8 +9,8 @@ import time
 import hashlib
 
 # v38.0: Shared Definitions for Modular Architecture
-APP_VER_NUM = 42.38
-APP_VER_TAG = "Fix: Formato de Notificaciones de Sistema"
+APP_VER_NUM = 42.39
+APP_VER_TAG = "Fix: Bug Fantasmas Resuelto + Colores Nuevos"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 # --- CONFIG POP ANTI-SPAM ---

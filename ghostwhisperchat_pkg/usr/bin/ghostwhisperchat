@@ -267,7 +267,14 @@ def send_raw(ip, d):
     gw_comm.send_tcp_packet(ip, d)
 
 # Popup Logic Delegated to gw_pop
-def get_col(n): return Colors.PALETTE[sum(ord(c) for c in n) % len(Colors.PALETTE)] if n else Colors.WH
+# COLOR LOGIC: Length-Based, Cyclic, No Green (System)
+# Colors: C(Cyan), M(Magenta), Y(Yellow), B(Blue), P(Purple), R(Red)
+NICK_PALETTE = [Colors.C, Colors.M, Colors.Y, Colors.B, Colors.P, Colors.R]
+def get_col(n): 
+    if not n: return Colors.WH
+    # User requested: Length based cycle
+    idx = len(n) % len(NICK_PALETTE)
+    return NICK_PALETTE[idx]
 
 # --- CONFIG & STATE ---
     
@@ -2132,10 +2139,12 @@ def handle_v2_logic(pkt_type, cmd_name, args, source_ip):
                  # Just notify User.
                  msg = f"{Colors.G}[+] Detectado: {sender_mpp['nick']} ({source_ip}){Colors.E}"
                  
-                 # Broadcast to all children
-                 for c_id, c_data in ACTIVE_CHATS.items():
-                     if 'port' in c_data:
-                          send_ipc(f"CMD_ADD_PEER{gw_comm.SEP}{source_ip}{gw_comm.SEP}{sender_mpp['nick']}", c_data['port'])
+                 # Broadcast to all children? NO.
+                 # Fix for "Ghost Members": Do NOT add random peers to active group chats.
+                 # Chats should only be populated by JOIN_GROUP or Messaging.
+                 # for c_id, c_data in ACTIVE_CHATS.items():
+                 #     if 'port' in c_data:
+                 #          send_ipc(f"CMD_ADD_PEER{gw_comm.SEP}{source_ip}{gw_comm.SEP}{sender_mpp['nick']}", c_data['port'])
 
                  if SCANNING_NOW:
                       SCAN_BUFFER.append(msg)
