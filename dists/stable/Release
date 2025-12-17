@@ -2,26 +2,26 @@ Origin: GhostWhisperChat
 Label: GhostWhisperChat Repo
 Suite: stable
 Codename: stable
-Version: 42.37
+Version: 42.38
 Architectures: amd64 all arm64 i386
 Components: main
 Description: Official GhostWhisperChat Repository
-Date: Wed, 17 Dec 2025 03:29:32 +0000
+Date: Wed, 17 Dec 2025 03:40:27 +0000
 MD5Sum:
- 3fe215e62c07bf1eac49b3160166d571 1527 main/binary-amd64/Packages
- 9a3a2fa046f7007ec82efe8b7c58a886 600 main/binary-amd64/Packages.gz
- 3fe215e62c07bf1eac49b3160166d571 1527 main/binary-all/Packages
- 9a3a2fa046f7007ec82efe8b7c58a886 600 main/binary-all/Packages.gz
- 3fe215e62c07bf1eac49b3160166d571 1527 main/binary-arm64/Packages
- 9a3a2fa046f7007ec82efe8b7c58a886 600 main/binary-arm64/Packages.gz
- 3fe215e62c07bf1eac49b3160166d571 1527 main/binary-i386/Packages
- 9a3a2fa046f7007ec82efe8b7c58a886 600 main/binary-i386/Packages.gz
+ a7cebea016553d020217dc3a5bbf05f0 1527 main/binary-amd64/Packages
+ 31e07f0d651f0b21c5e0df4228d735b3 599 main/binary-amd64/Packages.gz
+ a7cebea016553d020217dc3a5bbf05f0 1527 main/binary-all/Packages
+ 31e07f0d651f0b21c5e0df4228d735b3 599 main/binary-all/Packages.gz
+ a7cebea016553d020217dc3a5bbf05f0 1527 main/binary-arm64/Packages
+ 31e07f0d651f0b21c5e0df4228d735b3 599 main/binary-arm64/Packages.gz
+ a7cebea016553d020217dc3a5bbf05f0 1527 main/binary-i386/Packages
+ 31e07f0d651f0b21c5e0df4228d735b3 599 main/binary-i386/Packages.gz
 SHA256:
- 83902004b4e5beece4674564825251e013ffea42064ace118ff434d961f92015 1527 main/binary-amd64/Packages
- 9ad1aa051b3fbf7443047cb3c2e948941795a03b449b6532531d15bc4a71480e 600 main/binary-amd64/Packages.gz
- 83902004b4e5beece4674564825251e013ffea42064ace118ff434d961f92015 1527 main/binary-all/Packages
- 9ad1aa051b3fbf7443047cb3c2e948941795a03b449b6532531d15bc4a71480e 600 main/binary-all/Packages.gz
- 83902004b4e5beece4674564825251e013ffea42064ace118ff434d961f92015 1527 main/binary-arm64/Packages
- 9ad1aa051b3fbf7443047cb3c2e948941795a03b449b6532531d15bc4a71480e 600 main/binary-arm64/Packages.gz
- 83902004b4e5beece4674564825251e013ffea42064ace118ff434d961f92015 1527 main/binary-i386/Packages
- 9ad1aa051b3fbf7443047cb3c2e948941795a03b449b6532531d15bc4a71480e 600 main/binary-i386/Packages.gz
+ cf778213c645d3262e264093a1b6a251de22f3a756bd454fdc83dd8cc73ea640 1527 main/binary-amd64/Packages
+ 18e0ed798f0e8906dc40114650d6050244d84170cb1fbde79bdd650168c42e7c 599 main/binary-amd64/Packages.gz
+ cf778213c645d3262e264093a1b6a251de22f3a756bd454fdc83dd8cc73ea640 1527 main/binary-all/Packages
+ 18e0ed798f0e8906dc40114650d6050244d84170cb1fbde79bdd650168c42e7c 599 main/binary-all/Packages.gz
+ cf778213c645d3262e264093a1b6a251de22f3a756bd454fdc83dd8cc73ea640 1527 main/binary-arm64/Packages
+ 18e0ed798f0e8906dc40114650d6050244d84170cb1fbde79bdd650168c42e7c 599 main/binary-arm64/Packages.gz
+ cf778213c645d3262e264093a1b6a251de22f3a756bd454fdc83dd8cc73ea640 1527 main/binary-i386/Packages
+ 18e0ed798f0e8906dc40114650d6050244d84170cb1fbde79bdd650168c42e7c 599 main/binary-i386/Packages.gz

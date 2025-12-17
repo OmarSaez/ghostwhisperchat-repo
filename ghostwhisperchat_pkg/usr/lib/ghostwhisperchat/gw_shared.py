@@ -9,8 +9,8 @@ import time
 import hashlib
 
 # v38.0: Shared Definitions for Modular Architecture
-APP_VER_NUM = 42.37
-APP_VER_TAG = "Fix: NameError exec_lobby_cmd restored"
+APP_VER_NUM = 42.38
+APP_VER_TAG = "Fix: Formato de Notificaciones de Sistema"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 # --- CONFIG POP ANTI-SPAM ---

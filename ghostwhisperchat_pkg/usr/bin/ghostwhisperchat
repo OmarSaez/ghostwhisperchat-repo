@@ -1978,8 +1978,9 @@ def handle_v2_logic(pkt_type, cmd_name, args, source_ip):
                              
                              # Visual Notification
                              sys_msg = f"{Colors.G}[+] {sender_mpp['nick']} se ha unido al grupo.{Colors.E}"
-                             # Send as SYSTEM message (sender=[SYSTEM])
-                             ipc_msg = f"MSG_IN{gw_comm.SEP}{cid}{gw_comm.SEP}[SYSTEM]{gw_comm.SEP}{sys_msg}"
+                             # Send as SYSTEM message (MSG_IN | Sender | Text | Color)
+                             # Fixed: Removed extra 'cid' arg that caused formatting glitch
+                             ipc_msg = f"MSG_IN{gw_comm.SEP}[SYSTEM]{gw_comm.SEP}{sys_msg}{gw_comm.SEP}{Colors.C}"
                              send_ipc(ipc_msg, cdata['port'])
                 
                 if not found_match:
