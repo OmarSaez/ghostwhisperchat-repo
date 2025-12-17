@@ -33,9 +33,9 @@ Maintainer: Omar Saez <omar.saez@usach.cl>
 Depends: python3, zenity, psmisc, iptables
 Filename: pool/main/g/ghostwhisperchat/ghostwhisperchat_42.25_all.deb
 Size: 97314
-MD5sum: 6c87c1da486ee059052edefe8962f31c
-SHA1: 3821eb50745f45c2d1598eaf89b37688f66b010e
-SHA256: 925759a847a4685b491cd0e876ced2bed570f2764747c97b53d5ea2ecc19b4d3
+MD5sum: e1fa9d00f175406488d8896baad20f00
+SHA1: e975a56523c73dfe0a1e11f9e594dcde0db89c51
+SHA256: 2752930268bebf789c2df992eeb7251c2e850c7a4fd2be417b1f65cb0409dc21
 Section: net
 Priority: optional
 Description: GhostWhisperChat - Chat LAN silencioso para comunicación 1 a 1 y grupos.
