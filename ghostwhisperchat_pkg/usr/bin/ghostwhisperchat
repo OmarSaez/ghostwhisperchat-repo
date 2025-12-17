@@ -1893,22 +1893,29 @@ def handle_v2_logic(pkt_type, cmd_name, args, source_ip):
                 
                 found_match = False
                 for cid, cdata in ACTIVE_CHATS.items():
-                    if cdata['type'] == 'GROUP' and cdata['remote_id'] == gid and cdata['pass'] == gpass:
-                        found_match = True
-                        if 'port' in cdata:
-                             # Add Peer Logic
-                             payload = f"CMD_ADD_PEER{gw_comm.SEP}{source_ip}{gw_comm.SEP}{sender_mpp['nick']}"
-                             send_ipc(payload, cdata['port'])
-                             
-                             # Visual Notification
-                             sys_msg = f"{Colors.G}[+] {sender_mpp['nick']} se ha unido al grupo.{Colors.E}"
-                             # Send as SYSTEM message (MSG_IN | Sender | Text | Color)
-                             # Fixed: Removed extra 'cid' arg that caused formatting glitch
-                             ipc_msg = f"MSG_IN{gw_comm.SEP}[SYSTEM]{gw_comm.SEP}{sys_msg}{gw_comm.SEP}{Colors.C}"
-                             send_ipc(ipc_msg, cdata['port'])
+                    # Normalize pass (None -> "")
+                    my_pass = cdata.get('pass', '')
+                    if my_pass is None: my_pass = ""
+                    req_pass = gpass if gpass else ""
+                    
+                    if cdata['type'] == 'GROUP' and cdata['remote_id'] == gid:
+                        # Check pass
+                        if my_pass == req_pass:
+                            found_match = True
+                            if 'port' in cdata:
+                                 # Add Peer Logic
+                                 payload = f"CMD_ADD_PEER{gw_comm.SEP}{source_ip}{gw_comm.SEP}{sender_mpp['nick']}"
+                                 send_ipc(payload, cdata['port'])
+                                 
+                                 # Visual Notification
+                                 sys_msg = f"{Colors.G}[+] {sender_mpp['nick']} se ha unido al grupo.{Colors.E}"
+                                 ipc_msg = f"MSG_IN{gw_comm.SEP}[SYSTEM]{gw_comm.SEP}{sys_msg}{gw_comm.SEP}{Colors.C}"
+                                 send_ipc(ipc_msg, cdata['port'])
+                        else:
+                             debug_log(f"[V2] JOIN_GROUP Pass Mismatch. Local: '{my_pass}', Remote: '{req_pass}'")
                 
                 if not found_match:
-                     debug_log(f"[V2] JOIN_GROUP ignorado: No estoy en grupo '{gid}' o pass incorrecta.")
+                     debug_log(f"[V2] JOIN_GROUP ignorado: No encuentro grupo '{gid}' activo.")
 
 
             elif cmd_name == "INVITE":
