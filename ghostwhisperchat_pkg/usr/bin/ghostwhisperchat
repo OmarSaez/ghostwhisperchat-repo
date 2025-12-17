@@ -1447,7 +1447,12 @@ class LobbyAdapter:
              threading.Thread(target=spawn_child_process, args=(cid, cdata)).start()
         
              # 3. Network Discovery (V2)
+             # Search (Find others to populate my list)
              gw_comm.send_cmd(None, "SEARCH_GROUP", get_my_mpp(), remote_id, password)
+             
+             # Announce Presence (Tell others to add me)
+             # This triggers the JOIN_GROUP handler on peers (Fix Blind Join)
+             gw_comm.send_cmd(None, "JOIN_GROUP", get_my_mpp(), remote_id, password)
              
         # Restore Prompt
         sys.stdout.write(PROMPT)
