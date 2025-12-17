@@ -483,48 +483,6 @@ def update_memory(ip, nick, status):
              PEERS[ip]['nick'] = nick
     save_config()
 
-def handle_incoming_udp(d, ip):
-    global PEERS, DISC_TEMP, PEER_STATUSES, SCAN_RESULTS
-    
-    msg = d.decode('utf-8', errors='ignore')
-    debug_log(f"[UDP] Recibido de {ip}: {msg[:100]}") # Show first 100 chars
-    
-    if ip == MY_IP: return
-
-    is_cmd, cmd, args = parse_packet(msg)
-
-    if not is_cmd: return # Ignorar mensajes no estructurados en UDP
-
-    if cmd == "SEARCH_GROUP":
-        # args: GID, GPASS, NICK, STATUS
-        if len(args) >= 4:
-            gid, gpass, nick, st = args[0], args[1], args[2], args[3]
-            found_chat_id = None
-            for cid, cdata in ACTIVE_CHATS.items():
-                if cdata['type']=='GROUP' and str(cdata['remote_id'])==str(gid) and str(cdata['pass'])==str(gpass):
-                    found_chat_id = cid
-                    break
-
-            if found_chat_id:
-                if ip not in PEERS: PEERS[ip] = {'nick': nick, 'chats': set()}
-                PEERS[ip]['nick'] = nick
-                PEERS[ip]['chats'].add(found_chat_id)
-
-                PEER_STATUSES[ip] = st
-                update_memory(ip, nick, st)
-
-                if 'port' in ACTIVE_CHATS[found_chat_id]:
-                    send_ipc(f"FWD_PEER{SEP}{ip}{SEP}{nick}{SEP}{st}", ACTIVE_CHATS[found_chat_id]['port'])
-
-                gw_comm.send_udp_cmd(ip, "I_EXIST", gid, gpass, MY_NICK, MY_STATUS)
-
-    elif cmd == "I_EXIST":
-        # args: GID, GPASS, NICK, STATUS
-        if len(args) >= 4:
-            gid, gpass, nick, st = args[0], args[1], args[2], args[3]
-            found_chat_id = None
-            for cid, cdata in ACTIVE_CHATS.items():
-                if cdata['type']=='GROUP' and str(cdata['remote_id'])==str(gid) and str(cdata['pass'])==str(gpass):
                     found_chat_id = cid
                     break
 
@@ -2050,6 +2008,23 @@ def handle_v2_logic(pkt_type, cmd_name, args, source_ip):
 
                         # Only reply for one matching chat
                         break
+
+            elif cmd_name == "I_EXIST":
+                 # Args: [MPP], GID, PASS
+                 if len(args) < 3: return
+                 gid = args[1]
+                 
+                 debug_log(f"[V2] I_EXIST recibido de {source_ip} (Grupo {gid})")
+                 
+                 for cid, cdata in ACTIVE_CHATS.items():
+                     if cdata['type'] == 'GROUP' and cdata['remote_id'] == gid:
+                          if 'port' in cdata:
+                               # Add them to my list
+                               send_ipc(f"CMD_ADD_PEER{gw_comm.SEP}{source_ip}{gw_comm.SEP}{sender_mpp['nick']}", cdata['port'])
+                               
+                               # VITAL: Notify them via TCP that I joined
+                               # This ensures they see the "[+] User joined" message even if UDP Broadcast failed
+                               gw_comm.send_cmd(source_ip, "JOIN_GROUP", gid, cdata.get('pass',''))
 
             elif cmd_name == "INVITE_REJ":
                  # Args: [MPP], Reason
