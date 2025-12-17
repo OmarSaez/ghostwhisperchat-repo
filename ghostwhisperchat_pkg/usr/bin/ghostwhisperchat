@@ -1626,6 +1626,10 @@ class LobbyAdapter:
         # 4. ENTORNO GRÁFICO & TERMINAL
         report.append(f"\n{Colors.BO}:: Entorno Gráfico ::{Colors.E}")
         
+        # Detect Desktop Environment
+        de = os.environ.get("XDG_CURRENT_DESKTOP", os.environ.get("DESKTOP_SESSION", "?"))
+        report.append(f" - Entorno de Escritorio: {de}")
+
         # Zenity Test
         try:
              zver = subprocess.check_output(["zenity", "--version"], stderr=subprocess.DEVNULL).decode().strip()
@@ -1633,21 +1637,23 @@ class LobbyAdapter:
         except:
              report.append(f" - Zenity: {Colors.F}FALLO{Colors.E}")
 
-        # Popup Test
-        try:
-            import gw_pop
-            # Quick async popup test implies launching checking return
-            # We can't easily wait for it without blocking 3s, but let's try
-            # launching a thread that shows it.
-            def _test_pop():
-                 gw_pop.show_popup("GWC Test", "Prueba de Integridad: Notificaciones OK", duration=3)
-            
-            threading.Thread(target=_test_pop, daemon=True).start()
-            st_pop = f"{Colors.G}OK (Enviada){Colors.E}"
-        except Exception as e:
-            st_pop = f"{Colors.F}FALLO ({e}){Colors.E}"
+        # Popup Test (Direct notify-send)
+        if shutil.which("notify-send"):
+            try:
+                # Test directo sin wrapper gw_pop
+                cmd_pop = ["notify-send", "-u", "critical", "-t", "5000", "GWC Integridad", "Test de Notificación Visible"]
+                res = subprocess.run(cmd_pop, capture_output=True, text=True)
+                
+                if res.returncode == 0:
+                     st_pop = f"{Colors.G}OK (Enviado a DBus){Colors.E}"
+                else: 
+                     st_pop = f"{Colors.F}FALLO (Exit {res.returncode}: {res.stderr.strip()}){Colors.E}"
+            except Exception as e:
+                st_pop = f"{Colors.F}ERROR CALL ({e}){Colors.E}"
+        else:
+            st_pop = f"{Colors.F}FALTA (Instala libnotify-bin){Colors.E}"
         
-        report.append(f" - Notificaciones (Popup): {st_pop}")
+        report.append(f" - Notificaciones (notify-send): {st_pop}")
         
         
         terms = ["gnome-terminal", "mate-terminal", "tilix", "terminator", "konsole", "xfce4-terminal", "qterminal", "xterm", "x-terminal-emulator"]
