@@ -1606,7 +1606,6 @@ class LobbyAdapter:
              st_spawn = f"{Colors.H}Probando...{Colors.E}"
              
              try:
-             try:
                  # TEST LIVE: Intentar abrir una ventana que sobreviva 3 segundos
                  cmd_test = []
                  sleep_cmd = "sleep 3" 
