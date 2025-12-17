@@ -9,8 +9,8 @@ import time
 import hashlib
 
 # v38.0: Shared Definitions for Modular Architecture
-APP_VER_NUM = 42.43
-APP_VER_TAG = "Fix: Manual Join Announcement & TCP Handshake"
+APP_VER_NUM = 42.44
+APP_VER_TAG = "Fix: Indentation & Final Zombie Cleanup"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 # --- CONFIG POP ANTI-SPAM ---

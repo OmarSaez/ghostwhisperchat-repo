@@ -483,47 +483,6 @@ def update_memory(ip, nick, status):
              PEERS[ip]['nick'] = nick
     save_config()
 
-                    found_chat_id = cid
-                    break
-
-            if found_chat_id:
-                if ip not in PEERS: PEERS[ip] = {'nick': nick, 'chats': set()}
-                PEERS[ip]['nick'] = nick
-                PEERS[ip]['chats'].add(found_chat_id)
-
-                PEER_STATUSES[ip] = st
-                update_memory(ip, nick, st)
-
-                if 'port' in ACTIVE_CHATS[found_chat_id]:
-                        send_ipc(f"FWD_PEER{SEP}{ip}{SEP}{nick}{SEP}{st}", ACTIVE_CHATS[found_chat_id]['port'])
-
-    elif cmd == "WHOIS":
-        # args[0] = target_nick (puede ser vacío)
-        target = args[0].strip().lower() if args else ""
-
-        # Soy yo?
-        if not target or target == MY_NICK.lower():
-            gw_comm.send_udp_cmd(ip, "USER_HERE", MY_NICK, MY_STATUS)
-
-    elif cmd == "USER_HERE":
-        # args: Nick, Status
-        if len(args) >= 2:
-            nick, st = args[0], args[1]
-            # Check duplicate in DISC_TEMP
-            if not any(x[0] == ip for x in DISC_TEMP):
-                DISC_TEMP.append((ip, nick, st))
-            update_memory(ip, nick, st)
-
-    elif cmd == "WHO_ALL" and VISIBLE_IN_SCAN:
-        gw_comm.send_udp_cmd(ip, "IAM_HERE", MY_NICK, MY_STATUS)
-
-    elif cmd == "IAM_HERE":
-        # args: Nick, Status
-        if len(args) >= 2:
-            nick, st = args[0], args[1]
-            SCAN_RESULTS.append({'ip': ip, 'nick': nick, 'status': st})
-            update_memory(ip, nick, st)
-
 def find_global(t):
     target_clean = normalize_str(t)
     
