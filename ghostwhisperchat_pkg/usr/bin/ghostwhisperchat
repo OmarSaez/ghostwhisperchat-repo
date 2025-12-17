@@ -1656,31 +1656,60 @@ class LobbyAdapter:
         report.append(f" - Notificaciones (notify-send): {st_pop}")
         
         
-        terms = ["gnome-terminal", "mate-terminal", "tilix", "terminator", "konsole", "xfce4-terminal", "qterminal", "xterm", "x-terminal-emulator"]
-        found_term = None
-        for t in terms:
-            if shutil.which(t):
-                 found_term = t
-                 break
+        # Terminal Selection Logic (Mirrored from spawn_child_process)
+        term_bin = None
+        de_chk = str(de).upper()
+        
+        # 1. Prioridad por Entorno de Escritorio
+        if "MATE" in de_chk and shutil.which("mate-terminal"):
+             term_bin = "mate-terminal"
+        elif "GNOME" in de_chk and shutil.which("gnome-terminal"):
+             term_bin = "gnome-terminal"
+        elif "XFCE" in de_chk and shutil.which("xfce4-terminal"):
+             term_bin = "xfce4-terminal"
+        elif "KDE" in de_chk and shutil.which("konsole"):
+             term_bin = "konsole"
+        
+        # 2. Fallback
+        if not term_bin:
+             if shutil.which("mate-terminal"): term_bin = "mate-terminal"
+             elif shutil.which("gnome-terminal"): term_bin = "gnome-terminal"
+             elif shutil.which("tilix"): term_bin = "tilix"
+             elif shutil.which("terminator"): term_bin = "terminator"
+             elif shutil.which("konsole"): term_bin = "konsole"
+             elif shutil.which("xfce4-terminal"): term_bin = "xfce4-terminal"
+             elif shutil.which("qterminal"): term_bin = "qterminal"
+             elif shutil.which("xterm"): term_bin = "xterm"
+             elif shutil.which("x-terminal-emulator"): term_bin = "x-terminal-emulator"
+        
+        found_term = term_bin
         
         if found_term:
-             report.append(f" - Terminal Detectada: {Colors.G}{found_term}{Colors.E}")
+             report.append(f" - Terminal Detectada: {Colors.G}{found_term}{Colors.E} (Prioridad DE)")
              
              try:
                  # TEST LIVE: Intentar abrir una ventana que sobreviva 3 segundos
                  cmd_test = []
                  sleep_cmd = "sleep 3" 
                  
-                 # GNOME Fix: Use --wait to actually wait for the window
+                 # 3. Construir comando test
                  if found_term == "gnome-terminal":
                      cmd_test = [found_term, "--wait", "--", "sh", "-c", sleep_cmd]
-                 elif found_term in ["mate-terminal", "xfce4-terminal"]:
-                     cmd_test = [found_term, "--", "sh", "-c", sleep_cmd]
-                 elif found_term == "konsole":
-                      cmd_test = [found_term, "-e", "sh", "-c", sleep_cmd]
+                 elif found_term == "mate-terminal":
+                     cmd_test = [found_term, "--disable-factory", "--", "sh", "-c", sleep_cmd]
+                 elif found_term == "tilix":
+                     cmd_test = [found_term, "-e", "sh", "-c", sleep_cmd]
                  elif found_term == "terminator":
                       cmd_test = [found_term, "-x", "sh", "-c", sleep_cmd]
-                 else: # xterm, etc
+                 elif found_term == "konsole":
+                      cmd_test = [found_term, "--nofork", "-e", "sh", "-c", sleep_cmd]
+                 elif found_term == "xfce4-terminal":
+                      cmd_test = [found_term, "--disable-server", "--", "sh", "-c", sleep_cmd]
+                 elif found_term == "qterminal":
+                      cmd_test = [found_term, "-e", "sh", "-c", sleep_cmd]
+                 elif found_term == "xterm":
+                      cmd_test = [found_term, "-e", f"sh -c '{sleep_cmd}'"]
+                 else:
                       cmd_test = [found_term, "-e", f"sh -c '{sleep_cmd}'"]
                  
                  report.append(f"   ↳ Tecnología: {found_term}")
@@ -1955,29 +1984,52 @@ def spawn_child_process(cid, cdata):
 
     debug_log(f"Spawn start ({time.time()}) CMD: {inner_cmd}")
     
-    # Detectar terminal
+    # Detectar terminal con inteligencia situacional (DE Aware)
     try:
         terminal_cmd = None
-        if shutil.which("gnome-terminal"):
+        de = os.environ.get("XDG_CURRENT_DESKTOP", "").upper()
+        term_bin = None
+        
+        # 1. Prioridad por Entorno de Escritorio
+        if "MATE" in de and shutil.which("mate-terminal"):
+             term_bin = "mate-terminal"
+        elif "GNOME" in de and shutil.which("gnome-terminal"):
+             term_bin = "gnome-terminal"
+        elif "XFCE" in de and shutil.which("xfce4-terminal"):
+             term_bin = "xfce4-terminal"
+        elif "KDE" in de and shutil.which("konsole"):
+             term_bin = "konsole"
+        
+        # 2. Fallback: Búsqueda general (Orden de preferencia ajustado para Parrot)
+        if not term_bin:
+             if shutil.which("mate-terminal"): term_bin = "mate-terminal" # Parrot priority
+             elif shutil.which("gnome-terminal"): term_bin = "gnome-terminal"
+             elif shutil.which("tilix"): term_bin = "tilix"
+             elif shutil.which("terminator"): term_bin = "terminator"
+             elif shutil.which("konsole"): term_bin = "konsole"
+             elif shutil.which("xfce4-terminal"): term_bin = "xfce4-terminal"
+             elif shutil.which("qterminal"): term_bin = "qterminal"
+             elif shutil.which("xterm"): term_bin = "xterm"
+             elif shutil.which("x-terminal-emulator"): term_bin = "x-terminal-emulator"
+        
+        # 3. Construir comando según binario elegido
+        if term_bin == "gnome-terminal":
             terminal_cmd = ["gnome-terminal", "--wait", "--"] + shell_wrapper
-        elif shutil.which("mate-terminal"):
-             # Parrot OS / MATE Desktop Support
+        elif term_bin == "mate-terminal":
              terminal_cmd = ["mate-terminal", "--disable-factory", "--"] + shell_wrapper
-        elif shutil.which("tilix"):
+        elif term_bin == "tilix":
              terminal_cmd = ["tilix", "-e"] + shell_wrapper
-        elif shutil.which("terminator"):
-             # Terminator -x expects string if simple, but list works often. Safe bet implies -x "cmd".
-             # But here we use list structure compatibility.
+        elif term_bin == "terminator":
              terminal_cmd = ["terminator", "-x", "sh", "-c", inner_cmd]
-        elif shutil.which("konsole"):
-            terminal_cmd = ["konsole", "--nofork", "-e"] + shell_wrapper
-        elif shutil.which("xfce4-terminal"):
+        elif term_bin == "konsole":
+             terminal_cmd = ["konsole", "--nofork", "-e"] + shell_wrapper
+        elif term_bin == "xfce4-terminal":
              terminal_cmd = ["xfce4-terminal", "--disable-server", "--"] + shell_wrapper
-        elif shutil.which("qterminal"):
+        elif term_bin == "qterminal":
              terminal_cmd = ["qterminal", "-e"] + shell_wrapper
-        elif shutil.which("xterm"):
+        elif term_bin == "xterm":
              terminal_cmd = ["xterm", "-e"] + shell_wrapper
-        elif shutil.which("x-terminal-emulator"):
+        elif term_bin == "x-terminal-emulator":
              terminal_cmd = ["x-terminal-emulator", "-e"] + shell_wrapper
         
         if terminal_cmd:

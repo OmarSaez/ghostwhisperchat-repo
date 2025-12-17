@@ -281,7 +281,6 @@ def show_global_status(adapter, target_cid=None):
     my_nick, my_ip, my_st = adapter.get_my_info()
     vis = adapter.get_var("visible")
     auto_dl = adapter.get_var("auto_dl")
-    pop_on = adapter.get_var("pop_on")
     log_on = adapter.get_var("log_on")
     ver = adapter.get_version_str()
     users = adapter.get_known_users()
@@ -293,7 +292,6 @@ def show_global_status(adapter, target_cid=None):
     lines.append(f" {Colors.BO}Estado:{Colors.E} {my_st}")
     lines.append(f" {Colors.BO}Visibilidad Red:{Colors.E} {'VISIBLE' if vis else 'OCULTO'}")
     lines.append(f" {Colors.BO}Auto-Descargas:{Colors.E} {'ACTIVADAS' if auto_dl else 'OFF'}")
-    lines.append(f" {Colors.BO}Notificaciones:{Colors.E} {'ON' if pop_on else 'OFF'}")
     lines.append(f" {Colors.BO}Guardar Historial:{Colors.E} {'ON' if log_on else 'OFF'}")
     
     # AutoStart (assume adapter handles logic or returns N/A string)

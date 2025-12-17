@@ -9,8 +9,8 @@ import time
 import hashlib
 
 # v38.0: Shared Definitions for Modular Architecture
-APP_VER_NUM = 42.29
-APP_VER_TAG = "Feat: Test Popup Nativo + Detección DE"
+APP_VER_NUM = 42.30
+APP_VER_TAG = "Fix: Prioridad de Terminal por Entorno (DE-Aware)"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 # --- CONFIG POP ANTI-SPAM ---
