@@ -1911,6 +1911,9 @@ def handle_v2_logic(pkt_type, cmd_name, args, source_ip):
                                  sys_msg = f"{Colors.G}[+] {sender_mpp['nick']} se ha unido al grupo.{Colors.E}"
                                  ipc_msg = f"MSG_IN{gw_comm.SEP}[SYSTEM]{gw_comm.SEP}{sys_msg}{gw_comm.SEP}{Colors.C}"
                                  send_ipc(ipc_msg, cdata['port'])
+                                 
+                                 # HANDSHAKE: Send Welcome Back
+                                 gw_comm.send_cmd(source_ip, "WELCOME_GROUP", gid)
                         else:
                              debug_log(f"[V2] JOIN_GROUP Pass Mismatch. Local: '{my_pass}', Remote: '{req_pass}'")
                 
@@ -1991,6 +1994,12 @@ def handle_v2_logic(pkt_type, cmd_name, args, source_ip):
                                # VITAL: Notify them via TCP that I joined
                                # This ensures they see the "[+] User joined" message even if UDP Broadcast failed
                                gw_comm.send_cmd(source_ip, "JOIN_GROUP", gid, cdata.get('pass',''))
+                               debug_log(f"[I_EXIST] Enviado JOIN_GROUP TCP a {source_ip}")
+
+            elif cmd_name == "WELCOME_GROUP":
+                 # Confirmation from Host
+                 gid = args[1]
+                 safe_print(f"{Colors.G}[✔] Conexión confirmada con grupo '{gid}'.{Colors.E}")
 
             elif cmd_name == "INVITE_REJ":
                  # Args: [MPP], Reason

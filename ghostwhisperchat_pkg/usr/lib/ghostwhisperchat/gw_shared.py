@@ -9,8 +9,8 @@ import time
 import hashlib
 
 # v38.0: Shared Definitions for Modular Architecture
-APP_VER_NUM = 42.45
-APP_VER_TAG = "Fix: Relaxed Password Match & Ghost Busting"
+APP_VER_NUM = 42.46
+APP_VER_TAG = "Feat: Welcome Protocol & TCP Handshake Logging"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 # --- CONFIG POP ANTI-SPAM ---
