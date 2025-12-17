@@ -1919,6 +1919,11 @@ def handle_v2_logic(pkt_type, cmd_name, args, source_ip):
                 
                 if not found_match:
                      debug_log(f"[V2] JOIN_GROUP ignorado: No encuentro grupo '{gid}' activo.")
+                     # DEBUG VISUAL (Temporary)
+                     for cid, cdata in ACTIVE_CHATS.items():
+                         if 'port' in cdata and cdata.get('type')=='GROUP':
+                             msg = f"[DEBUG] Rechazado JOIN de {source_ip} para '{gid}'. Yo soy '{cdata.get('remote_id','?')}'"
+                             send_ipc(f"MSG_IN{gw_comm.SEP}Sistema{gw_comm.SEP}{msg}{gw_comm.SEP}{Colors.R}", cdata['port'])
 
 
             elif cmd_name == "INVITE":
@@ -2013,9 +2018,11 @@ def handle_v2_logic(pkt_type, cmd_name, args, source_ip):
                 if len(args) < 3: return
                 gid, text = args[1], args[2]
                 
+                found = False
                 # Route to compatible chats
                 for cid, cdata in ACTIVE_CHATS.items():
                     if cdata['type'] == 'GROUP' and cdata['remote_id'] == gid:
+                         found = True
                          # 1. Auto-Add Sender to Peers (Mesh Fix)
                          if 'port' in cdata:
                              payload = f"CMD_ADD_PEER{gw_comm.SEP}{source_ip}{gw_comm.SEP}{sender_mpp['nick']}"
@@ -2026,6 +2033,12 @@ def handle_v2_logic(pkt_type, cmd_name, args, source_ip):
                          ipc_payload = f"MSG_IN{gw_comm.SEP}{cid}{gw_comm.SEP}{tag}{gw_comm.SEP}{text}"
                          if 'port' in cdata:
                              send_ipc(ipc_payload, cdata['port'])
+                
+                if not found:
+                     for cid, cdata in ACTIVE_CHATS.items():
+                         if 'port' in cdata and cdata.get('type')=='GROUP':
+                             msg = f"[DEBUG] Ignorado MSG de {sender_mpp['nick']} para '{gid}'. Yo soy '{cdata.get('remote_id','?')}'"
+                             send_ipc(f"MSG_IN{gw_comm.SEP}Sistema{gw_comm.SEP}{msg}{gw_comm.SEP}{Colors.R}", cdata['port'])
                          
             elif cmd_name == "INVITE_ACC":
                 # Args: [MPP]

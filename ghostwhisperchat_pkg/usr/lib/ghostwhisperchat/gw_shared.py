@@ -9,8 +9,8 @@ import time
 import hashlib
 
 # v38.0: Shared Definitions for Modular Architecture
-APP_VER_NUM = 42.46
-APP_VER_TAG = "Feat: Welcome Protocol & TCP Handshake Logging"
+APP_VER_NUM = 42.47
+APP_VER_TAG = "Debug: Visible IPC Logs for Join Failures"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 # --- CONFIG POP ANTI-SPAM ---
