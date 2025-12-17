@@ -9,8 +9,8 @@ import time
 import hashlib
 
 # v38.0: Shared Definitions for Modular Architecture
-APP_VER_NUM = 42.39
-APP_VER_TAG = "Fix: Bug Fantasmas Resuelto + Colores Nuevos"
+APP_VER_NUM = 42.41
+APP_VER_TAG = "Stable: Fixed Scan, Updates, Colors & Code Quality"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 # --- CONFIG POP ANTI-SPAM ---
@@ -43,6 +43,8 @@ class Colors:
     H, B, G, W, F, E, BO = '\033[95m', '\033[94m', '\033[92m', '\033[93m', '\033[91m', '\033[0m', '\033[1m'
     C, M, WH = '\033[96m', '\033[95m', '\033[97m'
     R = F # Alias for Red
+    Y = W # Alias for Yellow
+    P = H # Alias for Purple
     PALETTE = [B, C, M, W, WH]
 
     @staticmethod

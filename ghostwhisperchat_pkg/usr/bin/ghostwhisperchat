@@ -2139,17 +2139,18 @@ def handle_v2_logic(pkt_type, cmd_name, args, source_ip):
                  # Just notify User.
                  msg = f"{Colors.G}[+] Detectado: {sender_mpp['nick']} ({source_ip}){Colors.E}"
                  
-                 # Broadcast to all children? NO.
-                 # Fix for "Ghost Members": Do NOT add random peers to active group chats.
-                 # Chats should only be populated by JOIN_GROUP or Messaging.
-                 # for c_id, c_data in ACTIVE_CHATS.items():
-                 #     if 'port' in c_data:
-                 #          send_ipc(f"CMD_ADD_PEER{gw_comm.SEP}{source_ip}{gw_comm.SEP}{sender_mpp['nick']}", c_data['port'])
+                 # Broadcast to all children
+                 # (Restored for --quienes visibility inside chats)
+                 # Note: CMD_ADD_PEER does NOT add to group roster, only to known peers list.
+                 for c_id, c_data in ACTIVE_CHATS.items():
+                     if 'port' in c_data:
+                          send_ipc(f"CMD_ADD_PEER{gw_comm.SEP}{source_ip}{gw_comm.SEP}{sender_mpp['nick']}", c_data['port'])
 
                  if SCANNING_NOW:
                       SCAN_BUFFER.append(msg)
                  else:
                       safe_print(msg)
+
 
 
         elif pkt_type == 'MSJ':
@@ -2204,6 +2205,23 @@ def handle_v2_logic(pkt_type, cmd_name, args, source_ip):
     except Exception as e:
         safe_print(f"Err V2 Logic: {e}")
 
+
+# --- FUNCIONES DE ACTUALIZACIÓN ---
+def perform_system_update():
+    """Ejecuta los comandos de sistema para actualizar"""
+    safe_print(f"{Colors.M}[*] Ejecutando actualización de sistema...{Colors.E}")
+    try:
+        cmd = "sudo apt update && sudo apt install ghostwhisperchat --only-upgrade -y"
+        subprocess.run(cmd, shell=True, check=True)
+        safe_print(f"{Colors.G}[✔] Actualización lista. Reiniciando servicio...{Colors.E}")
+        subprocess.run("systemctl --user restart ghostwhisperchat", shell=True)
+        time.sleep(2)
+        os.execv(sys.executable, ['python3'] + sys.argv)
+    except Exception as e:
+        safe_print(f"{Colors.F}[X] Error en actualización: {e}{Colors.E}")
+
+def trigger_manual_update():
+    perform_system_update()
 
 def get_rx_folder():
     base = os.path.join(os.path.expanduser("~"), "Desktop")
