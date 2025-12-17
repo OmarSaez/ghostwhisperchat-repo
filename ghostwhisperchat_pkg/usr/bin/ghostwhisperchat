@@ -2453,16 +2453,33 @@ def handle_v2_logic(pkt_type, cmd_name, args, source_ip):
                 for cid, cdata in ACTIVE_CHATS.items():
                     if cdata['type'] == 'GROUP' and cdata['remote_id'] == gid and cdata['pass'] == gpass:
                         # Found! Send I_EXIST
-                        # For now, Simple Response (No I_ANSWER delay)
-                        # Build Local LS
-                        # TODO: LS Builder from Peer list
-                         
-                        local_ls = [] # Placeholder
-                        ls_pkt = gw_comm.build_ls(local_ls) # Placeholder
-                        
+                        local_ls = [] 
+                        ls_pkt = gw_comm.build_ls(local_ls)
                         gw_comm.send_cmd(source_ip, "I_EXIST", get_my_mpp(), gid, gpass, ls_pkt)
                         debug_log(f"[V2] Respondido I_EXIST a {source_ip} por grupo {gid}")
                         break
+            
+            elif cmd_name == "JOIN_GROUP":
+                # Args: [MPP], GID, PASS
+                # Critical Fix: Register peer immediately when they join
+                if len(args) < 3: return
+                gid, gpass = args[1], args[2]
+                
+                debug_log(f"[V2] JOIN_GROUP de {sender_mpp['nick']} ({source_ip}) -> {gid}")
+                
+                for cid, cdata in ACTIVE_CHATS.items():
+                    if cdata['type'] == 'GROUP' and cdata['remote_id'] == gid and cdata['pass'] == gpass:
+                        if 'port' in cdata:
+                             # Add Peer Logic
+                             payload = f"CMD_ADD_PEER{gw_comm.SEP}{source_ip}{gw_comm.SEP}{sender_mpp['nick']}"
+                             send_ipc(payload, cdata['port'])
+                             
+                             # Visual Notification
+                             sys_msg = f"{Colors.G}[+] {sender_mpp['nick']} se ha unido al grupo.{Colors.E}"
+                             # Send as SYSTEM message (sender=[SYSTEM])
+                             ipc_msg = f"MSG_IN{gw_comm.SEP}{cid}{gw_comm.SEP}[SYSTEM]{gw_comm.SEP}{sys_msg}"
+                             send_ipc(ipc_msg, cdata['port'])
+
 
             elif cmd_name == "INVITE":
                 # Args: [MPP], TYPE (PRIV/GROUP), [GID, PASS]

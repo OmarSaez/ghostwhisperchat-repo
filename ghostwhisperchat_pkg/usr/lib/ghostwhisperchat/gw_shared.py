@@ -9,8 +9,8 @@ import time
 import hashlib
 
 # v38.0: Shared Definitions for Modular Architecture
-APP_VER_NUM = 42.31
-APP_VER_TAG = "Feat: Diagnóstico de Firewall + Sugerencia UFW"
+APP_VER_NUM = 42.32
+APP_VER_TAG = "Fix: Bug de Invitación Ciega (JOIN_GROUP Handler)"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 # --- CONFIG POP ANTI-SPAM ---
