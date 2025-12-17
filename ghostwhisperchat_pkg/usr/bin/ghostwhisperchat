@@ -2169,12 +2169,17 @@ def perform_system_update():
     try:
         cmd = "sudo apt update && sudo apt install ghostwhisperchat --only-upgrade -y"
         subprocess.run(cmd, shell=True, check=True)
-        safe_print(f"{Colors.G}[✔] Actualización lista. Reiniciando servicio...{Colors.E}")
+        safe_print(f"{Colors.G}[✔] Paquetes procesados.{Colors.E}")
+        
+        safe_print(f"{Colors.C}[*] Reiniciando servicio GhostWhisperChat...{Colors.E}")
         subprocess.run("systemctl --user restart ghostwhisperchat", shell=True)
-        time.sleep(2)
-        os.execv(sys.executable, ['python3'] + sys.argv)
+        time.sleep(1)
+        
+        safe_print(f"{Colors.G}[✔] Actualización completada con éxito.{Colors.E}")
+        sys.exit(0)
     except Exception as e:
         safe_print(f"{Colors.F}[X] Error en actualización: {e}{Colors.E}")
+        sys.exit(1)
 
 def trigger_manual_update():
     perform_system_update()
