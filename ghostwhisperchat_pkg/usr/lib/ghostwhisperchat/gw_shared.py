@@ -9,8 +9,8 @@ import time
 import hashlib
 
 # v38.0: Shared Definitions for Modular Architecture
-APP_VER_NUM = 42.32
-APP_VER_TAG = "Fix: Bug de Invitación Ciega (JOIN_GROUP Handler)"
+APP_VER_NUM = 42.33
+APP_VER_TAG = "Feat: Comando --purga y Fixes de Grupo"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 # --- CONFIG POP ANTI-SPAM ---
