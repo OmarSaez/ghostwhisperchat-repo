@@ -9,8 +9,8 @@ import time
 import hashlib
 
 # v38.0: Shared Definitions for Modular Architecture
-APP_VER_NUM = 42.35
-APP_VER_TAG = "Fix/Refactor: Limpieza de Código y TCP Join Forzado"
+APP_VER_NUM = 42.36
+APP_VER_TAG = "Fix: IndentationError y Limpieza Zombie Completada"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 # --- CONFIG POP ANTI-SPAM ---
