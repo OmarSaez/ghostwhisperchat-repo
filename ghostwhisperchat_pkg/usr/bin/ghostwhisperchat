@@ -1742,6 +1742,34 @@ class LobbyAdapter:
              report.append(f" - Terminal: {Colors.F}NO DETECTADA{Colors.E}")
              report.append(f"   {Colors.W}↳ Instala: sudo apt install gnome-terminal (o mate-terminal / xterm){Colors.E}")
         
+        # 5. SEGURIDAD (Firewall)
+        report.append(f"\n{Colors.BO}:: Diagnóstico de Firewall ::{Colors.E}")
+        
+        # Check UFW
+        fw_warn = False
+        if shutil.which("ufw"):
+             try:
+                 # Check status (needs sudo usually, but let's try or handle error)
+                 ufw_st = subprocess.check_output(["ufw", "status"], stderr=subprocess.STDOUT).decode().strip()
+                 if "inactive" in ufw_st.lower():
+                     inf_fw = f"{Colors.G}UFW: Inactivo (Permitido){Colors.E}"
+                 elif "active" in ufw_st.lower():
+                     inf_fw = f"{Colors.W}UFW: ACTIVO (Puede bloquear conexiones entrantes){Colors.E}"
+                     fw_warn = True
+                 else:
+                     inf_fw = f"UFW: {ufw_st}"
+             except Exception:
+                 inf_fw = f"{Colors.W}UFW: Detectado (Estado desconocido / Sin Permisos){Colors.E}"
+                 fw_warn = True
+             
+             report.append(f" - {inf_fw}")
+        else:
+             report.append(f" - UFW: No instalado (Check iptables manualmente)")
+             
+        if fw_warn:
+             report.append(f"   {Colors.W}↳ SOLUCIÓN PARROT/KALI: Ejecuta el siguiente comando para abrir puertos:{Colors.E}")
+             report.append(f"     {Colors.BO}sudo ufw allow 44494:44496/tcp && sudo ufw allow 44494:44496/udp{Colors.E}")
+        
         self.reply("\n".join(report), cid)
     
     def set_config(self, key, val):
