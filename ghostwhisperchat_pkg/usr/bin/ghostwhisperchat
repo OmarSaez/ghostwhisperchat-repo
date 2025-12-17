@@ -886,6 +886,11 @@ def dl_file(name, size, sock, sender, sender_ip=None, expected_hash=None, file_t
                          msg = f"{Colors.C}{sender} envía archivo: {name}. Escribe --aceptar.{Colors.E}"
                          send_ipc(f"FWD_MSG{SEP}{cid}{SEP}{tag}{SEP}{msg}", ACTIVE_CHATS[cid]['port'])
 
+# --- COMANDOS LOBBY CENTRALIZADOS ---
+def exec_lobby_cmd(inp, origin_cid=None):
+    import gw_cmd
+    gw_cmd.process(inp, origin_cid, LOBBY_ADAPTER)
+
 class LobbyAdapter:
     def reply(self, msg, cid):
         # Lobby context reply

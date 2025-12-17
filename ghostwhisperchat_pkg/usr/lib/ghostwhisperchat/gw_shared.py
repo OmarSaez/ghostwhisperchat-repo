@@ -9,8 +9,8 @@ import time
 import hashlib
 
 # v38.0: Shared Definitions for Modular Architecture
-APP_VER_NUM = 42.36
-APP_VER_TAG = "Fix: IndentationError y Limpieza Zombie Completada"
+APP_VER_NUM = 42.37
+APP_VER_TAG = "Fix: NameError exec_lobby_cmd restored"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 # --- CONFIG POP ANTI-SPAM ---
