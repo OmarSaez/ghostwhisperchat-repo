@@ -197,11 +197,15 @@ class Motor:
                 # 1. ¿Es un comando?
                 if msg_content.startswith("--") or msg_content.startswith("/"):
                      # Ejecutar como comando transitorio
-                     # Nota: Esto imprimirá el resultado en el journal por ahora, 
-                     # o podríamos intentar devolverlo al chat UI si soportara prints.
                      # Por ahora, solo ejecutamos y logueamos.
-                     res = self.ejecutar_comando_transitorio(msg_content)
-                     print(f"[UI_CMD_RESULT] {res}", file=sys.stderr)
+                     # v2.25: Mandamos el contexto para validaciones (ej: ADD)
+                     contexto_actual = ("UI", chat_id) # Podríamos enriquecer con tipo privado/grupo
+                     
+                     res = self.ejecutar_comando_transitorio(msg_content, context_ui=contexto_actual)
+                     
+                     # Enviar respuesta de vuelta a la UI
+                     if res:
+                         sock_ui.sendall(f"\n{res}\n".encode('utf-8'))
                      return
 
                 # 2. Es un mensaje normal
@@ -229,9 +233,9 @@ class Motor:
                 pass
             print(f"[UI] Ventana {to_del} cerrada.")
 
-    def ejecutar_comando_transitorio(self, cmd_raw):
+    def ejecutar_comando_transitorio(self, cmd_raw, context_ui=None):
         # Parseamos con logica de comandos anterior
-        print(f"[MOTOR_DEBUG] Procesando comando raw: {cmd_raw}", file=sys.stderr)
+        print(f"[MOTOR_DEBUG] Procesando comando raw: {cmd_raw} Context={context_ui}", file=sys.stderr)
         cmd, args = parsear_comando(cmd_raw)
         print(f"[MOTOR_DEBUG] Parseado: CMD={cmd}, ARGS={args}", file=sys.stderr)
         
@@ -252,7 +256,36 @@ class Motor:
         elif cmd == "SCAN":
              pkg = empaquetar("DISCOVER", {"filter": "ALL"}, "ALL")
              self.red.enviar_udp_broadcast(pkg)
-             return "[*] Señal de descubrimiento enviada a la red.\n    Espera unos segundos y revisa sus respuestas con --contactos."
+             
+             # Retornamos quien esta online AHORA
+             m = self.memoria
+             if not m.peers:
+                 return "[*] Señal enviada. Nadie detectado AÚN.\n    (Espera unos segundos y repite el comando)"
+             
+             res = "[*] Usuarios detectados en caché:\n"
+             for ip, data in m.peers.items():
+                 res += f" - {data['nick']} ({ip}) [{data['status']}]\n"
+             return res
+             
+        elif cmd == "ADD":
+             # --agregar
+             # Validacion de contexto: Solo en grupos
+             # context_ui es (tipo, id). En v2.25 asumimos que si viene de UI chata_ui, 
+             # necesitamos saber si es grupo o privado.
+             # HACK: Por ahora, si el ID es largo (SHA256) es grupo, si es IP/Nick...
+             # Mejor: Memoria sabe qué es.
+             
+             if not context_ui:
+                 return "[X] Debes usar este comando desde dentro de un Grupo."
+                 
+             chat_id = context_ui[1]
+             # Consultar memoria si es grupo
+             es_grupo = chat_id in self.memoria.grupos_activos
+             
+             if not es_grupo:
+                 return "[X] Error: No puedes invitar gente a un chat privado 1 a 1."
+             
+             return f"[*] Invitando usuarios a {chat_id[:8]}... (Stub)"
 
         elif cmd == "EXIT":
              self.running = False
