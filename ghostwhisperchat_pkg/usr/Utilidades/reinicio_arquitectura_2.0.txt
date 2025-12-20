@@ -1,0 +1,107 @@
+================================================================================
+GHOSTWHISPERCHAT 2.0 - ARQUITECTURA "GREENFIELD" (CÓDIGO LIMPIO)
+================================================================================
+
+OBJETIVO:
+Reescribir el sistema desde cero eliminando deuda técnica, código muerto y lógica "parcheada".
+Priorizar estabilidad, atomicidad de las operaciones y limpieza absoluta del protocolo.
+
+--- 1. ESTRUCTURA DEL PROYECTO (MODULARIZACIÓN) ---
+
+/usr/lib/ghostwhisperchat/core/
+    ├── protocolo.py    # Definición de paquetes JSON y validadores.
+    ├── transporte.py   # Manejo de Sockets Crudos (UDP/TCP/Unix). Sin lógica de negocio.
+    ├── estado.py       # "Single Source of Truth". Almacena PEERS, GRUPOS, MENSAJES.
+    ├── seguridad.py    # Hashes, Tokens de sesión y (futuro) Cifrado.
+    └── demonio.py      # El cerebro central. Orquesta todo.
+
+/usr/bin/
+    ├── gwc-daemon      # Ejecutable del servicio (Background).
+    └── gwc-cli         # Cliente Interfaz (Foreground). Solo "pinta" lo que dice el demonio.
+
+--- 2. FORMATO DE DATOS (ADIÓS PIPES) ---
+
+Todo intercambio de datos será JSON utf-8.
+Ventajas: Debug legible, manejo de caracteres especiales nativo, extensibilidad.
+
+Estructura Base del Paquete:
+{
+    "ver": 2,                   # Versión de protocolo
+    "tipo": "MSG",              # [JOIN, HELLO, MSG, PING, LIST_SYNC]
+    "token": "a1b2...",         # Hash de autenticación temporal
+    "origen": {                 # Datos REMITENTE (Mínimos)
+        "uid": "sh256...",      # ID único persistente del usuario
+        "ip": "192.168.1.X"
+    },
+    "destino": "gid_hash",      # ID del Grupo o UID destino
+    "payload": { ... }          # Datos variables según tipo
+}
+
+--- 3. PROTOCOLOS DE RED (SEPARACIÓN DE INTERESES) ---
+
+A. UDP (Puerto 44495) -> "EL RADAR"
+   - ÚNICO PROPÓSITO: Descubrimiento y Latidos.
+   - NUNCA transporta listas de usuarios ni mensajes de chat.
+   - Payload máximo: 512 bytes.
+   - Comandos: `WHO_IS_THERE?`, `I_EXIST`, `I_AM_LEAVING`.
+
+B. TCP (Puerto 44496) -> "LA TUBERÍA"
+   - PROPÓSITO: Todo lo importante.
+   - Mensajes de chat, Sincronización de listas, Handshakes.
+   - Conexiones persistentes o efímeras según necesidad del "Embajador".
+
+C. UNIX SOCKET (/tmp/gwc.sock) -> "EL CABLE INTERNO"
+   - Comunicación entre `gwc-cli` (Interfaz) y `gwc-daemon` (Lógica).
+   - Reemplaza al IPC por puertos locales (más seguro y rápido).
+
+--- 4. LÓGICA DISTRIBUIDA: "EL EMBAJADOR" ---
+
+Problema actual: Cuando entro, todos me gritan a la vez.
+Solución 2.0: Consenso implícito.
+
+CASO DE USO: USUARIO NUEVO (N) SE UNE A GRUPO EXISTENTE (A, B, C).
+1. N envía UDP Broadcast: `SEARCH_GROUP(ID=10)`.
+2. A, B y C reciben el paquete.
+3. A, B y C comparan sus IPs contra la lista de miembros que ELLOS conocen.
+   - Regla: "Solo responde quien tenga la IP más ALTA de la lista conocida".
+4. Supongamos que C tiene la IP más alta.
+   - A y B se quedan callados (silencio en la red).
+   - C responde TCP Directo a N: `WELCOME_PACKET`.
+5. `WELCOME_PACKET` contiene:
+   - "Bienvenido".
+   - "Aquí tienes la LISTA COMPLETA DE MIEMBROS [A, B, C] y sus IPs".
+6. N recibe la lista.
+   - N inicia conexiones TCP o saludos UDP dirigidos a A y B para confirmar: "Hola, C me dijo que estáis aquí".
+   - N se añade a la lista local.
+
+Resultado: 1 Intercambio pesado en lugar de 3. Escalabilidad garantizada.
+
+--- 5. GESTIÓN DE SESIONES (LINUX NATIVE) ---
+
+- El Demonio (`gwc-daemon`) corre bajo `systemd --user`.
+- Ciclo de vida atado al login del usuario real.
+- Detección de caída:
+  - Si el `gwc-cli` muere (cierre de ventana), el Demonio SIGUE VIVO (persistencia).
+  - Si el usuario hace Logoff, systemd mata el Demonio -> Envía `UDP I_AM_LEAVING` (Best effort).
+
+--- 6. MÁQUINA DE ESTADOS (STATE MACHINE) ---
+
+Para evitar "estados zombies" (fantasmas), los usuarios tendrán estados finitos.
+
+[UNKNOWN] -> (Handshake OK) -> [SYNCING] -> (Lista Recibida) -> [ACTIVE]
+                                   |
+                                (Timeout)
+                                   v
+                                [ZOMBIE] -> (3 Pings fallidos) -> [REMOVED]
+
+- Heartbeat: Cada 30-60 segundos, el "Embajador" manda un pulso ligero. Si alguien no responde, se marca para purga.
+
+--- 7. FLUJO DE TRABAJO SUGERIDO ---
+
+1. Limpiar el Repo: Mover el código actual a una carpeta `legacy_v1`.
+2. Crear `core/transporte.py`: Solo lograr enviar/recibir JSON por TCP/UDP. Nada más.
+3. Crear `core/demonio.py`: Que mantenga un diccionario en memoria e imprima lo que recibe.
+4. Crear `gwc-cli`: Un script tonto que lea del teclado y mande al socket Unix.
+5. Implementar Lógica Embajador.
+
+================================================================================
