@@ -53,51 +53,91 @@ class Motor:
         
         print("[*] Daemon listo. Esperando eventos...")
 
-        while self.running:
-            # Lista de sockets a vigilar: Red + IPC + UI Clients Activos
-            sockets_red = self.red.get_sockets_lectura()
-            sockets_ui = list(self.ui_sessions.values())
-            
-            rlist = sockets_red + [self.ipc_sock] + sockets_ui
-            
-            try:
-                readable, _, _ = select.select(rlist, [], [], 1.0)
-            except select.error:
-                continue
-
-            for s in readable:
-                # 1. IPC Listener (Nuevas conexiones locales)
-                if s == self.ipc_sock:
-                    try:
-                        conn, _ = s.accept()
-                        conn.setblocking(True) # Leemos blocking brevemente para handshake
-                        # En v2.1 el cliente transitorio manda y cierra.
-                        # El cliente UI manda y se queda.
-                        # Leemos primera linea o chunk
-                        data = conn.recv(4096)
-                        if data:
-                            texto = data.decode('utf-8').strip()
-                            self.procesar_ipc_mensaje(texto, conn)
-                        else:
-                            conn.close()
-                    except:
-                        pass
+    def bucle_principal(self):
+        """Loop principal del Demonio"""
+        self.iniciar_ipc()
+        self.running = True
+        
+        print(f"[MOTOR_DEBUG] Entrando a Bucle Principal. Running={self.running}", file=sys.stderr)
+        
+        try:
+            while self.running:
+                # Lista de sockets a vigilar: Red + IPC + UI Clients Activos
+                sockets_red = self.red.get_sockets_lectura()
+                sockets_ui = list(self.ui_sessions.values())
                 
-                # 2. Mensajes de UIs ya conectadas (User Input en chat windows)
-                elif s in sockets_ui:
-                    try:
-                        data = s.recv(4096)
-                        if data:
-                            self.procesar_input_chat_ui(s, data.decode('utf-8'))
-                        else:
-                            self.desconectar_ui(s)
-                    except:
-                        self.desconectar_ui(s)
+                # print(f"[MOTOR_DEBUG] Loop tick. Sockets Red={len(sockets_red)} IPC={1} UI={len(sockets_ui)}", file=sys.stderr)
+                
+                rlist = sockets_red + [self.ipc_sock] + sockets_ui
+                
+                try:
+                    # Timeout 5s para ver prints de vida
+                    readable, _, _ = select.select(rlist, [], [], 5.0)
+                except select.error as e:
+                    print(f"[MOTOR_DEBUG] Select Error: {e}", file=sys.stderr)
+                    # Si el error es EINTR (interrupcion de señal) seguimos
+                    if e.args[0] == 4: # EINTR
+                        continue
+                    else:
+                        raise e # Re-raise si es grave
+                except Exception as e:
+                    print(f"[MOTOR_DEBUG] Excepcion Generica en Select: {e}", file=sys.stderr)
+                    raise e
+                    
+                if not readable:
+                    # Timeout
+                    # print("[MOTOR_DEBUG] Select Timeout (Idle)", file=sys.stderr)
+                    continue
 
-                # 3. UDP Discovery
-                elif s == self.red.sock_udp:
-                    try:
-                        data, addr = s.recvfrom(65535)
+                for s in readable:
+                    # 1. IPC Listener (Nuevas conexiones locales)
+                    if s == self.ipc_sock:
+                        print("[MOTOR_DEBUG] Actividad en IPC Socket (Nueva conexión entrante)", file=sys.stderr)
+                        try:
+                            # Accept para sacar al cliente de la cola de espera
+                            conn, _ = s.accept()
+                            conn.setblocking(True) 
+                            
+                            # Leer mensaje (hasta 4k)
+                            data = conn.recv(4096)
+                            if data:
+                                texto = data.decode('utf-8').strip()
+                                print(f"[MOTOR_DEBUG] IPC Rx: {texto}", file=sys.stderr)
+                                self.procesar_ipc_mensaje(texto, conn)
+                            else:
+                                print("[MOTOR_DEBUG] IPC Conexión vacía (Probe)", file=sys.stderr)
+                                conn.close()
+                        except Exception as e:
+                            print(f"[MOTOR_DEBUG] Error en handling IPC: {e}", file=sys.stderr)
+                    
+                    # 2. Mensajes de UIs ya conectadas (User Input en chat windows)
+                    elif s in sockets_ui:
+                        try:
+                            data = s.recv(4096)
+                            if data:
+                                self.procesar_input_chat_ui(s, data.decode('utf-8'))
+                            else:
+                                print("[MOTOR_DEBUG] UI socket cerrado (EOF)", file=sys.stderr)
+                                self.desconectar_ui(s)
+                        except:
+                            self.desconectar_ui(s)
+    
+                    # 3. UDP Discovery
+                    elif s == self.red.sock_udp:
+                        try:
+                            data, addr = s.recvfrom(65535)
+                            print(f"[MOTOR_DEBUG] UDP Rx de {addr}", file=sys.stderr)
+                            # self.procesar_paquete_red(data, addr) <--- FALTABA ESTO EN SNIPPET ORIGINAL
+                        except Exception as e:
+                            print(f"[MOTOR_DEBUG] Error lectura UDP: {e}", file=sys.stderr)
+
+        except Exception as e:
+             print(f"[MOTOR_DEBUG] !!! CRASH EN BUCLE PRINCIPAL !!!: {e}", file=sys.stderr)
+             import traceback
+             traceback.print_exc(file=sys.stderr)
+             raise e
+        finally:
+             print(f"[MOTOR_DEBUG] Bucle finalizado. Running={self.running}", file=sys.stderr)
                         self.manejar_paquete_red(data, addr, "UDP")
                     except OSError:
                         pass
