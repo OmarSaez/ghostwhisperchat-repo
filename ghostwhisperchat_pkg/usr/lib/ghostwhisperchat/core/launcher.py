@@ -79,17 +79,4 @@ def abrir_chat_ui(id_destino, es_grupo=False):
                 
     log_launcher("[LAUNCHER] No se encontró terminal compatible.")
     return False
-            
-            log_launcher(f"[LAUNCHER] Intentando terminal: {term}")
-            log_launcher(f"[LAUNCHER] Exec args: {args_term}")
-            
-            try:
-                subprocess.Popen(args_term, start_new_session=True) # Added start_new_session for consistency with original
-                log_launcher(f"[LAUNCHER] Éxito lanzando {term}")
-                return True
-            except Exception as e:
-                log_launcher(f"[LAUNCHER] Error lanzando {term}: {e}")
-                continue
-                
-    log_launcher("[LAUNCHER] No se encontró terminal compatible.")
-    return False
+
