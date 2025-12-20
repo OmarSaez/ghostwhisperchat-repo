@@ -22,8 +22,8 @@ class Colores:
     BG_RED = "\033[41m"
 
 # Versionado
-APP_VER_NUM = "2.22"
-APP_VER_TAG = "Scan Feedback"
+APP_VER_NUM = "2.23"
+APP_VER_TAG = "Self Updater"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 BANNER = r"""

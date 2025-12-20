@@ -15,5 +15,48 @@ if [ "$1" == "--check" ]; then
     exit 0
 fi
 
+if [ "$1" == "--update" ] || [ "$1" == "update" ]; then
+    echo "=========================================="
+    echo "🔄 AUTO-ACTUALIZADOR GHOSTWHISPERCHAT"
+    echo "=========================================="
+    
+    REPO_PATH="$HOME/Escritorio/ghostwhisperchat-repo"
+    
+    if [ ! -d "$REPO_PATH" ]; then
+        echo "[X] Error: No se encuentra el repositorio en $REPO_PATH"
+        exit 1
+    fi
+    
+    cd "$REPO_PATH" || exit 1
+    
+    echo "[*] Sincronizando código (git pull)..."
+    git pull || echo "[!] Advertencia: No se pudo hacer git pull (¿Conflictos o sin red?)"
+    
+    echo "[*] Generando paquete .deb..."
+    ./actualizar_repo.sh
+    
+    echo "[*] Instalando actualización (Requiere sudo)..."
+    # Re-escaneamos el repo local para APT (si está configurado en sources.list)
+    # Si el usuario no tiene agregado el repo local a su sources.list, esto fallará con 'package not found' o instalará de internet (viejas).
+    # MEJOR: Instalamos directamente el .deb generado para asegurar que es la última versión local.
+    
+    # Buscamos el .deb más reciente
+    LATEST_DEB=$(ls -t pool/main/g/ghostwhisperchat/*.deb | head -n1)
+    
+    if [ -z "$LATEST_DEB" ]; then
+        echo "[X] No se generó el .deb"
+        exit 1
+    fi
+    
+    sudo apt install "./$LATEST_DEB" -y
+    
+    echo "[*] Reiniciando demonio..."
+    systemctl --user restart ghostwhisperchat
+    
+    echo "✅ Actualización completada. Nueva versión:"
+    gwc version
+    exit 0
+fi
+
 # Default: Cliente
 python3 -m ghostwhisperchat.cliente "$@"

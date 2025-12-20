@@ -42,19 +42,13 @@ class Motor:
         self.ipc_sock.setblocking(False)
 
     def bucle_principal(self):
-        print("[*] Iniciando Motor GWC v2.1 (Headless)...")
+        """Loop principal del Demonio"""
+        print("[*] Iniciando Motor GWC v2.1...", file=sys.stderr)
         
         if not self.red.iniciar_servidores():
-            print("[X] Fallo en red. Abortando.")
+            print("[X] Fallo en red. Abortando.", file=sys.stderr)
             return
 
-        self.iniciar_ipc()
-        self.running = True
-        
-        print("[*] Daemon listo. Esperando eventos...")
-
-    def bucle_principal(self):
-        """Loop principal del Demonio"""
         self.iniciar_ipc()
         self.running = True
         
