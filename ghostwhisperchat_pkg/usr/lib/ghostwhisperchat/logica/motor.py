@@ -1,0 +1,270 @@
+# /usr/lib/ghostwhisperchat/logica/motor.py
+# Motor Principal (Event Loop) - Refactor v2.1
+
+import select
+import socket
+import os
+import time
+import sys
+import threading
+from ghostwhisperchat.core.estado import MemoriaGlobal
+from ghostwhisperchat.core.transporte import GestorRed
+from ghostwhisperchat.core.protocolo import empaquetar, desempaquetar
+from ghostwhisperchat.core.launcher import abrir_chat_ui
+from ghostwhisperchat.logica.comandos import parsear_comando
+from ghostwhisperchat.logica import grupos
+from ghostwhisperchat.logica.notificaciones import enviar_notificacion, preguntar_invitacion_chat
+
+IPC_SOCK_PATH = os.path.expanduser("~/.ghostwhisperchat/gwc.sock")
+
+class Motor:
+    def __init__(self):
+        self.memoria = MemoriaGlobal()
+        self.red = GestorRed()
+        self.ipc_sock = None
+        self.running = False
+        
+        # Mapeo de UI Sockets: { "ID_CHAT": socket_ipc }
+        # Esto permite enrutar mensajes al proceso de UI correcto
+        self.ui_sessions = {} 
+
+    def iniciar_ipc(self):
+        if os.path.exists(IPC_SOCK_PATH):
+            try:
+                os.unlink(IPC_SOCK_PATH)
+            except OSError:
+                pass
+        
+        self.ipc_sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        self.ipc_sock.bind(IPC_SOCK_PATH)
+        self.ipc_sock.listen(5) # Aceptamos varias conexiones simultaneas (transitorias + UIs)
+        self.ipc_sock.setblocking(False)
+
+    def bucle_principal(self):
+        print("[*] Iniciando Motor GWC v2.1 (Headless)...")
+        
+        if not self.red.iniciar_servidores():
+            print("[X] Fallo en red. Abortando.")
+            return
+
+        self.iniciar_ipc()
+        self.running = True
+        
+        print("[*] Daemon listo. Esperando eventos...")
+
+        while self.running:
+            # Lista de sockets a vigilar: Red + IPC + UI Clients Activos
+            sockets_red = self.red.get_sockets_lectura()
+            sockets_ui = list(self.ui_sessions.values())
+            
+            rlist = sockets_red + [self.ipc_sock] + sockets_ui
+            
+            try:
+                readable, _, _ = select.select(rlist, [], [], 1.0)
+            except select.error:
+                continue
+
+            for s in readable:
+                # 1. IPC Listener (Nuevas conexiones locales)
+                if s == self.ipc_sock:
+                    try:
+                        conn, _ = s.accept()
+                        conn.setblocking(True) # Leemos blocking brevemente para handshake
+                        # En v2.1 el cliente transitorio manda y cierra.
+                        # El cliente UI manda y se queda.
+                        # Leemos primera linea o chunk
+                        data = conn.recv(4096)
+                        if data:
+                            texto = data.decode('utf-8').strip()
+                            self.procesar_ipc_mensaje(texto, conn)
+                        else:
+                            conn.close()
+                    except:
+                        pass
+                
+                # 2. Mensajes de UIs ya conectadas (User Input en chat windows)
+                elif s in sockets_ui:
+                    try:
+                        data = s.recv(4096)
+                        if data:
+                            self.procesar_input_chat_ui(s, data.decode('utf-8'))
+                        else:
+                            self.desconectar_ui(s)
+                    except:
+                        self.desconectar_ui(s)
+
+                # 3. UDP Discovery
+                elif s == self.red.sock_udp:
+                    try:
+                        data, addr = s.recvfrom(65535)
+                        self.manejar_paquete_red(data, addr, "UDP")
+                    except OSError:
+                        pass
+                
+                # 4. TCP Listeners
+                elif s == self.red.sock_tcp_group or s == self.red.sock_tcp_priv:
+                     self.red.aceptar_conexion(s) # Acepta y añade a lista interna de inputs
+
+                # 5. TCP Datos (Red Messages)
+                else: 
+                    # Puede ser un socket de red...
+                    try:
+                        data = s.recv(8192)
+                        if data:
+                            parts = data.split(b'\n')
+                            for p in parts:
+                                if p:
+                                    self.manejar_paquete_red(p, s.getpeername(), "TCP", s)
+                        else:
+                            self.red.cerrar_tcp(s)
+                    except OSError:
+                         self.red.cerrar_tcp(s)
+
+            self.tareas_mantenimiento()
+
+    # --- MANEJO IPC / COMANDOS LOCALES ---
+    
+    def procesar_ipc_mensaje(self, texto, conn):
+        """
+        Maneja tanto comandos transitorios ("--dm ...") 
+        como registros de UI ("__REGISTER_UI__ ...")
+        """
+        if texto.startswith("__REGISTER_UI__"):
+            # Es una ventana de chat persistente
+            # Formato: __REGISTER_UI__ TIPO ID
+            partes = texto.split(" ", 2)
+            if len(partes) >= 3:
+                chat_id = partes[2]
+                self.ui_sessions[chat_id] = conn
+                print(f"[UI] Registrada ventana para {chat_id}")
+                # Le mandamos historial reciente si tuvieramos...
+                conn.sendall(f"[*] Conectado al Daemon. ID: {chat_id}\n".encode('utf-8'))
+            return # NO cerramos la conexión
+
+        elif texto.startswith("__MSG__"):
+            # Esto deberia venir por el socket persistente, pero por si acaso
+            pass
+
+        else:
+            # Comando Transitorio Normal
+            result_msg = self.ejecutar_comando_transitorio(texto)
+            conn.sendall(result_msg.encode('utf-8'))
+            conn.close() # Transitorio = Cierra al terminar
+
+    def procesar_input_chat_ui(self, sock_ui, texto):
+        # Mensajes que escribe el usuario en la ventana
+        if texto.startswith("__MSG__"):
+            msg_content = texto.replace("__MSG__ ", "", 1)
+            # Buscar quien es este socket
+            chat_id = None
+            for uid, s in self.ui_sessions.items():
+                if s == sock_ui:
+                    chat_id = uid
+                    break
+            
+            if chat_id:
+                # ENVIAR A LA RED
+                print(f"[DEBUG] Enviando msg a {chat_id}: {msg_content}")
+                # Aqui iria logica de red: buscar peer IP, empaquetar MSG, enviar TCP...
+                # Simulado por ahora: Eco local
+                # sock_ui.sendall(f"Yo: {msg_content}\n".encode('utf-8'))
+                
+                # IMPLEMENTACION REAL V2.1 TCP PRIVADO:
+                peer = self.memoria.obtener_peer_por_id_o_ip(chat_id) # Necesitamos esa funcion
+                if peer:
+                    # Logica enviar TCP... pendiente conectar transporte
+                    pass
+
+    def desconectar_ui(self, sock):
+        to_del = None
+        for uid, s in self.ui_sessions.items():
+            if s == sock:
+                to_del = uid
+                break
+        if to_del:
+            del self.ui_sessions[to_del]
+            try:
+                sock.close()
+            except:
+                pass
+            print(f"[UI] Ventana {to_del} cerrada.")
+
+    def ejecutar_comando_transitorio(self, cmd_raw):
+        # Parseamos con logica de comandos anterior
+        cmd, args = parsear_comando(cmd_raw)
+        
+        if cmd == "DM": # --dm PEdro
+             dest = args[0]
+             # Lógica simplificada: Iniciar Chat
+             # 1. Buscar IP de Pedro
+             # 2. Mandar CHAT_REQ
+             # 3. Si ACK -> abrir_chat_ui(dest)
+             # Por ahora simulamos éxito local para probar UI
+             
+             # Simulacion: El usuario pide iniciar chat. Lo abrimos directamente?
+             # No, protocolo dice esperar CHAT_ACK.
+             # Pero para probar: Lanzamos ventana.
+             abrir_chat_ui(dest, es_grupo=False)
+             return f"[*] Abriendo chat con {dest}..."
+
+        elif cmd == "SCAN":
+             pkg = empaquetar("DISCOVER", {"filter": "ALL"}, "ALL")
+             self.red.enviar_udp_broadcast(pkg)
+             return "[*] Escaneo enviado. Espera notificaciones..."
+
+        elif cmd == "EXIT":
+             self.running = False
+             return "[!] Apagando Demonio..."
+             
+        return f"[?] Comando recibido: {cmd_raw}"
+
+    # --- MANEJO RED INCOMING ---
+
+    def manejar_paquete_red(self, data_bytes, addr, proto, sock_tcp=None):
+        valid, data = desempaquetar(data_bytes)
+        if not valid: return
+        
+        tipo = data.get("tipo")
+        payload = data.get("payload")
+        origen = data.get("origen")
+        
+        # Identity housekeeping
+        if origen:
+             # Hack para memoria: necesitamos guardar UID -> IP
+             self.memoria.actualizar_peer(origen['ip'], origen['uid'], origen['nick'])
+
+        if tipo == "CHAT_REQ":
+            # Alguien quiere hablar.
+            # 1. Preguntar al usuario (Zenity)
+            acepta = preguntar_invitacion_chat(origen['nick'], origen['uid'])
+            
+            if acepta:
+                # 2. Mandar ACK (Pendiente implementar envio)
+                # ... enviar_tcp(CHAT_ACK) ...
+                
+                # 3. Abrir Ventana
+                abrir_chat_ui(origen['uid']) # Usamos UID como ID unico
+            else:
+                pass # Mandar REJECT
+
+        elif tipo == "MSG":
+            # Mensaje entrante.
+            # ¿Tengo ventana abierta para esto?
+            # origen['uid'] es el ID del chat privado
+            chat_id = origen['uid']
+            
+            if chat_id in self.ui_sessions:
+                # Si, enviar al socket UI
+                s_ui = self.ui_sessions[chat_id]
+                fmt_msg = f"\n[{origen['nick']}]: {payload.get('text')}\n"
+                try:
+                    s_ui.sendall(fmt_msg.encode('utf-8'))
+                except:
+                    pass
+            else:
+                # No hay ventana? Notificar y quizás abrir?
+                enviar_notificacion(f"Mensaje de {origen['nick']}", payload.get('text'))
+                # Opcional: Auto abrir si no es spam
+                
+    def tareas_mantenimiento(self):
+        pass

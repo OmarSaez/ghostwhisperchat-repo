@@ -4,7 +4,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/ghostwhisperchat --daemon
+ExecStart=/usr/bin/gwc --start
 Restart=always
 RestartSec=10
 Environment=DISPLAY=:0

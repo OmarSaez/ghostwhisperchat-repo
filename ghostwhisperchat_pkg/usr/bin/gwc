@@ -1,0 +1,18 @@
+#!/bin/bash
+# Launcher principal de GhostWhisperChat
+
+export PYTHONPATH=$PYTHONPATH:/usr/lib/ghostwhisperchat
+
+if [ "$1" == "--start" ]; then
+    echo "Iniciando Demonio..."
+    python3 -m ghostwhisperchat.demonio &
+    exit 0
+fi
+
+if [ "$1" == "--check" ]; then
+    python3 -m ghostwhisperchat.core.diagnostico
+    exit 0
+fi
+
+# Default: Cliente
+python3 -m ghostwhisperchat.cliente "$@"

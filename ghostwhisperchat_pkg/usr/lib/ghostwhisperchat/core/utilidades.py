@@ -1,0 +1,76 @@
+# /usr/lib/ghostwhisperchat/core/utilidades.py
+# Modulo de utilidades generales para GhostWhisperChat 2.0
+
+import socket
+import re
+import unicodedata
+
+def get_local_ip():
+    """
+    Obtiene la IP de la interfaz de red principal que tiene salida al exterior.
+    Crea un socket UDP dummy hacia una IP pública (Google DNS) para determinar
+    qué interfaz usa el sistema por defecto. No envía datos reales.
+    """
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.settimeout(0)
+    try:
+        # No se necesita establecer conexión real, solo determinar la ruta
+        s.connect(('8.8.8.8', 1))
+        ip = s.getsockname()[0]
+    except Exception:
+        ip = '127.0.0.1'
+    finally:
+        s.close()
+    return ip
+
+def normalize_text(text):
+    """
+    Normaliza un texto para comparaciones (IDs, comandos, etc).
+    1. Convierte a minúsculas.
+    2. Elimina acentos/diacríticos (unidecode-style pero con librería estándar).
+    3. Elimina espacios al inicio y final.
+    Ej: "Ómar Sáez " -> "omarsaez" (segun arquitectura, aunque el ejemplo decia strip, 
+    usualmente ids quitan espacios internos también o normalizan. 
+    La arquitectura dice: Quita tildes, mayúsculas y espacios.
+    Ejemplo entrada: "Ómar Sáez", Salida: "omarsaez". 
+    Así que quitaremos espacios internos también para IDs de grupo, 
+    pero cuidado con mensajes. Esta función es para IDs/Normalización estricta.
+    """
+    if not isinstance(text, str):
+        return ""
+    
+    # 1. Lowercase
+    text = text.lower()
+    
+    # 2. Eliminar tildes (NFD separation + filtering non-spacing marks)
+    text = ''.join(c for c in unicodedata.normalize('NFD', text)
+                   if unicodedata.category(c) != 'Mn')
+    
+    # 3. Strip whitespace
+    text = text.strip()
+    
+    # 4. Eliminar espacios internos si queremos que "Ómar Sáez" sea "omarsaez"
+    # Segun arquitectura: "Ejemplo Entrada: 'Ómar Sáez' -> Salida: 'omarsaez'"
+    text = text.replace(" ", "")
+    
+    return text
+
+def validar_nick(nick):
+    """
+    Valida si un nickname cumple con las reglas:
+    - Longitud: 3 a 15 caracteres.
+    - Caracteres: Alfanuméricos y guion bajo _.
+    - Sin espacios.
+    """
+    if not nick:
+        return False
+        
+    if len(nick) < 3 or len(nick) > 15:
+        return False
+        
+    # Regex: Solo letras, numeros y guion bajo
+    patron = r'^[a-zA-Z0-9_]+$'
+    if not re.match(patron, nick):
+        return False
+        
+    return True
