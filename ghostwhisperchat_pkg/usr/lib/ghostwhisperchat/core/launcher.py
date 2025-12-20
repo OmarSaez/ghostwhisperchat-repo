@@ -1,9 +1,16 @@
-# /usr/lib/ghostwhisperchat/core/launcher.py
-# Lanzador de Terminales Agnostico (v2.1)
-
 import shutil
 import subprocess
 import os
+import sys
+import shlex
+
+# LOGGING SIMPLE (DEBUG)
+def log_launcher(msg):
+    try:
+        with open("/tmp/gwc_launcher.log", "a") as f:
+            f.write(f"{msg}\n")
+    except:
+        pass
 
 # Lista PRIORIZADA de terminales soportados
 # (binario, flag_ejecucion)
@@ -29,35 +36,49 @@ def abrir_chat_ui(id_destino, es_grupo=False):
     Abre una nueva ventana de terminal ejecutando el modo UI del cliente.
     Ejecuta: gwc --chat-ui <ID>
     """
-    term, flag = detectar_terminal()
     
-    if not term:
-        # Fallback critico si no hay terminal grafica detectada
-        print(f"[X] No se detectó terminal compatible para abrir chat con {id_destino}")
-        return False
     # Construir el comando del hijo
-    # NOTA: Usamos sys.executable para garantizar que usamos el mismo python
-    # Y escapamos los argumentos correctamente
-    cmd_inner = f"{sys.executable} -m ghostwhisperchat.cliente --chat-ui {id_destino}"
+    # Usamos sys.executable para apuntar al mismo intérprete Python
+    cmd_inner_str = f"{sys.executable} -m ghostwhisperchat.cliente --chat-ui {id_destino}"
     if es_grupo:
-        cmd_inner += " --group"
+        cmd_inner_str += " --group"
+    
+    # Dividir comando interno en lista argumentos seguros
+    inner_args = shlex.split(cmd_inner_str)
         
     log_launcher(f"[LAUNCHER] Solicitud abrir UI: ID={id_destino}, GRUPO={es_grupo}")
-    log_launcher(f"[LAUNCHER] Comando interno: {cmd_inner}")
+    log_launcher(f"[LAUNCHER] Comando interno raw: {cmd_inner_str}")
 
     for term, flag in TERMINALES:
         if shutil.which(term):
             # Construir comando final
-            # Ej: gnome-terminal -- /usr/bin/python3 -m ghostwhisperchat.cliente ...
+            # Ej: ['gnome-terminal', '--title', '...', '--', 'python3', '-m', ...]
             
-            # Algunos terminales (gnome-terminal) usan --title
             args_term = [term]
+            
+            # Flags específicos de terminal
             if term == "gnome-terminal":
                  args_term.extend(["--title", f"Chat GWC: {id_destino}"])
             
+            # Flag de ejecución ("--" o "-e" o "-x")
             args_term.append(flag)
-            # shlex.split del inner command para pasarlo como lista de argumentos al exec
-            args_term.extend(shlex.split(cmd_inner))
+            
+            # Añadimos los argumentos del comando interno
+            args_term.extend(inner_args)
+            
+            log_launcher(f"[LAUNCHER] Intentando terminal: {term}")
+            log_launcher(f"[LAUNCHER] Exec args: {args_term}")
+            
+            try:
+                subprocess.Popen(args_term, start_new_session=True)
+                log_launcher(f"[LAUNCHER] Éxito lanzando {term}")
+                return True
+            except Exception as e:
+                log_launcher(f"[LAUNCHER] Error lanzando {term}: {e}")
+                continue
+                
+    log_launcher("[LAUNCHER] No se encontró terminal compatible.")
+    return False
             
             log_launcher(f"[LAUNCHER] Intentando terminal: {term}")
             log_launcher(f"[LAUNCHER] Exec args: {args_term}")
