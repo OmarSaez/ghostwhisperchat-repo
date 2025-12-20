@@ -2,26 +2,26 @@ Origin: GhostWhisperChat
 Label: GhostWhisperChat Repo
 Suite: stable
 Codename: stable
-Version: 2.0
+Version: 2.1
 Architectures: amd64 all arm64 i386
 Components: main
 Description: Official GhostWhisperChat Repository
-Date: Sat, 20 Dec 2025 14:59:15 +0000
+Date: Sat, 20 Dec 2025 15:15:26 +0000
 MD5Sum:
- b4755ea1252f11e86d2dae98370b4870 531 main/binary-amd64/Packages
- d1227ca97690367e8f26f967b112021e 403 main/binary-amd64/Packages.gz
- b4755ea1252f11e86d2dae98370b4870 531 main/binary-all/Packages
- d1227ca97690367e8f26f967b112021e 403 main/binary-all/Packages.gz
- b4755ea1252f11e86d2dae98370b4870 531 main/binary-arm64/Packages
- d1227ca97690367e8f26f967b112021e 403 main/binary-arm64/Packages.gz
- b4755ea1252f11e86d2dae98370b4870 531 main/binary-i386/Packages
- d1227ca97690367e8f26f967b112021e 403 main/binary-i386/Packages.gz
+ c2399b2192617242dff52f150fae66b1 1062 main/binary-amd64/Packages
+ 892c751ba964ec6177e2f0a0cd6a11bb 517 main/binary-amd64/Packages.gz
+ c2399b2192617242dff52f150fae66b1 1062 main/binary-all/Packages
+ 892c751ba964ec6177e2f0a0cd6a11bb 517 main/binary-all/Packages.gz
+ c2399b2192617242dff52f150fae66b1 1062 main/binary-arm64/Packages
+ 892c751ba964ec6177e2f0a0cd6a11bb 517 main/binary-arm64/Packages.gz
+ c2399b2192617242dff52f150fae66b1 1062 main/binary-i386/Packages
+ 892c751ba964ec6177e2f0a0cd6a11bb 517 main/binary-i386/Packages.gz
 SHA256:
- 2180cfdcb7058a06afb47ed4bc52d1a6eab72c71f7aa2da5e24560848abfa12e 531 main/binary-amd64/Packages
- 21d2489af540a865ec33a927a38df724890c9502062502793289eb3536808ea2 403 main/binary-amd64/Packages.gz
- 2180cfdcb7058a06afb47ed4bc52d1a6eab72c71f7aa2da5e24560848abfa12e 531 main/binary-all/Packages
- 21d2489af540a865ec33a927a38df724890c9502062502793289eb3536808ea2 403 main/binary-all/Packages.gz
- 2180cfdcb7058a06afb47ed4bc52d1a6eab72c71f7aa2da5e24560848abfa12e 531 main/binary-arm64/Packages
- 21d2489af540a865ec33a927a38df724890c9502062502793289eb3536808ea2 403 main/binary-arm64/Packages.gz
- 2180cfdcb7058a06afb47ed4bc52d1a6eab72c71f7aa2da5e24560848abfa12e 531 main/binary-i386/Packages
- 21d2489af540a865ec33a927a38df724890c9502062502793289eb3536808ea2 403 main/binary-i386/Packages.gz
+ bb0578659036bc624278a2ca8896009fd0d92362d13a2a8e6950d3d154273a44 1062 main/binary-amd64/Packages
+ fe9e6e6c17692b14974b44fea94cb1b7505bbd73fa2ba15468b4c5038bbbb1d1 517 main/binary-amd64/Packages.gz
+ bb0578659036bc624278a2ca8896009fd0d92362d13a2a8e6950d3d154273a44 1062 main/binary-all/Packages
+ fe9e6e6c17692b14974b44fea94cb1b7505bbd73fa2ba15468b4c5038bbbb1d1 517 main/binary-all/Packages.gz
+ bb0578659036bc624278a2ca8896009fd0d92362d13a2a8e6950d3d154273a44 1062 main/binary-arm64/Packages
+ fe9e6e6c17692b14974b44fea94cb1b7505bbd73fa2ba15468b4c5038bbbb1d1 517 main/binary-arm64/Packages.gz
+ bb0578659036bc624278a2ca8896009fd0d92362d13a2a8e6950d3d154273a44 1062 main/binary-i386/Packages
+ fe9e6e6c17692b14974b44fea94cb1b7505bbd73fa2ba15468b4c5038bbbb1d1 517 main/binary-i386/Packages.gz

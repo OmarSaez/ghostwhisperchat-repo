@@ -32,6 +32,8 @@ fi
 
 echo "ℹ️  Para activar el inicio automático, ejecuta como TU USUARIO:"
 echo "   systemctl --user enable --now ghostwhisperchat"
+echo "   Despues puedes usar gwc "version" para ver la version del paquete"
+echo "   Por utlimo "gwc ayuda" para ver el listado de comandos de GhostWhisperChat"
 
 # Nota: No podemos ejecutar systemctl --user aquí porque corremos como root (sudo dpkg)
 # y no sabemos cual es el usuario "real" que lo usará.
