@@ -1,7 +1,7 @@
 #!/bin/bash
 # Launcher principal de GhostWhisperChat
 
-export PYTHONPATH=$PYTHONPATH:/usr/lib/ghostwhisperchat
+export PYTHONPATH=$PYTHONPATH:/usr/lib
 
 if [ "$1" == "--start" ]; then
     echo "Iniciando Demonio..."
