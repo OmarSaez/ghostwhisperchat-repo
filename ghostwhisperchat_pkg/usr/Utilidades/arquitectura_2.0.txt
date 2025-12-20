@@ -1,0 +1,798 @@
+========================================================================================================
+GHOSTWHISPERCHAT 2.0 - ARQUITECTURA "GREENFIELD" (DOCUMENTO MAESTRO) - Sistema de chats decentralizado
+========================================================================================================
+
+OBJETIVO GENERAL:
+Crear una plataforma de comunicación LAN distribuida, sin servidor central, robusta, modular y extensible.
+El sistema debe soportar chat 1 a 1 (Privado), Grupos Privados (con clave) y Grupos Públicos (descubribles).
+
+--- 1. ESTRUCTURA DEL PROYECTO (DETALLE DE IMPLEMENTACIÓN) ---
+
+El código se organizará separando datos, lógica y transporte. A continuación, el contenido esperado de cada módulo:
+
+/usr/lib/ghostwhisperchat/
+├── core/                  # INFRAESTRUCTURA (BAJO NIVEL - "FONTANERÍA")
+│   ├── __init__.py
+│   ├── transporte.py      # GESTOR DE SOCKETS
+│   │   - Clase `GestorRed`: Facade para todas las operaciones de red.
+│   │   - `iniciar_servidores()`: Levanta los 3 puertos (UDP 44495, TCP 44496, TCP 44494).
+│   │   - `enviar_udp(ip, data)`: Envía datagramas crudos.
+│   │   - `enviar_tcp(ip, port, data)`: Gestiona conexión, envío y cierre (o keep-alive).
+│   │   - `get_readable_sockets()`: Retorna lista de sockets para `select.select()`.
+│   ├── protocolo.py       # TRADUCTOR Y VALIDADOR
+│   │   - `empaquetar(tipo, payload, destino)`: Crea el JSON final con headers y timestamp.
+│   │   - `desempaquetar(bytes)`: Valida JSON, chequea versión y integridad.
+│   │   - `validar_schema(dict)`: Verifica que los campos obligatorios existan.
+│   ├── estado.py          # MEMORIA RAM (SINGLETON)
+│   │   - Clase `MemoriaGlobal`: Almacén central de datos volátiles.
+│   │   - `PEERS`: Dict {IP: {Nick, LastSeen, Status}}.
+│   │   - `GRUPOS_ACTIVOS`: Dict {GID: {Miembros: [], Mensajes: []}}.
+│   │   - `BUZON_PRIVADO`: Lista de mensajes 1 a 1 recibidos.
+│   ├── utilidades.py      # HERRAMIENTAS GENERALES
+│   │   - `get_local_ip()`: Obtiene la IP de la interfaz LAN principal.
+│   │   - `normalize_text(str)`: Quita tildes, mayúsculas y espacios.
+│   │   - `validar_nick(str)`: Reglas Regex para nombres de usuario.
+│   └── diagnostico.py     # NUEVO: AUTO-COMPROBACIÓN DEL SISTEMA
+│       - `check_dependencies()`: ¿Está Zenity? ¿Fuser?
+│       - `check_ports()`: ¿Están los puertos 44494-96 abiertos/escuchando?
+│       - `check_filesystem()`: Permisos de escritura en ~/.ghostwhisperchat.
+│       - `check_firewall()`: Detecta UFW/IPtables y sugiere comandos.
+│       - `generar_reporte()`: Imprime el estado visualmente limpio.
+│
+├── datos/                 # DATOS ESTÁTICOS Y PERSISTENCIA ("DISCO")
+│   ├── __init__.py
+│   ├── config.py          # GESTOR DE CONFIGURACIÓN
+│   │   - `cargar_config()`: Lee `inter_chat.json`.
+│   │   - `guardar_config(dict)`: Escribe atómicamente en disco.
+│   │   - `crear_default()`: Genera estructura base si no existe archivo.
+│   ├── contactos.py       # AGENDA
+│   │   - `agregar_contacto(uid, nick, ip)`: Guarda a alguien conocido.
+│   │   - `get_confianza(uid)`: Retorna si es un usuario verificado/bloqueado.
+│   └── recursos.py        # CONSTANTES VISUALES
+│       - Clase `Colores`: Códigos ANSI.
+│       - Dict `ABREVIACIONES`: Mapeo de comandos cortos a largos.
+│       - String `BANNER`: Logo ASCII.
+│       - String `AYUDA`: Texto completo del manpage.
+│
+├── logica/                # LÓGICA DE NEGOCIO ("CEREBRO")
+│   ├── __init__.py
+│   ├── comandos.py        # INTÉRPRETE DE COMANDOS
+│   │   - `procesar_input(str)`: Recibe "--join x", devuelve Objeto Acción.
+│   │   - `ejecutar_accion(accion)`: Llama a los métodos de grupos o red.
+│   ├── grupos.py          # LÓGICA DE GRUPOS
+│   │   - `crear_grupo(nombre, publico, clave)`: Calcula Hash, inicia broadcast.
+│   │   - `unirse_grupo(nombre)`: Inicia protocolo de descubrimiento.
+│   │   - `sync_lista(lista_remota)`: Actualiza tabla de miembros local.
+│   ├── notificaciones.py  # GESTOR DE ALERTAS (USER EXPERIENCE)
+│   │   - `mostrar_pop(titulo, cuerpo)`: Wrapper para `subprocess.run(['zenity', ...])`.
+│   │   - `check_spam(origen)`: Verifica timestamps para evitar flood de pops.
+│   │   - `should_notify(evento)`: Consulta config "No Molestar".
+│   └── motor.py           # COORDINADOR (OPCIONAL)
+│       - `bucle_principal()`: Orquesta el `select()` y despacha eventos a lógica.
+│
+├── demonio.py             # ENTRY POINT SERVICIO
+│   - Inicializa `MemoriaGlobal`.
+│   - Carga `Config`.
+│   - Lanza `bucle_principal()` de `motor.py`.
+│
+└── cliente.py             # ENTRY POINT INTERFAZ
+    - Conecta al socket Unix del Demonio.
+    - Loop de lectura de `sys.stdin` (Teclado) -> Envía comando.
+    - Loop de lectura de Socket Unix (Eventos) -> `print()` con colores.
+
+--- 2. FORMATO DE DATOS (JSON PURO) ---
+
+Se elimina el uso de separadores propietarios (`<SEPARATOR>`, `|`). Todo es JSON UTF-8.
+Esto previene errores de parsing y permite estructuras complejas anidadas.
+
+Base del Paquete:
+{
+    "ver": 2,                   # Versión del protocolo.
+    "tipo": "MSG",              # Enum: [JOIN, HELLO, MSG, PING, LIST_SYNC, DISCOVER]
+    "token": "a1b2...",         # Token de sesión o Hash temporal.
+    "origen": {                 
+        "uid": "sh256...",      # ID único persistente (Hash de mac/user).
+        "nick": "Usuario",      # Nombre visible actual.
+        "ip": "192.168.1.X"     # IP emisora (útil si hay NAT/Docker).
+    },
+    "destino": "gid_hash",      # ID del Grupo o UID del usuario destino.
+    "payload": { Aqui va el formato JSON definido en formatos_json.txt},    # Datos variables según el tipo.
+    "meta": {                   # Metadatos opcionales
+        "ts": 17098234,         # Timestamp.
+        "grp_name": "Oficina"   # Nombre legible del grupo (para Públicos).
+    }
+}
+
+--- 3. PROTOCOLOS DE RED (SEPARACIÓN POR PUERTOS) ---
+
+Usaremos 3 puertos para evitar que el tráfico de grupos interfiera con el privado o el descubrimiento.
+
+A. UDP (Puerto 44495) -> "EL RADAR" (DISCOVERY)
+   - Uso Exclusivo: Descubrimiento de red, latidos (heartbeats) y anuncios.
+   - Tráfico: Broadcast (`255.255.255.255`) y Unicast ligero.
+   - Mensajes típicos: `WHO_IS_THERE?`, `LOOKING_FOR_GROUP`, `I_AM_PUBLIC_GROUP`.
+
+B. TCP (Puerto 44496) -> "LA SALA DE REUNIONES" (GRUPOS)
+   - Uso Exclusivo: Tráfico de Chat Grupal (Mesh).
+   - Comportamiento: Conexión persistente mientras se está en el grupo (o efímera para sync, a definir).
+   - Característica: Sincronización de listas de miembros.
+
+C. TCP (Puerto 44494) -> "EL SUSURRO" (PRIVADOS)
+   - Uso Exclusivo: Chat 1 a 1 directo.
+   - Ventaja: Si el puerto de grupos se satura, el chat privado sigue fluyendo por su carril exclusivo.
+   - Comportamiento: Conexión directa P2P entre dos usuarios.
+
+--- 4. LÓGICA DE GRUPOS: EL MODELO DETERMINISTA ---
+
+PRINCIPIO FUNDAMENTAL: EL NOMBRE ES LA LLAVE.
+El ID interno del grupo NO es aleatorio. Se calcula siempre así: `ID = SHA256(normalize(NOMBRE))`.
+Esto permite unirse a un grupo solo sabiendo su nombre, sin necesitar códigos de invitación.
+
+A. DEFINICIÓN DE TIPOS
+   1. GRUPO PÚBLICO:
+      - Atributos: `Nombre`, `ID` (Hash del nombre).
+      - Requisito: Nombre único en la LAN.
+      - Visibilidad: Responde a escaneos globales (`DISCOVER_PUBLIC`).
+      - Acceso: Libre. Cualquiera que sepa el nombre entra.
+
+   2. GRUPO PRIVADO:
+      - Atributos: `Nombre`, `ID` (Hash del nombre), `HashClave` (Hash de la contraseña).
+      - Requisito: Nombre único en la LAN (para evitar colisiones de ID).
+      - Visibilidad: OCULTO. No responde a escaneos globales. Solo responde a `SEARCH(ID_ESPECIFICO)`.
+      - Acceso: Requiere Handshake criptográfico (demostrar que tienes la clave).
+
+B. COMANDOS DE USUARIO (CLI) - SIN AMBIGÜEDAD
+
+   1. CREAR GRUPO PÚBLICO:
+      `--crear-publico "Salud"`
+      - Acción: Calcula ID. Hace Broadcast `SEARCH(ID)`.
+      - Si nadie responde (ID libre) -> Crea el grupo y se proclama Embajador.
+      - Si alguien responde -> Error: "El nombre 'Salud' ya está en uso".
+
+   2. CREAR GRUPO PRIVADO:
+      `--crear-privado "ProyectoX" "secreto123"`
+      - Acción: Calcula ID. Calcula HashClave. Hace Broadcast `SEARCH(ID)`.
+      - Si alguien responde -> Error: "El nombre 'ProyectoX' ya está en uso".
+      - Si nadie responde -> Crea el grupo seguro.
+
+   3. UNIRSE (COMANDO UNIFICADO):
+      `--join "Nombre" [Clave]`
+      - El sistema calcula el ID localmente.
+      - Envía Broadcast `SEARCH(ID)`.
+      - ESCENARIO A (Es Público):
+          Recibe respuesta "EXISTE (Público)".
+          Se conecta automáticamente.
+      - ESCENARIO B (Es Privado + Usuario NO dio clave):
+          Recibe respuesta "EXISTE (Privado)".
+          Error local: "Este grupo requiere clave. Pruebe: --join 'Nombre' 'Clave'".
+      - ESCENARIO C (Es Privado + Usuario SÍ dio clave):
+          Recibe respuesta "EXISTE (Privado)".
+          Inicia Handshake TCP enviando el Hash de su clave candidata.
+          Si el Embajador valida el hash -> WELCOME.
+
+   4. EXPLORAR:
+      `--ver-grupos` o `--list-public`
+      - Envía Broadcast `DISCOVER_PUBLIC`.
+      - Los Embajadores de grupos públicos responden con `{Nombre, CantidadMiembros}`.
+      - Se muestra una lista estilo servidor de juegos.
+
+C. EL EMBAJADOR (MESH OPTIMIZADO)
+   - Problema V1: Al preguntar "¿Quién está ahí?", 50 PCs respondían a la vez.
+   - Solución V2:
+     - Regla: "Solo responde a búsquedas públicas quien tenga la IP más ALTA de la lista de miembros".
+     - Al unirse alguien nuevo, el Embajador le envía la LISTA COMPLETA por TCP.
+     - El nuevo usuario inicia conexión con el resto de la lista (Mesh Automático).
+
+--- 4-BIS. LÓGICA DE CHAT PRIVADO (P2P) ---
+
+El chat 1 a 1 utiliza el Puerto TCP Dedicado 44494.
+
+A. ESTABLECIMIENTO (HANDSHAKE)
+   1. SOLICITANTE -> DESTINO (TCP 44494):
+      `CHAT_REQUEST { "nick": "Juan" }`
+      - El Demonio del Destino consulta `logica/notificaciones.py`:
+        - ¿Está activo el modo 'No Molestar'? -> Rechazo automático.
+        - ¿Es spam (me ha invitado 10 veces en 1 min)? -> Ignorar.
+        - Si pasa filtros -> Envía evento al Cliente.
+      
+   2. DESTINO (Interfaz):
+      - Muestra Popup: "Juan quiere chatear. [Aceptar/Rechazar]".
+      - Si acepta ->
+      
+   3. DESTINO -> SOLICITANTE (TCP 44494):
+      `CHAT_ACCEPT { "nick": "Pedro" }`
+      
+   4. ESTADO ACTIVO:
+      - Ambos demonios marcan al otro peer como "EN_CHAT_PRIVADO".
+      - Se abre una pestaña específica en el Cliente.
+
+B. FLUJO DE MENSAJES
+   - Los mensajes van firmados (si implementamos critografía) o directos en JSON.
+   - No hay retransmisión a otros peers (no es Mesh). Es A <-> B puros.
+
+C. CIERRE DE SESIÓN
+   - Si Juan cierra la pestaña privada:
+     Juan -> Pedro: `CHAT_CLOSE { "razon": "Usuario cerró conexión" }`.
+   - El Demonio de Pedro recibe el cierre, notifica a su Cliente ("Juan se desconectó") y cierra el socket lógico.
+
+D. PERSISTENCIA DE CONTACTOS
+   - Al terminar un chat privado, se guarda el UID y Nick de la otra persona en `contactos.json`.
+   - Esto permite que en el futuro aparezca como "Sugerencia" o "Usuario Conocido" en lugar de IP desconocida.
+
+--- 5. GESTIÓN DE NOTIFICACIONES Y "NO MOLESTAR" (INTELIGENTE) ---
+Nuevo módulo `logica/notificaciones.py` con lógica anti-spam refinada.
+
+A. MENCIONES (@Usuario)
+   - Si un mensaje contiene `@TuNick` -> 
+     1. El Cliente busca la cadena en el texto.
+     2. Resalta la línea completa en AMARILLO (Hightlight).
+     3. Solicita enviar POP (Mensaje emergente) al Demonio.
+
+B. MODO "--silenciar" (NO MOLESTAR / DND)
+   El modo "Silenciar" (`--silenciar`) no aisla totalmente, es INTELIGENTE:
+   
+   1. REGLA BASE:
+      - Invitaciones entrantes: RECHAZO SILENCIOSO AUTOMÁTICO.
+      - Pops de sistema: OCULTOS.
+      - Mensaje al emisor: `CHAT_NO { "razon": "Usuario en silencio" }`.
+   
+   2. EXCEPCIÓN DE "INSISTENCIA" (EMERGENCIA):
+      - Si la MISMA IP vuelve a invitar en < 60 segundos (Insistencia)...
+      - SE ROMPE EL SILENCIO: Suena POP de alerta. 
+      - Mensaje visual: "⚠️ [IP] insiste en contactarte (Intento 2)".
+   
+   3. EXCEPCIÓN DE MENCIONES:
+      - Las menciones `@TuNick` siempre se ven en amarillo en el chat.
+      - Suenan 1 sola vez cada 2 minutos (Cooldown lento) para no spammear.
+      
+   4. INDICADOR VISUAL:
+      Prompt cambia a: `GWC [Zzz] >` mientras esté activo.
+
+C. IMPLEMENTACIÓN CON ZENITY
+   - Los POPs son ventanas emergentes nativas de Linux.
+   - Usaremos `zenity --notification --text="Mensaje"` para alertas discretas.
+   - Usaremos `zenity --question` para aceptar/rechazar chats privados.
+
+--- 6. MÁQUINA DE ESTADOS (STATE MACHINE) ---
+
+Cada Peer en la memoria tendrá un estado finito para evitar "Fantasmas".
+
+[UNKNOWN] -> [SYNCING] -> [ACTIVE] -> [ZOMBIE] -> [REMOVED]
+
+--- 7. ESTÁNDAR VISUAL (UX/UI) ---
+
+FILOSOFÍA: "Coloreado por Bloques" + "Estructura Distintiva".
+- Sistema: Usa `[CORCHETES]`. Monocromático (Verde/Rojo/Amarillo/Azul).
+- Usuario: Usa `(PARÉNTESIS)`. Color Nick arbitrario + Texto Blanco.
+
+A. CATEGORÍAS DE COLOR (SEMÁNTICA)
+   1. CHAT HUMANOS (La base)
+      - Timestamp: Gris Oscuro (Discreto).
+      - Etiqueta: `(Nick):` -> CUALQUIER COLOR (incluso Verde, no hay conflicto).
+      - Mensaje: BLANCO (Lectura clara).
+
+   2. SISTEMA POSITIVO/INFO (Todo VERDE)
+      - Símbolos: `[+]` (Entrada), `[*]` (Info), `[?]` (Pregunta).
+      - Uso: Alguien se une, escaneo terminado, configuración guardada.
+      - Ejemplo: `[14:30] [Sistema]: [+] Omar se ha unido al grupo.` (Toda la línea Verde).
+
+   3. SISTEMA NEGATIVO/ALERTA (Todo AMARILLO)
+      - Símbolos: `[-]` (Salida), `[!]` (Advertencia).
+      - Uso: Alguien se va, reintentando conexión, usuario ocupado.
+      - Ejemplo: `[14:35] [Sistema]: [-] Parrot ha salido.` (Toda la línea Amarilla).
+
+   4. SISTEMA ERROR (Todo ROJO)
+      - Símbolos: `[X]` (Fallo Crítico).
+      - Uso: Error de red, destino inalcanzable, comando inválido.
+      - Ejemplo: `[14:36] [Sistema]: [X] Error: Host inalcanzable.` (Toda la línea Roja).
+
+   5. SISTEMA TEMPORAL (Todo AZUL)
+      - Sin etiqueta de sistema, solo info de proceso.
+      - Uso: Barras de carga, "Conectando...".
+      - Ejemplo: `[*] Buscando grupos...` (Azul, se borra al terminar).
+
+B. DETALLES DEL FORMATO
+   - TIMESTAMP: Formato `[HH:MM]`. Color `\033[90m` (Gris). Va al inicio de TODO.
+   - MENCIONES: Regex `r"@\b" + re.escape(MI_NICK_NORMALIZADO) + r"\b"`. Fondo/Texto Amarillo.
+
+C. EJEMPLOS VISUALES FINALES
+
+   1. SISTEMA (ÉXITO):
+      `[14:30] [Sistema]: [+] Omar se ha unido al grupo.`  <-- TODA LA LÍNEA VERDE
+
+   2. SISTEMA (ERROR):
+      `[14:31] [Sistema]: [X] Error: Host inalcanzable.`  <-- TODA LA LÍNEA ROJA
+
+   3. USUARIO (NORMAL):
+      `[14:32] (Juan): Hola, ¿cómo están?`                 <-- (Juan) en Color hash, Texto Blanco.
+
+   4. USUARIO (CON NICK VERDE - VÁLIDO):
+      `[14:33] (GreenLantern): Soy verde, soy usuario.`    <-- (GreenLantern) en Verde, Texto Blanco.
+
+   5. MENCIÓN RECIBIDA (DESTACADO):
+      `[14:34] (Pedro): @Omar revisa esto.`                <-- TODA LA LÍNEA AMARILLA.
+
+--- 8. NORMAS DE VALIDACIÓN Y NORMALIZACIÓN ---
+
+Para evitar errores lógicos y bugs visuales, se centraliza la limpieza de inputs en `core/utilidades.py`.
+
+A. REGLAS PARA NICKS
+   - Longitud: 3 a 15 caracteres.
+   - Caracteres: Alfanuméricos (`a-z`, `0-9`) y guion bajo `_`.
+   - PROHIBIDO: Espacios en blanco (rompen el parsing simple).
+   - PROHIBIDO: Caracteres especiales (`@`, `#`, `[`, `]`, `(`, `)`).
+
+B. FUNCIÓN DE NORMALIZACIÓN (`normalize_text`)
+   - Objetivo: Comparar nicks y comandos sin importar acentos o mayúsculas.
+   - Entrada: "Ómar Sáez"
+   - Proceso: `lower()` -> `unidecode` (quitar tildes) -> `strip()`.
+   - Salida: "omarsaez".
+   - Uso: 
+     - Para detectar menciones (`@ómar` activa a `Omar`).
+     - Para generar IDs de grupos (`Salud` y `salud` generan el mismo ID).
+
+--- 9. INSTALACIÓN Y DESPLIEGUE (.DEB / POSTINST) ---
+El instalador debe garantizar que el entorno sea propicio, no solo copiar archivos.
+
+A. DEPENDENCIAS DEL SISTEMA (`Depends` en control)
+   - `python3 (>= 3.6)`
+   - `zenity` (Interfaz mínima de diálogos)
+   - `libnotify-bin` (Notificaciones de escritorio `notify-send`)
+   - `psmisc` (Herramientas fuser/killall)
+   - `zip`, `unzip` (NUEVO: Para auto-zip de carpetas).
+
+B. SCRIPT POST-INSTALACIÓN (`postinst`)
+   1. Validar Entorno Gráfico: ¿Hay `$DISPLAY`? (Advertencia si es headless).
+   2. Configurar Firewall (UFW):
+      - Ejecutar `ufw allow 44494:44496/tcp`
+      - Ejecutar `ufw allow 44494:44496/udp`
+      - (Opcional) Detectar `firewalld` y aplicar reglas equivalentes.
+   3. Habilitar Servicio Daemon: `systemctl --user enable ghostwhisperchat`.
+
+C. COMANDO DE AUTO-DIAGNÓSTICO (`gwc --check`)
+   Llama a `core/diagnostico.py` y muestra:
+   - Estado de Dependencias (Zenity, Notificadores).
+   - Test de Puertos.
+   - Test de Escritura en Disco.
+   - Test de Conectividad Base.
+
+D. ACTUALIZACIÓN AUTOMÁTICA (`--update`)
+   - Verifica repositorio remoto o URL de versiones.
+   - Descarga nuevo `.deb` o realiza `git pull` si es versión dev.
+   - Reinicia el daemon de forma segura para aplicar cambios sin cerrar chats bruscamente si es posible.
+
+--- 10. PROTOCOLO DE TRANSFERENCIA DE ARCHIVOS ---
+
+El envío de archivos es una operación P2P directa que usa el puerto TCP 44494 (Privado).
+
+A. ENVÍO DE CARPETAS (AUTO-ZIP)
+   - Si el usuario arrastra una carpeta:
+     1. El Cliente detecta `os.path.isdir()`.
+     2. Crea un ZIP temporal: `/tmp/carpeta_uid.zip`.
+     3. Inicia transferencia del ZIP.
+
+B. FLUJO DE TRANSFERENCIA
+   1. EMISOR -> RECEPTOR:
+      `FILE_OFFER { "name": "foto.jpg", "size": 1048576, "hash": "md5..." }`
+   
+   2. RECEPTOR (Lógica):
+      - Verifica espacio en disco.
+      - Verifica configuración `--descarga`:
+        - Si es 'AUTO' -> Acepta directo.
+        - Si es 'ASK' -> Muestra PopUp Zenity: "¿Recibir 'foto.jpg' (1MB)?".
+   
+   3. RECEPTOR -> EMISOR:
+      `FILE_ACCEPT` o `FILE_REJECT`.
+   
+   4. EMISOR:
+      - Envía flujo de bytes (Chunks de 4KB) por el socket TCP.
+      - Muestra barra de progreso en CLI (Azul).
+
+C. DESTINO
+   - Los archivos se guardan en `~/Escritorio/GhostWhisperChat_Recibidos`.
+   - Se auto-renombran si ya existen para no sobrescribir.
+
+--- 11. FLUJO DE TRABAJO TÁCTICO (EL ORDEN CORRECTO) ---
+
+Estrategia: "De Adentro hacia Afuera". Construimos primero las piezas independientes y al final el ensamblaje.
+
+PASO 1: LOS CIMIENTOS (Dependencias Cero)
+   - `core/utilidades.py`: Porque necesito saber cómo validar un nick antes de procesar nada.
+   - `core/protocolo.py`: Porque necesito saber el formato JSON antes de intentar enviarlo.
+   - `datos/recursos.py`: Colores y textos (ya casi hecho).
+
+PASO 2: MEMORIA Y PERSISTENCIA (estado.py, config.py).
+PASO 3: LA TUBERÍA (transporte.py).
+PASO 4: EL LATIDO (demonio.py).
+PASO 5: LA VOZ (cliente.py).
+PASO 6: EL CEREBRO (logica/comandos.py, logica/grupos.py).
+PASO 7: POLISH (logica/notificaciones.py, core/diagnostico.py).
+
+--- 12. PUNTOS DE ENTRADA Y DATOS ---
+
+A. MAIN DEL SERVICIO (`demonio.py`).
+B. MAIN DEL CLIENTE (`cliente.py`).
+C. ARCHIVOS (config.json, contactos.json).
+
+=========================================================================
+DICCIONARIO DE ACCIONES (PROTOCOL TYPES) - GHOSTWHISPERCHAT 2.0
+=========================================================================
+
+--- 1. UDP: EL RADAR (PUERTO 44495) ---
+Mensajes de descubrimiento y mantenimiento de red (Broadcast/Unicast).
+
+[TIPO]      [GATILLADO POR]              [DESCRIPCIÓN]
+SEARCH      --join [nombre]              Busca si un grupo existe para unirse.
+            --crear-publico [nombre]     Verifica colisiones antes de crear.
+            --crear-privado [nombre]     Verifica colisiones antes de crear.
+
+DISCOVER    --ver-grupos                 Solicita lista de grupos públicos.
+            --quienes                    (Futuro) Ver usuarios visibles en LAN.
+
+FOUND       Automático al recibir SEARCH  Respuesta a SEARCH/DISCOVER.
+            (Respuesta del Embajador)    "Hola, soy el grupo X y existo".
+
+PING        (Automático / Background)    Latido cada X seg para decir "sigo aquí".
+                                         Mantiene la lista de usuarios online.
+
+--- 2. TCP: SALA DE REUNIONES (PUERTO 44496) ---
+Acciones dentro de un grupo de chat (Mesh).
+
+[TIPO]      [GATILLADO POR]              [DESCRIPCIÓN]
+JOIN_REQ    Automático tras recibir FOUND "Hola, quiero entrar" (Envía hash clave si es privado).
+            (Reacción del Cliente)       Va dirigido solo al Embajador.
+
+WELCOME     (Automático por Embajador)   "Acceso concedido".
+                                         Se envía SOLO al nuevo usuario.
+                                         Confirma que la clave era correcta.
+
+SYNC        (Automático tras Welcome)    "Toma, esta es la lista de miembros".
+                                         El nuevo recibe las IPs para conectarse con el resto.
+
+ANNOUNCE    Automático tras recibir SYNC "Hola, soy el nuevo y vengo a conectarme".
+            (Reacción del Cliente)       El nuevo recorre la lista de IPs y se conecta uno por uno.
+                                         Cumple doble función:
+                                         1. Notifica presencia visual "[+] Omar se unió".
+                                         2. Establece el socket TCP permanente para futuros chats.
+
+MSG         (Enter en el input)          Envío de texto normal.
+                                         "Hola mundo".
+
+LEAVE       --salir                      "Me voy".
+            Ctrl+C                       Cierra sockets y avisa a los demás
+                                         para mostrar "[-] Omar ha salido".
+
+--- 3. TCP: EL SUSURRO (PUERTO 44494) ---
+Chat privado directo 1 a 1.
+
+[TIPO]      [GATILLADO POR]              [DESCRIPCIÓN]
+CHAT_REQ    --chatpersonal [nick]        Solicita iniciar sesión privada.
+                                         Abre popup en el destino (Zenity).
+
+CHAT_ACK    --aceptar                    "Acepto tu solicitud".
+            (Botón "Sí" en Popup)        Establece la conexión y abre ventana.
+
+CHAT_NO     --rechazar                   "No quiero hablar".
+            (Botón "No" en Popup)        Cierra el intento de conexión.
+            (Automático)                 Si está en modo "No Molestar".
+
+CHAT_BYE    --salir (en privado)         "Cierro el chat".
+            (Cerrar Ventana/Pestaña)     Avisa al otro para que cierre su ventana.
+
+=========================================================================
+4. FLUJOS DE INTERACCIÓN (DIAGRAMAS DE SECUENCIA)
+=========================================================================
+
+A. CREAR GRUPO (VERIFICACIÓN DE COLISIÓN)
+Comando: --crear-publico "Devs"
+Objetivo: Asegurar que el nombre no exista ya.
+
+   TU PC (Creador)                                  LA RED (Broadcast)
+     |                                                     |
+     | --- (UDP) SEARCH "Hash(Devs)" --------------------> |
+     |                                                     |
+     |      (ESPERA SILENCIO 2 SEG)                        |
+     |                                                     |
+     | <--- (NADIE RESPONDE) ----------------------------- |
+     |                                                     |
+     | [OK] "El nombre está libre".                        |
+     | [ACCION] Se crea el grupo localmente.               |
+     | [ESTADO] Tu PC se convierte en EMBAJADOR.           |
+
+
+B. UNIRSE A GRUPO (FLUJO COMPLETO: AUTH -> SYNC -> MESH)
+Comando: --join "Devs"
+
+   TU PC (Nuevo)                            PC DEL GRUPO (Embajador)       MIEMBROS (A, B...)
+     |                                                 |                           |
+     | --- (UDP) SEARCH "¿Dónde está Devs?" ---------> |                           |
+     |                                                 |                           |
+     | <--- (UDP) FOUND "Aquí, IP x.x.1.50" ---------- |                           |
+     |                                                 |                           |
+     |      (Tu PC guarda la IP destino)               |                           |
+     |                                                 |                           |
+     | --- (TCP) JOIN_REQ "Quiero entrar" + Clave ---> |                           |
+     |      (SOLICITUD DE AUTORIZACIÓN)                |                           |
+     |                                                 |                           |
+     | <--- (TCP) WELCOME "Acceso Concedido" --------- |                           |
+     |      (CONFIRMACIÓN DE CREDENCIALES)             |                           |
+     |                                                 |                           |
+     | <--- (TCP) SYNC "Toma la lista de Peers" ------ |                           |
+     |      (Payload: [IP_Miembro_A, IP_Miembro_B])    |                           |
+     |                                                 |                           |
+     |      --[FASE DE PROPAGACIÓN - MESH]--           |                           |
+     |      (Tu PC procesa la lista del SYNC)          |                           |
+     |                                                 |                           |
+     | --- (TCP) ANNOUNCE "Hola, soy Nuevo" -------------------------------------> | [Miembro A]
+     |      (SALUDO DE PRESENCIA)                      |                           | [ACCION] Agrega a lista.
+     |                                                 |                           | [VISUAL] "[+] Nuevo se unió"
+     |                                                 |                           |
+     | --- (TCP) ANNOUNCE "Hola, soy Nuevo" -------------------------------------> | [Miembro B]
+     |                                                 |                           | [ACCION] Agrega a lista.
+     |                                                 |                           | [VISUAL] "[+] Nuevo se unió"
+     |                                                 |                           |
+     | [ESTADO] Conectado y visible para todos.        |                           |
+
+C. INVITAR A UN GRUPO
+Comando: --invite "Pedro" (Estando tú dentro del grupo "Devs")
+
+   TU PC (Miembro)                                PC DE PEDRO
+     |                                                 |
+     | --- (UDP/TCP) INVITE "¿Vienes a 'Devs'?" -----> |
+     |                                                 |
+     |                                       [POPUP] "Te invitan a Devs"
+     |                                       [ACCION] Pedro acepta.
+     |                                                 |
+     |      (Pedro inicia automáticamente el Flujo B)  |
+     | <--- (UDP) SEARCH "¿Dónde está Devs?" --------- |
+
+
+D. SOLICITUD DE CHAT PRIVADO
+Comando: --chatpersonal "Ana"
+
+   TU PC                                          PC DE ANA
+     |                                                |
+     | --- (TCP 44494) CHAT_REQ "Hablemos" ---------> |
+     |                                                |
+     |                                       [POPUP] "¿Chatear con Omar?"
+     |                                       [ACCION] Ana hace click en SÍ.
+     |                                                |
+     | <--- (TCP 44494) CHAT_ACK "Vale, dale" ------- |
+     |                                                |
+     | [ESTADO] Conexión P2P establecida.             |
+
+
+E. ENVIAR MENSAJE DE GRUPO (MESH)
+Acción: Escribir "Hola a todos" y dar Enter.
+Nota: Se envía copia a cada miembro conectado.
+
+   TU PC                                       MIEMBROS (A, B, C...)
+     |                                                 |
+     | --- (TCP) MSG "Hola" --> [Usuario A]            |
+     | --- (TCP) MSG "Hola" --> [Usuario B]            |
+     | --- (TCP) MSG "Hola" --> [Usuario C]            |
+     |                                                 |
+
+
+F. ENVIAR MENSAJE PRIVADO
+Acción: Escribir "Secreto" en la pestaña privada.
+
+   TU PC                                          PC DESTINO
+     |                                                |
+     | --- (TCP 44494) MSG "Secreto" ---------------> |
+     |                                                |
+     | [VISUAL] Se muestra en ambos lados.            |
+     
+     
+============= fin ================
+
+        "GESTIÓN DE CHATS": [
+            ("--chatpersonal (Nick y/o IP)", "Crear un chat privado con un usuario."),
+            ("--chatgrupal ID CLAVE", "Unirse/Crear sala."), 
+            ("--invite (Nick1, Nick2...) y/o IPs", "Invitar gente al grupo actual."),
+            ("--aceptar / --rechazar", "Responder a invitaciones pendientes."),
+            ("--ls", "Listar usuarios CONECTADOS en el chat."), 
+            ("--salir", "Desconectar de la sesión.")
+        ],
+        "RED Y CONTACTOS": [
+            ("--quienes", "Escanear red (¿Quién está online?)."),
+            ("--contactos", "Ver historial de gente vista."),
+            ("--quienes-si / --quienes-no", "Visibilidad en escáner.")
+        ],
+        "UTILIDADES Y ARCHIVOS": [
+            ("--archivo (Ruta)", "Enviar archivo."),
+            ("--nombre (NuevoNick)", "Cambiar tu nombre visible."),
+            ("--estado (Texto)", "Cambiar estado."),
+            ("--estados-globales", "Ver resumen de configuración."),
+            ("--abreviaciones", "Ver todos los formatos aceptados por cada comando."),
+            ("--limpiar", "Limpiar pantalla.")
+        ],
+        "SISTEMA Y CONFIGURACIÓN": [
+             ("--log on / off", "Guardar historial."),
+             ("--descarga-si / --descarga-no", "Control descarga automática.")
+        ]
+
+-----------------------------------------------
+-----------------------------------------------
+#========= MENSAJE DE HELP =========
+
+        "GESTIÓN DE CHATS": [
+            --dm (Nick y/o IP)", "Invitar a un chat privado a un usuario.",
+            --crearpublico (Nombre), "Crear un grupo publico",
+            --crearprivado (Nombre) (Clave), "Crear un grupo privado",
+            --unirse (nombre) opcional (clave), "Unirse a un grupo publico o privado (privado requiere clave)",
+            --agregar (Nick1, Nick2...) y/o IPs", "Invitar gente al grupo actual."),
+            --aceptar, "Aceptar una solicitud de cualquier tipo",
+            --rechazar, "Rechazar una solicitud de cualquier tipo",
+            --silenciar, "Switch Desactivar los mensajes pops (Solo lo rompe una mencion en un chat con coldown de 2 minutos)",
+            --ls, "Listar los usuarios conectado dentro del chat", 
+            --salir, "Desconectar de la sesión"
+        ],
+        "RED Y CONTACTOS": [
+            --enlinea, "Escanear red y listar los usuarios que estan en la red",
+            --vergrupos, "Listar el nombre de los grupos publicos en la red",
+            --contactos, "Listar mi historial de usuarios con los que e interactuado",
+            --invisible, "Switch Visibilidad en escáner"
+        ],
+        "UTILIDADES Y ARCHIVOS": [
+            --archivo (Ruta), "Enviar archivo (se necesita estar dentro de un chat)",
+            --cambiarnombre (NuevoNick), "Cambiar tu nombre",
+            --estado (Texto), "Cambiar estado",
+            --info, "Listar el estado de todas las variables (Variables espceficas que se muestran: Version, IP, Nick, No Molestar, Visibilidad, Descargas automaticas, Logs de chats)",
+            --abreviaciones, "Ver todos los formatos aceptados por cada comando",
+            --limpiar, "Limpiar pantalla"
+        ],
+        "SISTEMA Y CONFIGURACIÓN": [
+             --log, "Switch guardar historial.",
+             --descarga, "Switch Control descarga automática."
+        ]
+        
+----------------------------------------
+
+# --- DICCIONARIO PARA MOSTRAR EN PANTALLA (--abreviaciones) ---
+
+ABBREVIATIONS_DISPLAY = {
+    "GESTIÓN DE CHATS": {
+        "MENSAJE PRIVADO": {
+            'aliases': ['--dm', '-d', '--mensaje', '--susurrar', '--priv'],
+            'desc': "Invitar a un chat privado a un usuario (Nick/IP)."
+        },
+        "CREAR SALA PÚBLICA": {
+            'aliases': ['--crearpublico', '-o', '--publico', '--abrir', '--sala'],
+            'desc': "Crear un grupo público visible para todos."
+        },
+        "CREAR SALA PRIVADA": {
+            'aliases': ['--crearprivado', '-p', '--privado', '--candado', '--cerrado'],
+            'desc': "Crear un grupo privado con contraseña."
+        },
+        "UNIRSE A SALA": {
+            'aliases': ['--unirse', '-u', '--entrar', '--join'],
+            'desc': "Entrar a un grupo público o privado."
+        },
+        "INVITAR AL GRUPO": {
+            'aliases': ['--agregar', '-a', '--invitar', '--sumar', '--meter'],
+            'desc': "Sumar usuarios conectados al grupo actual."
+        },
+        "ACEPTAR SOLICITUD": {
+            'aliases': ['--aceptar'],
+            'desc': "Confirmar una invitación entrante."
+        },
+        "RECHAZAR SOLICITUD": {
+            'aliases': ['--rechazar'],
+            'desc': "Denegar una invitación entrante."
+        },
+        "MODO SILENCIO": {
+            'aliases': ['--silenciar', '-m', '--shh', '--nomolestar', '--mute'],
+            'desc': "[Switch] Activar/Desactivar notificaciones."
+        },
+        "LISTAR ASISTENTES": {
+            'aliases': ['--ls', '-l', '--gente', '--lista', '--usuarios'],
+            'desc': "Ver quiénes están en el chat actual."
+        },
+        "SALIR / DESCONECTAR": {
+            'aliases': ['--salir', '-x', '--chau', '--adios', '--exit'],
+            'desc': "Cerrar sesión y salir del programa."
+        }
+    },
+
+    "RED Y CONTACTOS": {
+        "ESCANEAR RED": {
+            'aliases': ['--enlinea', '-s', '--buscar', '--radar', '--quienes'],
+            'desc': "Buscar usuarios activos en la red local."
+        },
+        "EXPLORAR GRUPOS": {
+            'aliases': ['--vergrupos', '-g', '--grupos', '--explorar', '--salas'],
+            'desc': "Listar grupos públicos disponibles."
+        },
+        "CONTACTOS CONOCIDOS": {
+            'aliases': ['--contactos', '-c', '--amigos', '--agenda', '--historial'],
+            'desc': "Ver listado de usuarios con los que hablaste."
+        },
+        "VISIBILIDAD EN RED": {
+            'aliases': ['--invisible', '-v', '--fantasma', '--oculto', '--visibilidad'],
+            'desc': "[Switch] Ocultarte o mostrarte en los escaneos de otros."
+        }
+    },
+
+    "UTILIDADES Y ARCHIVOS": {
+        "ENVIAR ARCHIVO": {
+            'aliases': ['--archivo', '-f', '--enviar', '--mandar', '--adjuntar'],
+            'desc': "Enviar un archivo a la sala actual (puedes arrastrarlo al chat para la ruta)."
+        },
+        "CAMBIAR NOMBRE": {
+            'aliases': ['--cambiarnombre', '-n', '--nick', '--apodo', '--nombre'],
+            'desc': "Cambiar tu nombre de usuario."
+        },
+        "CAMBIAR ESTADO": {
+            'aliases': ['--estado', '-e', '--situacion', '--mood', '--st'],
+            'desc': "Definir un mensaje de estado personal."
+        },
+        "INFO DEL SISTEMA": {
+            'aliases': ['--estados-globales', '-i', '--info', '--config', '--todo'],
+            'desc': "Ver IP, versión, configuración y logs."
+        },
+        "AYUDA GENERAL": {
+            'aliases': ['--ayuda', '-?', '--help'],
+            'desc': "Ver instrucciones generales y sintaxis."
+        },
+        "VER ABREVIACIONES": {
+            'aliases': ['--abreviaciones', '-ab', '--alias'],
+            'desc': "Mostrar este listado de comandos y variantes."
+        },
+        "LIMPIAR PANTALLA": {
+            'aliases': ['--limpiar', '-k', '--borrar', '--cls', '--vaciar', '--clear'],
+            'desc': "Limpiar el texto de la consola."
+        }
+    },
+
+    "SISTEMA": {
+        "GUARDAR HISTORIAL": {
+            'aliases': ['--log', '-r', '--guardar', '--registro', '--grabar'],
+            'desc': "[Switch] Guardar o no el historial de chat."
+        },
+        "DESCARGA AUTOMÁTICA": {
+            'aliases': ['--descarga', '-b', '--bajar', '--autobajar', '--dl'],
+            'desc': "[Switch] Aceptar archivos automáticamente o preguntar siempre."
+        }
+    }
+}
+
+# --- DICCIONARIO LÓGICO PARA EL SISTEMA (PARSER) ---
+# Clave: Nombre de la función lógica
+# Valor: Lista de todos los comandos posibles que activan esa función
+
+COMMAND_MAP = {
+    # --- GESTIÓN DE CHATS ---
+    'DM':           ['--dm', '-d', '--mensaje', '--susurrar', '--priv'],
+    'CREATE_PUB':   ['--crearpublico', '-o', '--publico', '--abrir', '--sala'],
+    'CREATE_PRIV':  ['--crearprivado', '-p', '--privado', '--candado', '--cerrado'],
+    'JOIN':         ['--unirse', '-u', '--entrar', '--join'],
+    'ADD':          ['--agregar', '-a', '--invitar', '--sumar', '--meter'],
+    'ACCEPT':       ['--aceptar'],  # Sin alias por seguridad
+    'DENY':         ['--rechazar'], # Sin alias por seguridad
+    'MUTE_TOGGLE':  ['--silenciar', '-m', '--shh', '--nomolestar', '--mute'],
+    'LS':           ['--ls', '-l', '--gente', '--lista', '--usuarios'],
+    'EXIT':         ['--salir', '-x', '--chau', '--adios', '--exit'],
+
+    # --- RED Y CONTACTOS ---
+    'SCAN':             ['--enlinea', '-s', '--buscar', '--radar', '--quienes'],
+    'LIST_GROUPS':      ['--vergrupos', '-g', '--grupos', '--explorar', '--salas'],
+    'CONTACTS':         ['--contactos', '-c', '--amigos', '--agenda', '--historial'],
+    'VISIBILITY_TOGGLE':['--invisible', '-v', '--fantasma', '--oculto', '--visibilidad'],
+
+    # --- UTILIDADES Y ARCHIVOS ---
+    'FILE':         ['--archivo', '-f', '--enviar', '--mandar', '--adjuntar'],
+    'CHANGE_NICK':  ['--cambiarnombre', '-n', '--nick', '--apodo', '--nombre'],
+    'STATUS':       ['--estado', '-e', '--situacion', '--mood', '--st'],
+    'GLOBAL_STATUS':['--estados-globales', '-i', '--info', '--config', '--todo'],
+    
+    # Ayuda y Abreviaciones separados
+    'HELP':         ['--ayuda', '-?', '--help'],            # Ayuda general
+    'SHORTCUTS':    ['--abreviaciones', '-ab', '--alias'],  # Lista de comandos
+    
+    'CLEAR':        ['--limpiar', '-k', '--borrar', '--cls', '--vaciar', '--clear'],
+
+    # --- SISTEMA (SWITCHES) ---
+    'LOG_TOGGLE':   ['--log', '-r', '--guardar', '--registro', '--grabar'],
+    'DL_TOGGLE':    ['--descarga', '-b', '--bajar', '--autobajar', '--dl']
+}

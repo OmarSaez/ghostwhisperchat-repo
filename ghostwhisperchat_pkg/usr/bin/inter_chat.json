@@ -1,12 +1,6 @@
 {
-    "known_users": {
-        "192.168.1.227": {
-            "nick": "Omar-pc",
-            "status": "En l\u00ednea",
-            "t": 1765849819.969503
-        }
-    },
-    "nick": "omar-laptop-ubuntu",
+    "known_users": {},
+    "nick": "NuevoUser",
     "status": "",
     "visible": true,
     "log_on": false,

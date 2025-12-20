@@ -1,0 +1,170 @@
+================================================================================
+GHOSTWHISPERCHAT 2.0 - DICCIONARIO DE FORMATOS JSON (PAYLOADS)
+================================================================================
+Este documento define la estructura EXACTA del campo "payload" `{ ... }`.
+El JSON final que viaja por la red tendrá la estructura "Base del Paquete" y dentro, en la llave "payload", insertará estos objetos.
+
+Ejemplo Visual:
+Paquete_Final = { "ver": 2, ..., "payload": { <CONTENIDO_DE_ESTE_ARCHIVO> } }
+
+--- 1. UDP DISCOVERY (PUERTO 44495) ---
+
+A. TIPO: "SEARCH" (Búsqueda de Grupo)
+   - Uso: Cuando haces --join "Devs" o al intentar crear un grupo para ver si existe.
+   {
+       "base": { "ver": 2, "tipo": "SEARCH", ... },
+       "payload": {
+           "target_gid": "a8f93...",   # Hash del nombre del grupo buscado (SHA256).
+           "target_name": "Devs",      # Nombre legible (para que el humano decida si responder).
+           "password_required": false  # (Opcional) Si busco un privado, indico que tengo clave.
+       }
+   }
+
+B. TIPO: "FOUND" (Respuesta de Existencia)
+   - Uso: El Embajador responde "Sí, existo".
+   {
+       "base": { "ver": 2, "tipo": "FOUND", ... },
+       "payload": {
+           "gid": "a8f93...",
+           "group_name": "Devs",
+           "is_public": true,
+           "member_count": 5,
+           "ambassador_ip": "192.168.1.50"
+       }
+   }
+
+C. TIPO: "DISCOVER" (Listar Públicos)
+   - Uso: --ver-grupos
+   {
+       "base": { "ver": 2, "tipo": "DISCOVER", ... },
+       "payload": {
+           "filter": "PUBLIC_ONLY"
+       }
+   }
+
+D. TIPO: "PING" (Heartbeat)
+   - Uso: Mantenerse vivo en la lista de "En Línea".
+   {
+       "base": { "ver": 2, "tipo": "PING", ... },
+       "payload": {
+           "status": "ONLINE",   # Enum: ONLINE, AWAY, DND (Silenciar).
+           "version": "2.0.1"
+       }
+   }
+
+--- 2. TCP GRUPOS - MESH (PUERTO 44496) ---
+
+A. TIPO: "JOIN_REQ" (Solicitud de Entrada)
+   - Uso: El usuario pide entrar al Embajador.
+   {
+       "base": { "ver": 2, "tipo": "JOIN_REQ", ... },
+       "payload": {
+           "gid": "a8f93...",
+           "password_hash": "c4ca4238...",  # Hash de la clave (si es privado). Null si es público.
+           "my_pub_key": "..."              # (Futuro: Para cifrado E2E).
+       }
+   }
+
+B. TIPO: "WELCOME" (Aprobado)
+   - Uso: Embajador -> Usuario Nuevo.
+   {
+       "base": { "ver": 2, "tipo": "WELCOME", ... },
+       "payload": {
+           "message": "Bienvenido a Devs",
+           "rules": "No spam",
+           "session_id": "sess_001"
+       }
+   }
+
+C. TIPO: "SYNC" (Sincronización de Lista)
+   - Uso: Embajador entrega la lista de IPs para hacer Mesh.
+   {
+       "base": { "ver": 2, "tipo": "SYNC", ... },
+       "payload": {
+           "members": [
+               { "nick": "Pedro", "ip": "192.168.1.40", "uid": "..." },
+               { "nick": "Ana", "ip": "192.168.1.41", "uid": "..." }
+           ]
+       }
+   }
+
+D. TIPO: "ANNOUNCE" (Conexión Mesh)
+   - Uso: Nuevo Usuario -> Cada Miembro de la lista.
+   {
+       "base": { "ver": 2, "tipo": "ANNOUNCE", ... },
+       "payload": {
+           "action": "CONNECT",
+           "status": "He llegado"
+       }
+   }
+
+E. TIPO: "MSG" (Mensaje de Chat)
+   - Uso: Chat normal.
+   {
+       "base": { "ver": 2, "tipo": "MSG", ... },
+       "payload": {
+           "text": "Hola a todos",
+           "style": "normal",   # (Futuro: bold, code, etc).
+           "mentions": ["@Pedro"] # Lista de nicks mencionados para facilitar highlight.
+       }
+   }
+
+F. TIPO: "LEAVE" (Salida)
+   - Uso: --salir o Ctrl+C
+   {
+       "base": { "ver": 2, "tipo": "LEAVE", ... },
+       "payload": {
+           "reason": "USER_QUIT" # o "TIMEOUT", "KICKED".
+       }
+   }
+
+--- 3. TCP PRIVADO - P2P (PUERTO 44494) ---
+
+A. TIPO: "CHAT_REQ" (Solicitud Privada)
+   - Uso: --chatpersonal
+   {
+       "base": { "ver": 2, "tipo": "CHAT_REQ", ... },
+       "payload": {
+           "reason": "Hablemos de negocios"
+       }
+   }
+
+B. TIPO: "CHAT_ACK" (Aceptado)
+   - Uso: Botón "Sí" en Zenity.
+   {
+       "base": { "ver": 2, "tipo": "CHAT_ACK", ... },
+       "payload": {
+           "status": "ACCEPTED"
+       }
+   }
+
+C. TIPO: "CHAT_NO" (Rechazado)
+   - Uso: Botón "No" o Auto-Silencio.
+   {
+       "base": { "ver": 2, "tipo": "CHAT_NO", ... },
+       "payload": {
+           "razon": "Usuario en modo Silencio" # o "Rechazado manualmente".
+       }
+   }
+
+D. TIPO: "FILE_OFFER" (Envío de Archivos)
+   - Uso: Arrastrar archivo/carpeta.
+   {
+       "base": { "ver": 2, "tipo": "FILE_OFFER", ... },
+       "payload": {
+           "filename": "proyecto.zip",
+           "filesize": 104857600,  # Bytes (100MB).
+           "md5": "a5b3...",       # Checksum.
+           "is_folder": true       # Indica si fue zippeado automáticamente.
+       }
+   }
+
+E. TIPO: "FILE_ACCEPT" / "FILE_REJECT"
+   - Uso: Respuesta al archivo.
+   {
+       "base": { "ver": 2, "tipo": "FILE_ACCEPT", ... },
+       "payload": {
+           "port": 44494,          # Puerto donde espera los bytes (generalmente el mismo).
+           "start_byte": 0         # Para resume (futuro).
+       }
+   }
