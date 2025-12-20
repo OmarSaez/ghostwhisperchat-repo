@@ -131,6 +131,25 @@ class Motor:
                         except Exception as e:
                             print(f"[MOTOR_DEBUG] Error lectura UDP: {e}", file=sys.stderr)
 
+                    # 4. TCP Listeners
+                    elif s == self.red.sock_tcp_group or s == self.red.sock_tcp_priv:
+                         self.red.aceptar_conexion(s) # Acepta y añade a lista interna de inputs
+
+                    # 5. TCP Datos (Red Messages)
+                    else: 
+                        # Puede ser un socket de red...
+                        try:
+                            data = s.recv(8192)
+                            if data:
+                                parts = data.split(b'\n')
+                                for p in parts:
+                                    if p:
+                                        self.manejar_paquete_red(p, s.getpeername(), "TCP", s)
+                        except OSError:
+                             self.red.cerrar_tcp(s)
+
+                self.tareas_mantenimiento()
+
         except Exception as e:
              print(f"[MOTOR_DEBUG] !!! CRASH EN BUCLE PRINCIPAL !!!: {e}", file=sys.stderr)
              import traceback
@@ -139,27 +158,6 @@ class Motor:
         finally:
              print(f"[MOTOR_DEBUG] Bucle finalizado. Running={self.running}", file=sys.stderr)
 
-                
-                # 4. TCP Listeners
-                elif s == self.red.sock_tcp_group or s == self.red.sock_tcp_priv:
-                     self.red.aceptar_conexion(s) # Acepta y añade a lista interna de inputs
-
-                # 5. TCP Datos (Red Messages)
-                else: 
-                    # Puede ser un socket de red...
-                    try:
-                        data = s.recv(8192)
-                        if data:
-                            parts = data.split(b'\n')
-                            for p in parts:
-                                if p:
-                                    self.manejar_paquete_red(p, s.getpeername(), "TCP", s)
-                        else:
-                            self.red.cerrar_tcp(s)
-                    except OSError:
-                         self.red.cerrar_tcp(s)
-
-            self.tareas_mantenimiento()
 
     # --- MANEJO IPC / COMANDOS LOCALES ---
     
