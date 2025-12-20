@@ -22,24 +22,26 @@ class Colores:
     BG_RED = "\033[41m"
 
 # Versionado
-APP_VER_NUM = "2.26"
-APP_VER_TAG = "Full Cmd Suite"
+APP_VER_NUM = "2.27"
+APP_VER_TAG = "UX Polish"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 BANNER = r"""
 
 Inicializando
 
- ░▒▓██████▓▒░░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░░▒▓██████▓▒░  
-░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░ 
-░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░        
-░▒▓█▓▒▒▓███▓▒░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░        
-░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░        
-░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░ 
- ░▒▓██████▓▒░ ░▒▓█████████████▓▒░ ░▒▓██████▓▒░  
-                                                
+  ▄████  █     █░ ▄████▄  
+ ██▒ ▀█▒▓█░ █ ░█░▒██▀ ▀█  
+▒██░▄▄▄░▒█░ █ ░█ ▒▓█    ▄ 
+░▓█  ██▓░█░ █ ░█ ▒▓▓▄ ▄██▒
+░▒▓███▀▒░░██▒██▓ ▒ ▓███▀ ░
+ ░▒   ▒ ░ ▓░▒ ▒  ░ ░▒ ▒  ░
+  ░   ░   ▒ ░ ░    ░  ▒   
+░ ░   ░   ░   ░  ░        
+      ░     ░    ░ ░      
+                 ░        
 
-               :: v2.0 :: LAN Distributed Chat ::
+               :: v2 :: LAN Distributed Chat ::
 """
 
 AYUDA = """
@@ -48,44 +50,44 @@ DICCIONARIO DE COMANDOS - GHOSTWHISPERCHAT 2.0
 =========================================================================
 
 GESTIÓN DE CHATS:
-  --dm (Nick/IP)        : Iniciar chat privado.
+  --dm (Nick/IP)                : Iniciar chat privado.
                           Alias: -d, --mensaje, --susurrar
-  --crearpublico        : Crear un grupo público.
+  --crearpublico (Nombre)       : Crear un grupo público.
                           Alias: -o, --publico, --sala
-  --crearprivado        : Crear un grupo privado (requiere clave).
+  --crearprivado (Nombre Clave) : Crear un grupo privado (requiere clave).
                           Alias: -p, --privado, --candado
-  --unirse (Nombre)     : Unirse a un grupo.
+  --unirse (Nombre)             : Unirse a un grupo.
                           Alias: -u, --entrar, --join
-  --agregar (Nicks)     : Invitar usuarios al grupo actual.
+  --agregar (Nicks)             : Invitar usuarios al grupo actual.
                           Alias: -a, --invitar, --meter
-  --aceptar / --rechazar: Responder a solicitudes.
-  --salir               : Salir del chat o cerrar sesión.
+  --aceptar / --rechazar        : Responder a solicitudes.
+  --salir                       : Salir del chat o cerrar sesión.
                           Alias: -x, --chau, --exit
 
 RED Y CONTACTOS:
-  --enlinea             : Escanear red (¿Quién está online?).
+  --enlinea                     : Escanear red (¿Quién está online?).
                           Alias: -s, --buscar, --radar
-  --vergrupos           : Ver grupos públicos disponibles.
+  --vergrupos                   : Ver grupos públicos disponibles.
                           Alias: -g, --grupos, --salas
-  --contactos           : Ver historial de usuarios.
+  --contactos                   : Ver historial de usuarios.
                           Alias: -c, --amigos
-  --invisible           : Ocultarse del escáner (Switch).
+  --invisible                   : Ocultarse del escáner (Switch).
                           Alias: -v, --fantasma
 
 UTILIDADES:
-  --archivo (Ruta)      : Enviar archivo (Drag & Drop soportado).
+  --archivo (Ruta)              : Enviar archivo (Drag & Drop soportado).
                           Alias: -f, --enviar
-  --cambiarnombre       : Cambiar tu nick.
+  --cambiarnombre               : Cambiar tu nick.
                           Alias: -n, --nick
-  --estado (Texto)      : Poner un mensaje de estado.
+  --estado (Texto)              : Poner un mensaje de estado.
                           Alias: -e, --mood
-  --info                : Ver estado del sistema e IP.
-  --limpiar             : Limpiar pantalla.
+  --info                        : Ver estado del sistema e IP.
+  --limpiar                     : Limpiar pantalla.
                           Alias: --cls, --clear
 
 SISTEMA:
-  --log                 : Guardar historial (Switch).
-  --descarga            : Descarga automática de archivos (Switch).
+  --log                         : Guardar historial (Switch).
+  --descarga                    : Descarga automática de archivos (Switch).
 
 Para ver todos los alias, escribe: --abreviaciones
 """

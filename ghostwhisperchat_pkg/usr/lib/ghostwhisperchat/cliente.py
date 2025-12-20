@@ -7,51 +7,37 @@ import os
 import sys
 import threading
 import time
+import readline # Habilita historial con flechas automaticamente
+import shutil
 import argparse
 from ghostwhisperchat.datos.recursos import Colores as C, BANNER
 
 IPC_SOCK_PATH = os.path.expanduser("~/.ghostwhisperchat/gwc.sock")
 
-def enviar_comando_transitorio(cmd_str):
-    """Envía un comando, espera respuesta inmediata y sale."""
-    if not os.path.exists(IPC_SOCK_PATH):
-        print(f"{C.RED}[X] El servicio ghostwhisperchat no está corriendo.{C.RESET}")
-        return
-
+def get_local_ip():
     try:
-        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        s.connect(IPC_SOCK_PATH)
-        s.sendall(cmd_str.encode('utf-8'))
-        
-        # Esperar ACK o Respuesta breve (Timeout corto)
-        s.settimeout(2.0)
-        try:
-            resp = s.recv(4096)
-            if resp:
-                print(resp.decode('utf-8').strip())
-        except socket.timeout:
-            pass # Si no hay respuesta rapida, asumimos que fue procesado
-            
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
         s.close()
-    except Exception as e:
-        print(f"{C.RED}[X] Error comunicando con daemon: {e}{C.RESET}")
+        return ip
+    except:
+        return "127.0.0.1"
 
 def modo_ui_chat(target_id, es_grupo):
     """
     Modo Persistente: UI de Chat Dedicada.
-    Se conecta al daemon y se suscribe a eventos de este chat específico.
     """
+    mi_ip = get_local_ip()
     print(C.GREEN + BANNER + C.RESET)
-    print(f"{C.BOLD}[*] CHAT ACTIVO CON: {target_id}{C.RESET}")
-    print(f"{C.GREY}(Escribe y presiona Enter para enviar. Ctrl+C para cerrar){C.RESET}\n")
+    print(f"{C.BOLD}[*] IP LOCAL: {mi_ip} | CHAT CON: {target_id}{C.RESET}")
+    print(f"{C.GREY}(Escribe y presiona Enter. Ctrl+C para cerrar){C.RESET}\n")
     
     # 1. Conectar Persistente
     try:
         s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         s.connect(IPC_SOCK_PATH)
         
-        # Handshake de UI: Decirle al daemon "Soy UI para X"
-        # Usamos un comando especial interno
         tipo = "GROUP" if es_grupo else "PRIVATE"
         handshake = f"__REGISTER_UI__ {tipo} {target_id}"
         s.sendall(handshake.encode('utf-8'))
@@ -68,11 +54,22 @@ def modo_ui_chat(target_id, es_grupo):
                 data = s.recv(4096)
                 if not data:
                     print(f"\n{C.RED}[!] Desconectado.{C.RESET}")
-                    break
-                # Imprimir mensaje "crudo" que manda el Daemon ya formateado
-                # O podríamos recibir JSON y formatear aquí. 
-                # Por simplicidad v2.1, el Daemon manda texto formateado listo para imprimir.
-                print(data.decode('utf-8'), end='') 
+                    os._exit(0)
+                
+                # Input Protection Hack:
+                # Borramos linea actual, imprimimos msg, y repintamos prompt
+                # Nota: Esto es imperfecto sin curses, pero mejor que nada.
+                # \r = return to start line, \033[K = clear line
+                
+                msg_in = data.decode('utf-8')
+                
+                # Si es un eco nuestro (empieza con Tu:), asumimos que el input local ya lo mostró?
+                # NO, decidimos que el daemon hace eco. Asi que borramos input local.
+                
+                sys.stdout.write(f"\r\033[K{msg_in}\n")
+                sys.stdout.write("Tu: ") # Prompt
+                sys.stdout.flush()
+                
             except:
                 break
         os._exit(0)
@@ -81,25 +78,35 @@ def modo_ui_chat(target_id, es_grupo):
     t.start()
     
     # 3. Loop de Escritura (User Input)
+    sys.stdout.write("Tu: ")
+    sys.stdout.flush()
+    
     while True:
         try:
-            msg = input() # Bloqueante
-            # Borrar linea del input local para que no duplique visualmente si el daemon hace eco
-            # O mejor: El input local se ve, y el daemon SOLO manda lo que viene de AFUERA.
-            # Para chat visual limpio:
-            # Opción A: Imprimo mi msg localmente 'Yo: ...' y mando al daemon.
-            # Opción B: Mando al daemon y él me hace eco. (Mayor latencia visual, mejor consistencia).
-            # Vamos por Opción A visual simple. 
+            # readline ya maneja el historial con flechas
+            msg = input() 
+            
+            # Al dar enter, readline deja el texto ahi.
+            # Nosotros mandamos al daemon, que nos hará eco con "Tu: lo que escribi"
+            # ENTONCES: Para que no salga duplicado "Tu: hola" (local) y "Tu: hola" (red),
+            # deberiamos borrar la linea local o confiar en el eco.
+            # V2.27: Confiamos en el ECO del daemon.
+            # Borramos la linea que acabamos de escribir para que el eco la reemplace limpiamente
+            sys.stdout.write("\033[A\033[K") # Subir una linea y borrarla
             
             if msg.strip():
-                # Enviar MSG al daemon
-                # Formato comando interno UI: "__MSG__ <texto>"
-                # El daemon sabe a quien va porque el socket esta registrado.
+                if msg.startswith("--") or msg.startswith("/"):
+                    # Comandos no llevan prefijo "Tu:" en el servidor, 
+                    # pero el resultado [SISTEMA] se imprimirá.
+                    pass
+                
                 payload = f"__MSG__ {msg}"
                 s.sendall(payload.encode('utf-8'))
                 
         except KeyboardInterrupt:
             print("\nCerrando chat...")
+            break
+        except EOFError:
             break
             
     s.close()

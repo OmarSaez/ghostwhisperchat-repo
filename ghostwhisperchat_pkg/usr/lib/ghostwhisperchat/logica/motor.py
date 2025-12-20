@@ -203,13 +203,16 @@ class Motor:
                      
                      res = self.ejecutar_comando_transitorio(msg_content, context_ui=contexto_actual)
                      
-                     # Enviar respuesta de vuelta a la UI
+                     # Enviar respuesta de vuelta a la UI con prefijo SISTEMA
                      if res:
-                         sock_ui.sendall(f"\n{res}\n".encode('utf-8'))
+                         sock_ui.sendall(f"\n[SISTEMA] {res}\n".encode('utf-8'))
                      return
 
                 # 2. Es un mensaje normal
                 print(f"[DEBUG] Enviando msg a {chat_id}: {msg_content}")
+                
+                # ECO LOCAL: "Tu: mensaje"
+                sock_ui.sendall(f"Tu: {msg_content}\n".encode('utf-8'))
                 
                 # IMPLEMENTACION REAL V2.1 TCP PRIVADO:
                 try:
@@ -237,166 +240,9 @@ class Motor:
         # Parseamos con logica de comandos anterior
         print(f"[MOTOR_DEBUG] Procesando comando raw: {cmd_raw} Context={context_ui}", file=sys.stderr)
         cmd, args = parsear_comando(cmd_raw)
-        print(f"[MOTOR_DEBUG] Parseado: CMD={cmd}, ARGS={args}", file=sys.stderr)
         
-        if cmd == "DM": # --dm PEdro
-             dest = args[0]
-             # Lógica simplificada: Iniciar Chat
-             # 1. Buscar IP de Pedro
-             # 2. Mandar CHAT_REQ
-             # 3. Si ACK -> abrir_chat_ui(dest)
-             # Por ahora simulamos éxito local para probar UI
-             
-             # Simulacion: El usuario pide iniciar chat. Lo abrimos directamente?
-             # No, protocolo dice esperar CHAT_ACK.
-             # Pero para probar: Lanzamos ventana.
-             abrir_chat_ui(dest, nombre_legible=dest, es_grupo=False)
-             return f"[*] Abriendo chat con {dest}..."
-
-        elif cmd == "SCAN":
-             pkg = empaquetar("DISCOVER", {"filter": "ALL"}, "ALL")
-             self.red.enviar_udp_broadcast(pkg)
-             
-             # Retornamos quien esta online AHORA (Filtrando nosotros)
-             m = self.memoria
-             if not m.peers:
-                 return "[*] Señal enviada. Nadie detectado AÚN.\n    (Espera unos segundos y repite el comando)"
-             
-             res = "[*] Usuarios detectados en caché:\n"
-             found_count = 0
-             for ip, data in m.peers.items():
-                 # Filtrar nuestro propio UID
-                 if data['uid'] == m.mi_uid: continue
-                 
-                 res += f" - {data['nick']} ({ip}) [{data['status']}]\n"
-                 found_count += 1
-                 
-             if found_count == 0:
-                  return "[*] Señal enviada. (0 usuarios encontrados aparte de ti)"
-             return res
-
-        elif cmd == "EXIT":
-             # --salir
-             # Context Aware:
-             if context_ui:
-                 # Estamos en una UI, cerramos ESA ventana/sesion
-                 chat_id_to_close = context_ui[1]
-                 # Buscamos el socket asociado
-                 sock_to_close = self.ui_sessions.get(chat_id_to_close)
-                 if sock_to_close:
-                     self.desconectar_ui(sock_to_close)
-                     return "[*] Cerrando chat..."
-                 else:
-                     return "[!] Error: No se encontró sesión UI activa."
-             else:
-                 # Estamos en consola transitoria: Apagar Demonio
-                 self.running = False
-                 return "[!] Apagando Demonio..."
-        
-        elif cmd == "LS":
-             # --ls: Listar miembros
-             if not context_ui:
-                 return "[X] Comando solo disponible dentro de un chat."
-                 
-             chat_id = context_ui[1]
-             # ¿Es grupo?
-             if chat_id in self.memoria.grupos_activos:
-                 g = self.memoria.grupos_activos[chat_id]
-                 miembros = g.get('miembros', [])
-                 if not miembros: return f"[*] Grupo '{g['nombre']}': Sin miembros listados."
-                 return f"[*] Grupo '{g['nombre']}' Miembros: {', '.join(miembros)}"
-             else:
-                 # Chat Privado
-                 # Mostrar mi nick y el del otro
-                 peer = self.memoria.obtener_peer(chat_id) # Si ID es IP
-                 # TODO: Mejor resolucion
-                 nick_peer = "Desconocido"
-                 # Intento buscar en peers por UID o IP
-                 p = self.memoria.buscar_peer(chat_id) # Buscar por UID exacto
-                 if p: nick_peer = p['nick']
-                 
-                 return f"[*] Chat Privado: {self.memoria.mi_nick} (Tú) <-> {nick_peer}"
-
-        elif cmd == "CONTACTS":
-             # --contactos
-             # Fix Crash: .get('ip', '?')
-             # Nota: self.memoria.contactos_guardados no existe aun en MemoriaGlobal, usamos peers
-             # El usuario pidio historial, pero v2.0 asume peers online.
-             ct = self.memoria.peers
-             if not ct: return "No hay contactos recientes."
-             res = "--- CONTACTOS (Caché) ---\n"
-             for ip, data in ct.items():
-                  # Filtrar self
-                  if data['uid'] == self.memoria.mi_uid: continue
-                  ip_safe = ip
-                  res += f"[{data['nick']}] ({ip_safe}) {data.get('status','?')}\n"
-             return res
-
-        elif cmd == "CLEAR":
-             # --limpiar
-             # Return ANSI clear screen code
-             return "\033c[*] Pantalla limpia."
-
-        elif cmd == "LOG_TOGGLE":
-             self.memoria.log_chat = not self.memoria.log_chat
-             return f"[*] Historial: {'ACTIVADO' if self.memoria.log_chat else 'DESACTIVADO'}"
-
-        elif cmd == "DL_TOGGLE":
-             self.memoria.auto_download = not self.memoria.auto_download
-             return f"[*] Auto-Descarga: {'ACTIVADA' if self.memoria.auto_download else 'DESACTIVADA'}"
-
-        elif cmd == "MUTE_TOGGLE":
-            self.memoria.no_molestar = not self.memoria.no_molestar
-            return f"[*] No Molestar: {'ACTIVADO' if self.memoria.no_molestar else 'DESACTIVADO'}"
-
-        elif cmd == "HELP":
-             return AYUDA
-
-        elif cmd == "SHORTCUTS":
-             res = "ABREVIACIONES DISPONIBLES:\n"
-             for cat, cmds in ABBREVIATIONS_DISPLAY.items():
-                 res += f"\n[{cat}]\n"
-                 for sub, data in cmds.items():
-                      res += f"  - {sub}: {', '.join(data['aliases'])}\n"
-             return res
-             
-        elif cmd == "CREATE_PUB":
-             # --crearpublico Nombre
-             if not args: return "[X] Faltan argumentos. Uso: --crearpublico <Nombre>"
-             nombre = args[0]
-             # Generar ID
-             gid = grupos.generar_id_grupo(nombre)
-             self.memoria.agregar_grupo_activo(gid, nombre)
-             abrir_chat_ui(gid, nombre_legible=nombre, es_grupo=True)
-             return f"[*] Grupo público '{nombre}' creado (ID: {gid[:8]})."
-             
-        # ... Resto de comandos de creacion (Priv, Join) siguen igual ... 
-        # (Se asume que la herramienta mantendra el resto si no coinciden lineas, pero mejor corto la edicion aqui para no sobreescribir CREATE_PRIV erróneamente si los numeros de linea varian)
-
-        elif cmd == "CREATE_PRIV":
-             # --crearprivado Nombre Clave
-             if len(args) < 2: return "[X] Faltan argumentos. Uso: --crearprivado <Nombre> <Clave>"
-             nombre = args[0]
-             clave = args[1]
-             gid = grupos.generar_id_grupo(nombre)
-             # Hash clave
-             pwd_hash = grupos.hash_password(clave)
-             # Guardar en memoria (TODO: persistir)
-             self.memoria.agregar_grupo_activo(gid, nombre, pwd_hash)
-             abrir_chat_ui(gid, nombre_legible=nombre, es_grupo=True)
-             return f"[*] Grupo privado '{nombre}' creado."
-
-        elif cmd == "JOIN":
-             # --unirse Nombre
-             if not args: return "[X] Faltan argumentos. Uso: --unirse <Nombre>"
-             nombre = args[0]
-             gid = grupos.generar_id_grupo(nombre)
-             # Simular unión (en realidad deberíamos buscar si existe en red)
-             abrir_chat_ui(gid, nombre_legible=nombre, es_grupo=True)
-             return f"[*] Uniendo a grupo '{nombre}'..."
-
-        elif cmd == "GLOBAL_STATUS":
-             # --info
+        if cmd == "GLOBAL_STATUS":
+             # --info ENRIQUECIDO
              m = self.memoria
              res =  f"--- ESTADO GLOBAL ---\n"
              res += f"UID: {m.mi_uid}\n"
@@ -410,7 +256,14 @@ class Motor:
              p_grp = self.red.sock_tcp_group.getsockname()[1] if self.red.sock_tcp_group else "?"
              p_priv = self.red.sock_tcp_priv.getsockname()[1] if self.red.sock_tcp_priv else "?"
              
-             res += f"Puertos: UDP:{p_udp} TCP_GRP:{p_grp} TCP_PRIV:{p_priv}"
+             res += f"Puertos: UDP:{p_udp} TCP_GRP:{p_grp} TCP_PRIV:{p_priv}\n"
+             
+             # Variables de Configuración
+             res += f"No Molestar: {'ON' if m.no_molestar else 'OFF'}\n"
+             res += f"Invisible: {'ON' if m.invisible else 'OFF'}\n"
+             res += f"Auto-Descarga: {'ON' if m.auto_download else 'OFF'}\n"
+             res += f"Log Chat: {'ON' if m.log_chat else 'OFF'}"
+             
              return res
              
         elif cmd == "CONTACTS":
