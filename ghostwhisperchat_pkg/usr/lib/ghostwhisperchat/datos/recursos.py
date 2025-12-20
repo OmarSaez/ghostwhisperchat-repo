@@ -22,8 +22,8 @@ class Colores:
     BG_RED = "\033[41m"
 
 # Versionado
-APP_VER_NUM = "2.12"
-APP_VER_TAG = "Env Debug"
+APP_VER_NUM = "2.13"
+APP_VER_TAG = "Motor Debug"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 BANNER = r"""

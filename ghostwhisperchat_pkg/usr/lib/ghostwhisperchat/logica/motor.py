@@ -192,7 +192,9 @@ class Motor:
 
     def ejecutar_comando_transitorio(self, cmd_raw):
         # Parseamos con logica de comandos anterior
+        print(f"[MOTOR_DEBUG] Procesando comando raw: {cmd_raw}", file=sys.stderr)
         cmd, args = parsear_comando(cmd_raw)
+        print(f"[MOTOR_DEBUG] Parseado: CMD={cmd}, ARGS={args}", file=sys.stderr)
         
         if cmd == "DM": # --dm PEdro
              dest = args[0]
