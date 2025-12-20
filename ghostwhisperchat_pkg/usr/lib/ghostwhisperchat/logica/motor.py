@@ -228,6 +228,84 @@ class Motor:
                       res += f"  - {sub}: {', '.join(data['aliases'])}\n"
              return res
              
+        elif cmd == "CREATE_PUB":
+             # --crearpublico Nombre
+             if not args: return "[X] Faltan argumentos. Uso: --crearpublico <Nombre>"
+             nombre = args[0]
+             # Generar ID
+             gid = grupos.generar_id_grupo(nombre)
+             self.memoria.agregar_grupo_activo(gid, nombre)
+             abrir_chat_ui(gid, es_grupo=True)
+             return f"[*] Grupo público '{nombre}' creado (ID: {gid[:8]})."
+
+        elif cmd == "CREATE_PRIV":
+             # --crearprivado Nombre Clave
+             if len(args) < 2: return "[X] Faltan argumentos. Uso: --crearprivado <Nombre> <Clave>"
+             nombre = args[0]
+             clave = args[1]
+             gid = grupos.generar_id_grupo(nombre)
+             # Hash clave
+             pwd_hash = grupos.hash_password(clave)
+             # Guardar en memoria (TODO: persistir)
+             self.memoria.agregar_grupo_activo(gid, nombre, pwd_hash)
+             abrir_chat_ui(gid, es_grupo=True)
+             return f"[*] Grupo privado '{nombre}' creado."
+
+        elif cmd == "JOIN":
+             # --unirse Nombre
+             if not args: return "[X] Faltan argumentos. Uso: --unirse <Nombre>"
+             nombre = args[0]
+             gid = grupos.generar_id_grupo(nombre)
+             # Simular unión (en realidad deberíamos buscar si existe en red)
+             abrir_chat_ui(gid, es_grupo=True)
+             return f"[*] Uniendo a grupo '{nombre}'..."
+
+        elif cmd == "GLOBAL_STATUS":
+             # --info
+             m = self.memoria
+             res =  f"--- ESTADO GLOBAL ---\n"
+             res += f"UID: {m.mi_uid}\n"
+             res += f"Nick: {m.mi_nick}\n"
+             res += f"IP: {m.mi_ip}\n"
+             res += f"Versión: {m.version}\n"
+             res += f"Peers conocidos: {len(m.peers)}\n"
+             res += f"Chats activos (UI): {len(self.ui_sessions)}\n"
+             res += f"Puertos: UDP:{self.red.sock_udp.getsockname()[1]} TCP:{self.red.sock_tcp_group.getsockname()[1]}"
+             return res
+             
+        elif cmd == "CONTACTS":
+             # --contactos
+             ct = self.memoria.contactos_guardados
+             if not ct: return "No hay contactos guardados."
+             res = "--- CONTACTOS ---\n"
+             for uid, data in ct.items():
+                 res += f"[{data['nick']}] ({data.get('ip','?')}) {'[BLOQ]' if data.get('bloqueado') else ''}\n"
+             return res
+
+        elif cmd == "CHANGE_NICK":
+            if not args: return "[X] Uso: --cambiarnombre <NuevoNick>"
+            old = self.memoria.mi_nick
+            self.memoria.mi_nick = args[0]
+            # TODO: Broadcast cambio
+            return f"[*] Nick cambiado: {old} -> {self.memoria.mi_nick}"
+
+        elif cmd == "STATUS":
+             if not args: return "[X] Uso: --estado <Mensaje>"
+             # TODO: Guardar estado en memoria
+             return f"[*] Estado actualizado: {' '.join(args)}"
+
+        elif cmd == "LIST_GROUPS":
+            # TODO: Implementar descubrimiento real
+            return "Escaneando grupos... (Funcionalidad pendiente de red)"
+
+        elif cmd == "VISIBILITY_TOGGLE":
+            self.memoria.invisible = not self.memoria.invisible
+            return f"[*] Visibilidad: {'INVISIBLE' if self.memoria.invisible else 'VISIBLE'}"
+
+        elif cmd == "MUTE_TOGGLE":
+            self.memoria.no_molestar = not self.memoria.no_molestar
+            return f"[*] No Molestar: {'ACTIVADO' if self.memoria.no_molestar else 'DESACTIVADO'}"
+             
         return f"[?] Comando recibido: {cmd_raw}"
 
     # --- MANEJO RED INCOMING ---
