@@ -11,7 +11,8 @@ from ghostwhisperchat.core.estado import MemoriaGlobal
 from ghostwhisperchat.core.transporte import GestorRed
 from ghostwhisperchat.core.protocolo import empaquetar, desempaquetar
 from ghostwhisperchat.core.launcher import abrir_chat_ui
-from ghostwhisperchat.logica.comandos import parsear_comando
+from ghostwhisperchat.logica.comandos import parsear_comando, obtener_ayuda_comando
+from ghostwhisperchat.datos.recursos import AYUDA, ABBREVIATIONS_DISPLAY
 from ghostwhisperchat.logica import grupos
 from ghostwhisperchat.logica.notificaciones import enviar_notificacion, preguntar_invitacion_chat
 
@@ -215,6 +216,17 @@ class Motor:
         elif cmd == "EXIT":
              self.running = False
              return "[!] Apagando Demonio..."
+
+        elif cmd == "HELP":
+             return AYUDA
+
+        elif cmd == "SHORTCUTS":
+             res = "ABREVIACIONES DISPONIBLES:\n"
+             for cat, cmds in ABBREVIATIONS_DISPLAY.items():
+                 res += f"\n[{cat}]\n"
+                 for sub, data in cmds.items():
+                      res += f"  - {sub}: {', '.join(data['aliases'])}\n"
+             return res
              
         return f"[?] Comando recibido: {cmd_raw}"
 
