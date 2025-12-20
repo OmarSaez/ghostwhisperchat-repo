@@ -5,8 +5,9 @@ export PYTHONPATH=$PYTHONPATH:/usr/lib
 
 if [ "$1" == "--start" ]; then
     echo "Iniciando Demonio..."
-    python3 -m ghostwhisperchat.demonio &
-    exit 0
+    # Usamos exec para reemplazar el proceso shell por el demonio python
+    # Esto evita que systemd mate el proceso al salir el script
+    exec python3 -m ghostwhisperchat.demonio
 fi
 
 if [ "$1" == "--check" ]; then

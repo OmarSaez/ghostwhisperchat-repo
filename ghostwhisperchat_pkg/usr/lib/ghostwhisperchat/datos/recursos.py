@@ -22,8 +22,8 @@ class Colores:
     BG_RED = "\033[41m"
 
 # Versionado
-APP_VER_NUM = "2.4"
-APP_VER_TAG = "Corrección de ruta del cliente"
+APP_VER_NUM = "2.5"
+APP_VER_TAG = "Systemd Persistence Fix"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 BANNER = r"""
