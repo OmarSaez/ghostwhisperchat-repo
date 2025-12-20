@@ -31,7 +31,7 @@ def detectar_terminal():
             return term, flag
     return None, None
 
-def abrir_chat_ui(id_destino, es_grupo=False):
+def abrir_chat_ui(id_destino, nombre_legible=None, es_grupo=False):
     """
     Abre una nueva ventana de terminal ejecutando el modo UI del cliente.
     Ejecuta: gwc --chat-ui <ID>
@@ -58,9 +58,11 @@ def abrir_chat_ui(id_destino, es_grupo=False):
             
             args_term = [term]
             
-            # Flags específicos de terminal
+             # Flags específicos de terminal
             if term == "gnome-terminal":
-                 args_term.extend(["--title", f"Chat GWC: {id_destino}"])
+                 # Usamos nombre_legible en el título si existe, sino el ID corto
+                 display_title = nombre_legible if nombre_legible else id_destino[:8]
+                 args_term.extend(["--title", f"Chat GWC: {display_title}"])
             
             # Flag de ejecución ("--" o "-e" o "-x")
             args_term.append(flag)

@@ -246,7 +246,7 @@ class Motor:
              # Simulacion: El usuario pide iniciar chat. Lo abrimos directamente?
              # No, protocolo dice esperar CHAT_ACK.
              # Pero para probar: Lanzamos ventana.
-             abrir_chat_ui(dest, es_grupo=False)
+             abrir_chat_ui(dest, nombre_legible=dest, es_grupo=False)
              return f"[*] Abriendo chat con {dest}..."
 
         elif cmd == "SCAN":
@@ -276,7 +276,7 @@ class Motor:
              # Generar ID
              gid = grupos.generar_id_grupo(nombre)
              self.memoria.agregar_grupo_activo(gid, nombre)
-             abrir_chat_ui(gid, es_grupo=True)
+             abrir_chat_ui(gid, nombre_legible=nombre, es_grupo=True)
              return f"[*] Grupo público '{nombre}' creado (ID: {gid[:8]})."
 
         elif cmd == "CREATE_PRIV":
@@ -289,7 +289,7 @@ class Motor:
              pwd_hash = grupos.hash_password(clave)
              # Guardar en memoria (TODO: persistir)
              self.memoria.agregar_grupo_activo(gid, nombre, pwd_hash)
-             abrir_chat_ui(gid, es_grupo=True)
+             abrir_chat_ui(gid, nombre_legible=nombre, es_grupo=True)
              return f"[*] Grupo privado '{nombre}' creado."
 
         elif cmd == "JOIN":
@@ -298,7 +298,7 @@ class Motor:
              nombre = args[0]
              gid = grupos.generar_id_grupo(nombre)
              # Simular unión (en realidad deberíamos buscar si existe en red)
-             abrir_chat_ui(gid, es_grupo=True)
+             abrir_chat_ui(gid, nombre_legible=nombre, es_grupo=True)
              return f"[*] Uniendo a grupo '{nombre}'..."
 
         elif cmd == "GLOBAL_STATUS":
