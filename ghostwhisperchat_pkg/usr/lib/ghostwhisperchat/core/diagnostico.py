@@ -1,86 +1,117 @@
 # /usr/lib/ghostwhisperchat/core/diagnostico.py
-# Módulo de Autodiagnóstico y Reporte
-
+# Módulo de Autodiagnóstico y Reporte Avanzado
 import shutil
 import socket
 import os
 import subprocess
-from ghostwhisperchat.datos.recursos import Colores as C
+import time
+import sys
+from ghostwhisperchat.datos.recursos import APP_VERSION, Colores as C
 
-REQUIRED_HITS = ["zenity", "notify-send", "fuser"]
+REQUIRED_DEPS = [("python3", "Motor Python"), ("zenity", "Interfaz de Ventanas"), ("notify-send", "Notificaciones"), ("fuser", "Gestor Procesos")]
 
 def check_dependencies():
-    print(f"{C.BOLD}[*] Verificando dependencias del sistema...{C.RESET}")
+    print(f"\n{C.BOLD}:: Dependencias del Sistema ::{C.RESET}")
     all_ok = True
-    for tool in REQUIRED_HITS:
+    for tool, desc in REQUIRED_DEPS:
         path = shutil.which(tool)
         if path:
-            print(f"  [OK] {tool}: {path}")
+            print(f" - {desc} ({tool}): {C.GREEN}OK{C.RESET}")
         else:
-            print(f"  {C.RED}[X] {tool}: NO ENCONTRADO{C.RESET}")
+            print(f" - {desc} ({tool}): {C.RED}⚠️ FALTA{C.RESET}")
             all_ok = False
-            
-    if not all_ok:
-        print(f"{C.YELLOW}[!] Faltan dependencias. Instale: zenity libnotify-bin psmisc{C.RESET}")
     return all_ok
 
 def check_ports():
-    print(f"{C.BOLD}[*] Verificando puertos (44494-44496)...{C.RESET}")
-    ports = [44494, 44495, 44496]
-    busy = []
-    
-    for p in ports:
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.settimeout(1)
-        res = s.connect_ex(('127.0.0.1', p))
-        s.close()
-        # Si devuelve 0, es que conectó => ALGUIEN ESCUCHA (Puerto Ocupado)
-        if res == 0:
-            print(f"  {C.YELLOW}[!] Puerto {p} está en uso.{C.RESET}")
-            busy.append(p)
-        else:
-            print(f"  [OK] Puerto {p} libre.")
-            
-    return busy
+    print(f"\n{C.BOLD}:: Estado de Puertos (Daemon Health) ::{C.RESET}")
+    ports = [
+        (44494, "TCP Privado"),
+        (44495, "UDP Discovery"),
+        (44496, "TCP Mesh (Grupos)")
+    ]
+    for p, desc in ports:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(0.5)
+            # Intentamos conectar. Si conecta (0), alguien escucha.
+            res = s.connect_ex(('127.0.0.1', p))
+            if res == 0:
+                print(f" - Puerto {p} ({desc}): {C.GREEN}EN ESCUCHA (Activo){C.RESET}")
+            else:
+                # Si falla, puerto cerrado o filtrado
+                print(f" - Puerto {p} ({desc}): {C.YELLOW}LIBRE / INACTIVO{C.RESET}")
+
+def check_ipc():
+    print(f"\n{C.BOLD}:: Subsistema IPC (Socket Demonio) ::{C.RESET}")
+    ipc_path = os.path.expanduser("~/.ghostwhisperchat/gwc.sock")
+    if os.path.exists(ipc_path):
+        # Intentar conectar
+        try:
+            sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            sock.connect(ipc_path)
+            sock.close()
+            print(f" - Socket {ipc_path}: {C.GREEN}OK (Conexión exitosa){C.RESET}")
+        except Exception as e:
+            print(f" - Socket {ipc_path}: {C.RED}FALLO (Existe pero no responde: {e}){C.RESET}")
+            print(f"   {C.YELLOW}↳ Sugerencia: El daemon podría estar zombie.{C.RESET}")
+    else:
+        print(f" - Socket {ipc_path}: {C.RED}NO EXISTE (Daemon apagado){C.RESET}")
 
 def check_filesystem():
+    print(f"\n{C.BOLD}:: Sistema de Archivos ::{C.RESET}")
     conf_dir = os.path.expanduser("~/.ghostwhisperchat")
-    print(f"{C.BOLD}[*] Verificando permisos de escritura en {conf_dir}...{C.RESET}")
-    
     if not os.path.exists(conf_dir):
         try:
             os.makedirs(conf_dir, mode=0o755)
-            print("  [OK] Directorio creado.")
-        except OSError as e:
-            print(f"  {C.RED}[X] Error creando directorio: {e}{C.RESET}")
-            return False
-            
-    if os.access(conf_dir, os.W_OK):
-        print("  [OK] Escritura permitida.")
-        return True
+            st_fs = f"{C.GREEN}OK (Creado){C.RESET}"
+        except Exception as e:
+            st_fs = f"{C.RED}ERROR ({e}){C.RESET}"
+    elif os.access(conf_dir, os.W_OK):
+        st_fs = f"{C.GREEN}OK (Escritura){C.RESET}"
     else:
-        print(f"  {C.RED}[X] Sin permisos de escritura.{C.RESET}")
-        return False
+        st_fs = f"{C.RED}FALLO (Permisos){C.RESET}"
+    print(f" - Config (~/.ghostwhisperchat): {st_fs}")
+
+def check_display():
+    print(f"\n{C.BOLD}:: Entorno Gráfico & Terminales ::{C.RESET}")
+    display = os.environ.get("DISPLAY")
+    if display:
+        print(f" - DISPLAY: {display} ({C.GREEN}Detectado{C.RESET})")
+    else:
+        print(f" - DISPLAY: {C.RED}NO DETECTADO (Headless mode?){C.RESET}")
+        print(f"   {C.YELLOW}↳ Las ventanas de chat NO se abrirán sin DISPLAY.{C.RESET}")
+
+    # Verificar Terminales
+    from ghostwhisperchat.core.launcher import TERMINALES
+    found_term = None
+    for t_name, _ in TERMINALES:
+        if shutil.which(t_name):
+            print(f" - Terminal '{t_name}': {C.GREEN}INSTALADA{C.RESET}")
+            if not found_term: found_term = t_name
+        else:
+            print(f" - Terminal '{t_name}': {C.RED}NO ENCONTRADA{C.RESET}")
+
+    if found_term:
+        print(f" -> Se usará: {C.BOLD}{found_term}{C.RESET}")
+        # Test Live
+        input_chk = input(f"\n¿Deseas probar lanzar una ventana real con {found_term}? (s/n): ")
+        if input_chk.lower() == 's':
+            try:
+                cmd = [found_term, '--', 'sh', '-c', 'echo "TEST GWC EXITOSO"; sleep 5']
+                if 'gnome' in found_term: cmd = [found_term, '--', 'sh', '-c', 'echo "TEST GWC"; sleep 5']
+                # Ajuste rapido para test
+                subprocess.Popen(cmd)
+                print(f"   {C.GREEN}[INFO] Ventana lanzada. Debería cerrarse en 5 seg.{C.RESET}")
+            except Exception as e:
+                print(f"   {C.RED}[ERROR] Falló lanzamiento: {e}{C.RESET}")
 
 def ejecutar_diagnostico_completo():
-    print( "========================================")
-    print(f" GHOSTWHISPERCHAT DIAGNOSTICO v2.0")
-    print( "========================================")
-    
-    fs = check_filesystem()
-    deps = check_dependencies()
-    ports_busy = check_ports() # devuelve lista de ocupados
-    
-    print("\n--- CONCLUSIÓN ---")
-    if not fs:
-        print(f"{C.RED}[CRITICO] No se puede escribir configuración.{C.RESET}")
-    elif not deps:
-        print(f"{C.YELLOW}[ADVERTENCIA] Faltan herramientas visuales. El chat funcionará pero sin popups.{C.RESET}")
-    
-    if ports_busy:
-        print(f"{C.BLUE}[INFO] Puertos ocupados: {ports_busy}. Si es GWC corriendo, todo bien.{C.RESET}")
-    else:
-        print(f"{C.GREEN}[INFO] Puertos libres. Listo para iniciar daemon.{C.RESET}")
-        
+    print(f"{C.BOLD}=== REPORTE DE INTEGRIDAD ({APP_VERSION}) ==={C.RESET}")
+    check_dependencies()
+    check_filesystem()
+    check_ipc()
+    check_ports()
+    check_display()
+    print("\n[FIN DEL DIAGNOSTICO]")
+
 if __name__ == "__main__":
     ejecutar_diagnostico_completo()

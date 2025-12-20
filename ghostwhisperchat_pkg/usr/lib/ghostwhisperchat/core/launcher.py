@@ -5,16 +5,16 @@ import shutil
 import subprocess
 import os
 
-# Lista de terminales soportadas en orden de preferencia
+# Lista PRIORIZADA de terminales soportados
+# (binario, flag_ejecucion)
 TERMINALES = [
-    # (Binario, Argumento para ejecutar comando)
-    ('gnome-terminal', '--'), 
-    ('mate-terminal', '--'),
-    ('xfce4-terminal', '-x'),
-    ('konsole', '-e'),
-    ('terminator', '-x'),
-    ('tilix', '-e'),
-    ('xterm', '-e'),
+    ("gnome-terminal", "--"),
+    ("mate-terminal", "--"),
+    ("xfce4-terminal", "--execute"), 
+    ("konsole", "-e"),
+    ("tilix", "-e"),
+    ("terminator", "-x"),
+    ("xterm", "-e"),
 ]
 
 def detectar_terminal():
