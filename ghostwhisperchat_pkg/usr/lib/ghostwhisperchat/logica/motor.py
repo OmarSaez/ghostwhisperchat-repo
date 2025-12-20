@@ -200,17 +200,26 @@ class Motor:
                     break
             
             if chat_id:
-                # ENVIAR A LA RED
+                # 1. ¿Es un comando?
+                if msg_content.startswith("--") or msg_content.startswith("/"):
+                     # Ejecutar como comando transitorio
+                     # Nota: Esto imprimirá el resultado en el journal por ahora, 
+                     # o podríamos intentar devolverlo al chat UI si soportara prints.
+                     # Por ahora, solo ejecutamos y logueamos.
+                     res = self.ejecutar_comando_transitorio(msg_content)
+                     print(f"[UI_CMD_RESULT] {res}", file=sys.stderr)
+                     return
+
+                # 2. Es un mensaje normal
                 print(f"[DEBUG] Enviando msg a {chat_id}: {msg_content}")
-                # Aqui iria logica de red: buscar peer IP, empaquetar MSG, enviar TCP...
-                # Simulado por ahora: Eco local
-                # sock_ui.sendall(f"Yo: {msg_content}\n".encode('utf-8'))
                 
                 # IMPLEMENTACION REAL V2.1 TCP PRIVADO:
-                peer = self.memoria.obtener_peer_por_id_o_ip(chat_id) # Necesitamos esa funcion
-                if peer:
-                    # Logica enviar TCP... pendiente conectar transporte
+                try:
+                    # TODO: Implementar lookup real
+                    # peer = self.memoria.obtener_peer(chat_id) 
                     pass
+                except Exception as e:
+                    print(f"[!] Error enviando mensaje a {chat_id}: {e}", file=sys.stderr)
 
     def desconectar_ui(self, sock):
         to_del = None
@@ -249,7 +258,7 @@ class Motor:
         elif cmd == "SCAN":
              pkg = empaquetar("DISCOVER", {"filter": "ALL"}, "ALL")
              self.red.enviar_udp_broadcast(pkg)
-             return "[*] Escaneo enviado. Espera notificaciones..."
+             return "[*] Señal de descubrimiento enviada a la red.\n    Espera unos segundos y revisa sus respuestas con --contactos."
 
         elif cmd == "EXIT":
              self.running = False
@@ -308,7 +317,12 @@ class Motor:
              res += f"Versión: {m.version}\n"
              res += f"Peers conocidos: {len(m.peers)}\n"
              res += f"Chats activos (UI): {len(self.ui_sessions)}\n"
-             res += f"Puertos: UDP:{self.red.sock_udp.getsockname()[1]} TCP_GRP:{self.red.sock_tcp_group.getsockname()[1]} TCP_PRIV:{self.red.sock_tcp_priv.getsockname()[1]}"
+             
+             p_udp = self.red.sock_udp.getsockname()[1] if self.red.sock_udp else "?"
+             p_grp = self.red.sock_tcp_group.getsockname()[1] if self.red.sock_tcp_group else "?"
+             p_priv = self.red.sock_tcp_priv.getsockname()[1] if self.red.sock_tcp_priv else "?"
+             
+             res += f"Puertos: UDP:{p_udp} TCP_GRP:{p_grp} TCP_PRIV:{p_priv}"
              return res
              
         elif cmd == "CONTACTS":
