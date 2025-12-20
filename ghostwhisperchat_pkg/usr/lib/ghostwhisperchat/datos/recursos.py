@@ -28,7 +28,7 @@ APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 BANNER = r"""
 
-Inicializando
+Inicializando...
 
   ▄████  █     █░ ▄████▄  
  ██▒ ▀█▒▓█░ █ ░█░▒██▀ ▀█  
@@ -41,7 +41,7 @@ Inicializando
       ░     ░    ░ ░      
                  ░        
 
-               :: v2 :: LAN Distributed Chat ::
+:: v2 :: LAN Distributed Chat ::
 """
 
 AYUDA = """

@@ -14,6 +14,30 @@ from ghostwhisperchat.datos.recursos import Colores as C, BANNER
 
 IPC_SOCK_PATH = os.path.expanduser("~/.ghostwhisperchat/gwc.sock")
 
+def enviar_comando_transitorio(cmd_str):
+    """Envía un comando, espera respuesta inmediata y sale."""
+    if not os.path.exists(IPC_SOCK_PATH):
+        print(f"{C.RED}[X] El servicio ghostwhisperchat no está corriendo.{C.RESET}")
+        return
+
+    try:
+        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        s.connect(IPC_SOCK_PATH)
+        s.sendall(cmd_str.encode('utf-8'))
+        
+        # Esperar ACK o Respuesta breve (Timeout corto)
+        s.settimeout(2.0)
+        try:
+            resp = s.recv(4096)
+            if resp:
+                print(resp.decode('utf-8').strip())
+        except socket.timeout:
+            pass # Si no hay respuesta rapida, asumimos que fue procesado
+            
+        s.close()
+    except Exception as e:
+        print(f"{C.RED}[X] Error comunicando con daemon: {e}{C.RESET}")
+
 def get_local_ip():
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
