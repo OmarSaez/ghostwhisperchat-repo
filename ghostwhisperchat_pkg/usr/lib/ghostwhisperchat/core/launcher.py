@@ -47,6 +47,8 @@ def abrir_chat_ui(id_destino, es_grupo=False):
     inner_args = shlex.split(cmd_inner_str)
         
     log_launcher(f"[LAUNCHER] Solicitud abrir UI: ID={id_destino}, GRUPO={es_grupo}")
+    log_launcher(f"[LAUNCHER] Entorno (DISPLAY): {os.environ.get('DISPLAY', 'NO_DISPLAY')}")
+    log_launcher(f"[LAUNCHER] Entorno (XDG_RUNTIME_DIR): {os.environ.get('XDG_RUNTIME_DIR', '?')}")
     log_launcher(f"[LAUNCHER] Comando interno raw: {cmd_inner_str}")
 
     for term, flag in TERMINALES:
