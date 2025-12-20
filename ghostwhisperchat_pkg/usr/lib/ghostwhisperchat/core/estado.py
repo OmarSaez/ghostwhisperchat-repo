@@ -88,3 +88,27 @@ class MemoriaGlobal:
                       if (ahora - data['last_seen']) > timeout_segundos]
             for ip in borrar:
                 del self.peers[ip]
+
+    def agregar_grupo_activo(self, gid, nombre, clave_hash=None):
+        """Registra un grupo en la memoria local"""
+        with self._lock:
+            if gid not in self.grupos_activos:
+                self.grupos_activos[gid] = {
+                    "nombre": nombre,
+                    "es_publico": (clave_hash is None),
+                    "miembros": [],
+                    "mensajes": [],
+                    "clave_hash": clave_hash
+                }
+
+    def buscar_peer(self, query):
+        """Busca un peer por Nick (comienzo) o UID exacto"""
+        query = query.lower()
+        with self._lock:
+            for ip, p in self.peers.items():
+                if p['nick'].lower() == query or p['uid'] == query:
+                    # Devolvemos una copia enriquecida con IP
+                    ret = p.copy()
+                    ret['ip'] = ip
+                    return ret
+        return None

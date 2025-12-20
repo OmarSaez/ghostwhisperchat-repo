@@ -22,8 +22,8 @@ class Colores:
     BG_RED = "\033[41m"
 
 # Versionado
-APP_VER_NUM = "2.18"
-APP_VER_TAG = "Syntax Verified"
+APP_VER_NUM = "2.20"
+APP_VER_TAG = "Integrity Fix"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 BANNER = r"""

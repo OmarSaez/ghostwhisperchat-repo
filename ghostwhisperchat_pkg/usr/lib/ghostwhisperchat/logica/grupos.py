@@ -12,6 +12,8 @@ def generar_group_id(nombre):
     nom = normalize_text(nombre)
     return hashlib.sha256(nom.encode('utf-8')).hexdigest()
 
+generar_id_grupo = generar_group_id
+
 def generar_hash_clave(clave):
     """
     Genera el hash de la contraseña para grupos privados.
@@ -19,6 +21,8 @@ def generar_hash_clave(clave):
     if not clave:
         return None
     return hashlib.sha256(clave.encode('utf-8')).hexdigest()
+
+hash_password = generar_hash_clave
 
 def es_grupo_valido(group_data, clave_input=None):
     """
