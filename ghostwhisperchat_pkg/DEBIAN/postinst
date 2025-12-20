@@ -30,10 +30,20 @@ if command -v iptables >/dev/null; then
     fi
 fi
 
-echo "ℹ️  Para activar el inicio automático, ejecuta como TU USUARIO:"
-echo "   systemctl --user enable --now ghostwhisperchat"
-echo "   Despues puedes usar gwc "version" para ver la version del paquete"
-echo "   Por utlimo "gwc ayuda" para ver el listado de comandos de GhostWhisperChat"
+echo "=========================================================================="
+echo "✨ GhostWhisperChat instalado correctamente ✨"
+echo "=========================================================================="
+echo "ℹ️  PASOS FINALES PARA ACTIVAR:"
+echo ""
+echo "   1. Activa el servicio (Solo una vez):"
+echo "      systemctl --user enable --now ghostwhisperchat"
+echo ""
+echo "   2. Comprueba que todo esté bien:"
+echo "      gwc version"
+echo ""
+echo "   3. ¡Listo! Usa el chat con:"
+echo "      gwc ayuda"
+echo "=========================================================================="
 
 # Nota: No podemos ejecutar systemctl --user aquí porque corremos como root (sudo dpkg)
 # y no sabemos cual es el usuario "real" que lo usará.
