@@ -127,7 +127,7 @@ class Motor:
                         try:
                             data, addr = s.recvfrom(65535)
                             print(f"[MOTOR_DEBUG] UDP Rx de {addr}", file=sys.stderr)
-                            # self.procesar_paquete_red(data, addr) <--- FALTABA ESTO EN SNIPPET ORIGINAL
+                            self.manejar_paquete_red(data, addr, "UDP")
                         except Exception as e:
                             print(f"[MOTOR_DEBUG] Error lectura UDP: {e}", file=sys.stderr)
 
@@ -138,9 +138,7 @@ class Motor:
              raise e
         finally:
              print(f"[MOTOR_DEBUG] Bucle finalizado. Running={self.running}", file=sys.stderr)
-                        self.manejar_paquete_red(data, addr, "UDP")
-                    except OSError:
-                        pass
+
                 
                 # 4. TCP Listeners
                 elif s == self.red.sock_tcp_group or s == self.red.sock_tcp_priv:
