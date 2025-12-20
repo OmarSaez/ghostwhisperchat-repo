@@ -270,7 +270,7 @@ class Motor:
              res += f"Versión: {m.version}\n"
              res += f"Peers conocidos: {len(m.peers)}\n"
              res += f"Chats activos (UI): {len(self.ui_sessions)}\n"
-             res += f"Puertos: UDP:{self.red.sock_udp.getsockname()[1]} TCP:{self.red.sock_tcp_group.getsockname()[1]}"
+             res += f"Puertos: UDP:{self.red.sock_udp.getsockname()[1]} TCP_GRP:{self.red.sock_tcp_group.getsockname()[1]} TCP_PRIV:{self.red.sock_tcp_priv.getsockname()[1]}"
              return res
              
         elif cmd == "CONTACTS":

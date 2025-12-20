@@ -1,18 +1,4 @@
 Package: ghostwhisperchat
-Version: 2.5
-Architecture: all
-Maintainer: Omar Saez <omar.saez@usach.cl>
-Depends: python3 (>= 3.6), zenity, libnotify-bin, psmisc, zip, unzip
-Filename: pool/main/g/ghostwhisperchat/ghostwhisperchat_2.5_all.deb
-Size: 109538
-MD5sum: 107a285ec2a04ea38edd807da8fcc1a8
-SHA1: 753154a7bf9bf82fdea8a3cb8842961dfd245f66
-SHA256: aca8291034bbaf28e1cc34ffd36c1d17bbe3e0ada8383c0f94661b7a43e05206
-Section: net
-Priority: optional
-Description: GhostWhisperChat - Chat LAN silencioso para comunicación 1 a 1 y grupos.
-
-Package: ghostwhisperchat
 Version: 2.6
 Architecture: all
 Maintainer: Omar Saez <omar.saez@usach.cl>
@@ -36,6 +22,20 @@ Size: 110416
 MD5sum: fdd9df80c9b2f15ccf6f1f05a429b99d
 SHA1: c88c567160b9b794eb7e6743154e72b10a355734
 SHA256: 591c779eef4992bb1fe9cf7df60f37fee77a48496472397bf9ec57c443ec754a
+Section: net
+Priority: optional
+Description: GhostWhisperChat - Chat LAN silencioso para comunicación 1 a 1 y grupos.
+
+Package: ghostwhisperchat
+Version: 2.8
+Architecture: all
+Maintainer: Omar Saez <omar.saez@usach.cl>
+Depends: python3 (>= 3.6), zenity, libnotify-bin, psmisc, zip, unzip
+Filename: pool/main/g/ghostwhisperchat/ghostwhisperchat_2.8_all.deb
+Size: 110648
+MD5sum: b37a17f1ba4b8ead6da9c84d6d5c0a48
+SHA1: 2d99a5af99f10be1d7bfd381808829cfa1ae34a3
+SHA256: 0f20818c864784d9328df2108b1821eab51f8548b494b72f60c78d795c924f29
 Section: net
 Priority: optional
 Description: GhostWhisperChat - Chat LAN silencioso para comunicación 1 a 1 y grupos.
