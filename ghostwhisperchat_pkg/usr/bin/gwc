@@ -7,7 +7,7 @@ if [ "$1" == "--start" ]; then
     echo "Iniciando Demonio..."
     # Usamos exec para reemplazar el proceso shell por el demonio python
     # Esto evita que systemd mate el proceso al salir el script
-    exec python3 -m ghostwhisperchat.demonio
+    exec python3 -u -m ghostwhisperchat.demonio
 fi
 
 if [ "$1" == "--check" ]; then
