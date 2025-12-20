@@ -240,6 +240,7 @@ class Motor:
         # Parseamos con logica de comandos anterior
         print(f"[MOTOR_DEBUG] Procesando comando raw: {cmd_raw} Context={context_ui}", file=sys.stderr)
         cmd, args = parsear_comando(cmd_raw)
+        print(f"[MOTOR_DEBUG] Parseado: CMD='{cmd}' Type={type(cmd)} ARGS={args}", file=sys.stderr)
         
         if cmd == "GLOBAL_STATUS":
              # --info ENRIQUECIDO
@@ -263,42 +264,136 @@ class Motor:
              res += f"Invisible: {'ON' if m.invisible else 'OFF'}\n"
              res += f"Auto-Descarga: {'ON' if m.auto_download else 'OFF'}\n"
              res += f"Log Chat: {'ON' if m.log_chat else 'OFF'}"
-             
              return res
+
+        elif cmd == "DM": 
+             if not args: return "[X] Uso: --dm <Usuario>"
+             dest = args[0]
+             abrir_chat_ui(dest, nombre_legible=dest, es_grupo=False)
+             return f"[*] Abriendo chat con {dest}..."
+
+        elif cmd == "CREATE_PUB":
+             if not args: return "[X] Uso: --crearpublico <Nombre>"
+             nombre = args[0]
+             gid = grupos.generar_id_grupo(nombre)
+             self.memoria.agregar_grupo_activo(gid, nombre)
+             abrir_chat_ui(gid, nombre_legible=nombre, es_grupo=True)
+             return f"[*] Grupo público '{nombre}' creado."
+
+        elif cmd == "CREATE_PRIV":
+             if len(args) < 2: return "[X] Uso: --crearprivado <Nombre> <Clave>"
+             nombre = args[0]
+             clave = args[1]
+             gid = grupos.generar_id_grupo(nombre)
+             pwd_hash = grupos.hash_password(clave)
+             self.memoria.agregar_grupo_activo(gid, nombre, pwd_hash)
+             abrir_chat_ui(gid, nombre_legible=nombre, es_grupo=True)
+             return f"[*] Grupo privado '{nombre}' creado."
+
+        elif cmd == "JOIN":
+             if not args: return "[X] Uso: --unirse <Nombre>"
+             nombre = args[0]
+             gid = grupos.generar_id_grupo(nombre)
+             abrir_chat_ui(gid, nombre_legible=nombre, es_grupo=True)
+             return f"[*] Uniendo a grupo '{nombre}'..."
+
+        elif cmd == "SCAN":
+             pkg = empaquetar("DISCOVER", {"filter": "ALL"}, "ALL")
+             self.red.enviar_udp_broadcast(pkg)
              
+             m = self.memoria
+             if not m.peers:
+                 return "[*] Señal enviada. Nadie detectado AÚN.\n    (Espera unos segundos)"
+             
+             res = "[*] Usuarios detectados en caché:\n"
+             count = 0
+             for ip, data in m.peers.items():
+                 if data['uid'] == m.mi_uid: continue
+                 res += f" - {data['nick']} ({ip})\n"
+                 count += 1
+             if count == 0: return "[*] Señal enviada. (0 encontrados)"
+             return res
+
+        elif cmd == "LS":
+             if not context_ui: return "[X] Solo en chat."
+             chat_id = context_ui[1]
+             if chat_id in self.memoria.grupos_activos:
+                 g = self.memoria.grupos_activos[chat_id]
+                 miembros = g.get('miembros', [])
+                 if not miembros: return f"[*] Grupo '{g['nombre']}': Sin miembros listados."
+                 return f"[*] Miembros: {', '.join(miembros)}"
+             else:
+                 return f"[*] Chat Privado: Tú y el remoto."
+
+        elif cmd == "ADD":
+             if not context_ui: return "[X] Solo en chat."
+             chat_id = context_ui[1]
+             if chat_id not in self.memoria.grupos_activos:
+                 return "[X] Solo puedes invitar en grupos."
+             return f"[*] Invitando (Stub)..."
+
         elif cmd == "CONTACTS":
-             # --contactos
-             ct = self.memoria.contactos_guardados
-             if not ct: return "No hay contactos guardados."
-             res = "--- CONTACTOS ---\n"
-             for uid, data in ct.items():
-                 res += f"[{data['nick']}] ({data.get('ip','?')}) {'[BLOQ]' if data.get('bloqueado') else ''}\n"
+             # Usamos peers para historial reciente por ahora
+             ct = self.memoria.peers
+             if not ct: return "No hay contactos recientes."
+             res = "--- CONTACTOS (Caché) ---\n"
+             for ip, data in ct.items():
+                  if data['uid'] == self.memoria.mi_uid: continue
+                  res += f"[{data['nick']}] ({ip})\n"
              return res
 
-        elif cmd == "CHANGE_NICK":
-            if not args: return "[X] Uso: --cambiarnombre <NuevoNick>"
-            old = self.memoria.mi_nick
-            self.memoria.mi_nick = args[0]
-            # TODO: Broadcast cambio
-            return f"[*] Nick cambiado: {old} -> {self.memoria.mi_nick}"
+        elif cmd == "EXIT":
+             if context_ui:
+                 chat_id = context_ui[1]
+                 s = self.ui_sessions.get(chat_id)
+                 if s: self.desconectar_ui(s)
+                 return "[*] Cerrando chat..."
+             else:
+                 self.running = False
+                 return "[!] Apagando Demonio..."
 
-        elif cmd == "STATUS":
-             if not args: return "[X] Uso: --estado <Mensaje>"
-             # TODO: Guardar estado en memoria
-             return f"[*] Estado actualizado: {' '.join(args)}"
+        elif cmd == "HELP":
+             return AYUDA
 
-        elif cmd == "LIST_GROUPS":
-            # TODO: Implementar descubrimiento real
-            return "Escaneando grupos... (Funcionalidad pendiente de red)"
+        elif cmd == "SHORTCUTS":
+             res = "ABREVIACIONES:\n"
+             for cat, cmds in ABBREVIATIONS_DISPLAY.items():
+                 res += f"\n[{cat}]\n"
+                 for sub, data in cmds.items():
+                      res += f"  - {sub}: {', '.join(data['aliases'])}\n"
+             return res
 
-        elif cmd == "VISIBILITY_TOGGLE":
-            self.memoria.invisible = not self.memoria.invisible
-            return f"[*] Visibilidad: {'INVISIBLE' if self.memoria.invisible else 'VISIBLE'}"
+        elif cmd == "CLEAR":
+             return "\033c[*] Pantalla limpia."
+
+        elif cmd == "LOG_TOGGLE":
+             self.memoria.log_chat = not self.memoria.log_chat
+             return f"[*] Historial: {'ON' if self.memoria.log_chat else 'OFF'}"
+
+        elif cmd == "DL_TOGGLE":
+             self.memoria.auto_download = not self.memoria.auto_download
+             return f"[*] Auto-Descarga: {'ON' if self.memoria.auto_download else 'OFF'}"
 
         elif cmd == "MUTE_TOGGLE":
             self.memoria.no_molestar = not self.memoria.no_molestar
-            return f"[*] No Molestar: {'ACTIVADO' if self.memoria.no_molestar else 'DESACTIVADO'}"
+            return f"[*] No Molestar: {'ON' if self.memoria.no_molestar else 'OFF'}"
+            
+        elif cmd == "VISIBILITY_TOGGLE":
+            self.memoria.invisible = not self.memoria.invisible
+            return f"[*] Invisible: {'ON' if self.memoria.invisible else 'OFF'}"
+
+        elif cmd == "CHANGE_NICK":
+            if not args: return "[X] Uso: --nick <Nuevo>"
+            old = self.memoria.mi_nick
+            self.memoria.mi_nick = args[0]
+            return f"[*] Nick cambiado: {old} -> {self.memoria.mi_nick}"
+
+        elif cmd == "STATUS":
+             return f"[*] Estado actualizado: {' '.join(args)}"
              
+        elif cmd == "LIST_GROUPS":
+            return "Escaneando grupos... (Pendiente)"
+
         return f"[?] Comando recibido: {cmd_raw}"
 
     # --- MANEJO RED INCOMING ---
