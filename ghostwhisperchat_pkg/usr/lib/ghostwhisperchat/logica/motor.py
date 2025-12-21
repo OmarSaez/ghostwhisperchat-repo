@@ -822,7 +822,7 @@ class Motor:
              target_id = gid if gid else origen['uid']
              
              if target_id in self.ui_sessions:
-                 self.ui_sessions[target_id].sendall(f"\n[{origen['nick']}]: {text}\n".encode('utf-8'))
+                 self.ui_sessions[target_id].sendall(f"\n({origen['nick']}): {text}\n".encode('utf-8'))
              else:
                  enviar_notificacion(f"Mensaje de {origen['nick']}", text)
 

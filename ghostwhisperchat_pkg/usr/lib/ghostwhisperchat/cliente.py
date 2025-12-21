@@ -54,8 +54,8 @@ def modo_ui_chat(target_id, es_grupo):
     """
     mi_ip = get_local_ip()
     print(C.GREEN + BANNER + C.RESET)
-    print(f"{C.BOLD}[*] IP LOCAL: {mi_ip} | CHAT CON: {target_id}{C.RESET}")
-    print(f"{C.GREY}(Escribe y presiona Enter. Ctrl+C para cerrar){C.RESET}\n")
+    # Header moved to after connection for cleanliness
+
     
     # 1. Conectar Persistente
     try:
@@ -70,6 +70,10 @@ def modo_ui_chat(target_id, es_grupo):
         print(f"{C.RED}[X] Fallo conexión UI: {e}{C.RESET}")
         input("Presiona Enter para cerrar...")
         return
+        
+    # Header Limpio (Sin IDs)
+    print(f"{C.BOLD}[*] IP LOCAL: {mi_ip}{C.RESET}")
+    print(f"{C.GREY}(Escribe y presiona Enter. Ctrl+C para cerrar){C.RESET}\n")
 
     # 2. Thread de Lectura (Incoming Messages)
     def escuchar():
@@ -80,30 +84,29 @@ def modo_ui_chat(target_id, es_grupo):
                     print(f"\n{C.RED}[!] Desconectado.{C.RESET}")
                     os._exit(0)
                 
-                # Input Protection Hack:
-                # Borramos linea actual, imprimimos msg, y repintamos prompt
-                # Nota: Esto es imperfecto sin curses, pero mejor que nada.
-                # \r = return to start line, \033[K = clear line
-                
                 msg_in = data.decode('utf-8')
                 
                 # Check for special Close Trigger
                 if "__CLOSE_UI__" in msg_in:
-                    # Daemon is telling us to close.
                     time.sleep(2.0)
                     os._exit(0)
 
-                # Si estamos en modo "Animación", guardamos en buffer en vez de imprimir
-                # a menos que sea un mensaje critico? No, buffer es mejor.
-                # Actually, user suggested buffering.
-                # Use a global-ish variable via closure if possible or simple global.
-                # For simplicity in this structure: check the threading Event/Flag?
-                # We can't easily share variables without class refactor.
-                # Strategy: Just print cleanly using \r and clearing line.
-                
                 # FIX SPACING: Strip trailing newlines from message itself
                 msg_in = msg_in.strip()
                 if not msg_in: continue
+                
+                # --- SISTEMA COLORING (UX/UI Standard) ---
+                if msg_in.startswith("[SISTEMA]"):
+                    # Check indicators for specific colors
+                    if "[X]" in msg_in or "Error" in msg_in:
+                         # ERROR (Red)
+                         msg_in = f"{C.RED}{msg_in}{C.RESET}"
+                    elif "[-]" in msg_in or "[!]" in msg_in:
+                         # WARNING/LEAVE (Yellow)
+                         msg_in = f"{C.YELLOW}{msg_in}{C.RESET}"
+                    else:
+                         # INFO/JOIN/POSITIVE (Green) -> Default System
+                         msg_in = f"{C.GREEN}{msg_in}{C.RESET}"
 
                 sys.stdout.write(f"\r\033[K{msg_in}\n")
                 sys.stdout.write("Tu: ") # Prompt
