@@ -493,11 +493,9 @@ class Motor:
                                  # print(f"[X] LEAVE fail to {ip}: {e}", file=sys.stderr) 
                                  pass
                          
-                         # Also remove group from active memory if we leave? 
-                         # No, architecture says we stay "in" the group data-wise until explicit leave command?
-                         # Usually "Closing a window" might just mean closing session, not Leaving group permanently.
-                         # But user said "nobody knew I left".
-                         # If it's "Closing Window", maybe we should send LEAVE (Temporarily Offline)?
+                         # FULL EXIT: Remove group from memory
+                         del self.memoria.grupos_activos[chat_id]
+                         print(f"[Estado] Grupo {chat_id} eliminado de memoria.", file=sys.stderr)
                          # Or CHAT_BYE?
                          # Architecture says: [-] Nick has left.
                          # So yes, LEAVE is correct for "Session Ended".
@@ -709,57 +707,40 @@ class Motor:
         elif tipo == "SYNC":
              gid = payload.get("gid")
              members = payload.get("members", [])
+             print(f"[DEBUG] SYNC recibido para GID {gid}. Miembros: {len(members)}", file=sys.stderr)
+             
              if gid in self.memoria.grupos_activos:
                  g = self.memoria.grupos_activos[gid]
                  if 'miembros' not in g: g['miembros'] = {}
                  
-                 # Importante: Conectar y Anunciarse
-                 for m in members:
-                     uid = m.get('uid')
-                     if uid == self.memoria.mi_uid: continue
-                     
-                     g['miembros'][uid] = m
-                     # TODO: Logic to connect to these peers if not connected, and send ANNOUNCE
-                     # Por simplicidad v2, asumimos que ANNOUNCE es broadcast o multicast.
-                     # Pero en TCP Mesh, debemos conectar punto a punto.
-                     
-                 # Si acabamos de unirnos (SYNC recibido), anunciamos nuestra llegada
-                 # A todos los miembros conocidos (MESH INIT)
+                 # Prepare ANNOUNCE packet
                  ann_pkg = empaquetar("ANNOUNCE", {"gid": gid, "user": self.memoria.get_origen()}, self.memoria.get_origen())
-                 
                  from ghostwhisperchat.core.transporte import PORT_GROUP
+
                  for m in members:
                      uid = m.get('uid')
                      if uid == self.memoria.mi_uid: continue
+                     
+                     # Update local memory
+                     g['miembros'][uid] = m
                      
                      target_ip = m.get('ip')
                      if not target_ip: continue
                      
-                     # Update local memory first
-                     g['miembros'][uid] = m
-
-                     # Intento de conexion mesh (Connect -> Announce -> Add to Pool)
+                     print(f"[DEBUG] SYNC: Conectando a {m.get('nick')} ({target_ip})...", file=sys.stderr)
                      try:
-                         # We need a Persistent connection for Chat
-                         # But ANNOUNCE is usually the first packet.
-                         # Check if we already have a connection? 
-                         # For v2 simplification, we initiate a new one if not present.
-                         # Actually, we should check `self.red.tcp_connections`? NO, we don't map by UID easily there.
-                         # Just connect.
                          s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                          s.settimeout(2.0)
                          s.connect((target_ip, PORT_GROUP))
                          s.setblocking(False)
                          
-                         # Send ANNOUNCE
                          self.red.enviar_tcp(s, ann_pkg)
-                         
-                         # Register for reading future messages
                          self.red.registrar_socket_tcp(s, f"GRP_PEER_{gid}_{uid}")
-                         print(f"[MESH] Conectado con peer {m.get('nick')} ({target_ip})", file=sys.stderr)
-                         
+                         print(f"[MESH] Conectado y anunciado a {m.get('nick')}", file=sys.stderr)
                      except Exception as e:
                          print(f"[MESH] Fallo conexion mesh a {target_ip}: {e}", file=sys.stderr)
+             else:
+                 print(f"[DEBUG] SYNC ignorado: GID {gid} no esta en grupos activos", file=sys.stderr)
                  
         elif tipo == "ANNOUNCE":
              gid = payload.get("gid")
