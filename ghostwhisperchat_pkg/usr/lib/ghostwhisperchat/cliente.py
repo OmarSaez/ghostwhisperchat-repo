@@ -90,14 +90,21 @@ def modo_ui_chat(target_id, es_grupo):
                 # Check for special Close Trigger
                 if "__CLOSE_UI__" in msg_in:
                     # Daemon is telling us to close.
-                    # It likely sent [SISTEMA] xxx closed session before this.
-                    # Wait 2 seconds as requested, then exit.
                     time.sleep(2.0)
                     os._exit(0)
 
-                # Si es un eco nuestro (empieza con Tu:), asumimos que el input local ya lo mostró?
-                # NO, decidimos que el daemon hace eco. Asi que borramos input local.
+                # Si estamos en modo "Animación", guardamos en buffer en vez de imprimir
+                # a menos que sea un mensaje critico? No, buffer es mejor.
+                # Actually, user suggested buffering.
+                # Use a global-ish variable via closure if possible or simple global.
+                # For simplicity in this structure: check the threading Event/Flag?
+                # We can't easily share variables without class refactor.
+                # Strategy: Just print cleanly using \r and clearing line.
                 
+                # FIX SPACING: Strip trailing newlines from message itself
+                msg_in = msg_in.strip()
+                if not msg_in: continue
+
                 sys.stdout.write(f"\r\033[K{msg_in}\n")
                 sys.stdout.write("Tu: ") # Prompt
                 sys.stdout.flush()
@@ -139,8 +146,17 @@ def modo_ui_chat(target_id, es_grupo):
                 if is_scan:
                      # Send trigger
                      s.sendall(f"__MSG__ {msg}".encode('utf-8'))
-                     # Wait for buffer fill (daemon will reply "Buscando..." which listen thread prints)
-                     time.sleep(1.5)
+                     
+                     # USER REQUEST: Unify console experience with Animation
+                     from ghostwhisperchat.datos.recursos import mostrar_animacion_espera
+                     msg_anim = "Escaneando red" if args_raw[0] in COMMAND_MAP['SCAN'] else "Buscando grupos"
+                     
+                     # Run animation temporarily blocks input loop, fitting nicely.
+                     # But incoming messages might ruin it. 
+                     # Ideally we should pause the 'escuchar' thread printing, but that's complex.
+                     # We will just run it. The user accepted race conditions.
+                     mostrar_animacion_espera(msg_anim, 1.2)
+                     
                      # Request results
                      s.sendall(b"__MSG__ --scan-results")
                      continue

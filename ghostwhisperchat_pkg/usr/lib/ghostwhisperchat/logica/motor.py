@@ -221,13 +221,17 @@ class Motor:
              target_nick = args[0]
              
              # Buscar peer por nick
+             target_peer = self.memoria.buscar_peer(target_nick)
              if not target_peer: 
                  # Fallback: Look in scan_buffer
+                 # Fixed: 'target_peer' was being checked before this block if we relied on previous logic.
+                 # With 'buscar_peer' returning None, we enter this block. 
                  found_in_buffer = next((x for x in self.scan_buffer if x.get('nick') == target_nick), None)
                  if found_in_buffer:
                      target_peer = {'ip': found_in_buffer['ip'], 'nick': target_nick}
                  else:
                      return f"[X] Usuario '{target_nick}' no encontrado. (Prueba --enlinea primero)"
+
                  
              # Send INVITE packet
              g = self.memoria.grupos_activos[gid]
@@ -552,7 +556,7 @@ class Motor:
                         try:
                             from ghostwhisperchat.core.transporte import PORT_GROUP
                             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                            s.connect((_ip, PORT_GROUP))
+                            s.connect((ambassador_ip, PORT_GROUP))
                             s.sendall(req_pkg + b'\n')
                             self.red.registrar_socket_tcp(s, f"GRP_OUT_{gid}")
                         except Exception as e:
