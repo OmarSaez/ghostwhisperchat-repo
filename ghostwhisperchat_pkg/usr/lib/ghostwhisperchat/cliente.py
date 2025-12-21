@@ -156,7 +156,8 @@ def modo_ui_chat(target_id, es_grupo):
                      
                      # USER REQUEST: Unify console experience with Animation
                      from ghostwhisperchat.datos.recursos import mostrar_animacion_espera
-                     msg_anim = "Escaneando red" if args_raw[0] in COMMAND_MAP['SCAN'] else "Buscando grupos"
+                     # Detect type based on command string
+                     msg_anim = "Escaneando red" if cmd_raw in COMMAND_MAP['SCAN'] else "Buscando grupos"
                      
                      # Run animation temporarily blocks input loop, fitting nicely.
                      # But incoming messages might ruin it. 

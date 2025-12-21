@@ -669,34 +669,33 @@ class Motor:
                  gid = payload.get("gid")
                  if gid in self.memoria.grupos_activos:
                      g = self.memoria.grupos_activos[gid]
-
-                
-                # 1. Add to our own list (Ambassador)
-                if 'miembros' not in g: g['miembros'] = {}
-                # We need the full details of the joiner. Paradoxically, the 'origen' header has it.
-                if origen:
-                    # FIX: Ensure 'status' is separated/included if available or default to ONLINE
-                    status = origen.get('status', 'ONLINE')
-                    g['miembros'][origen['uid']] = {'nick': origen['nick'], 'ip': origen['ip'], 'uid': origen['uid'], 'status': status}
-                    print(f"[GROUP] Agregado nuevo miembro: {origen['nick']} ({origen['ip']})", file=sys.stderr)
-                
-                # 2. Send WELCOME
-                welcome = empaquetar("WELCOME", {"gid": gid, "name": g['nombre']}, self.memoria.get_origen())
-                try: sock.sendall(welcome + b'\n')
-                except: pass
-                
-                # 3. Send SYNC (List of current members, including the new one so they know they are in)
-                members = g.get('miembros', [])
-                sync_list = []
-                # If 'miembros' is a dict in memory, convert to list.
-                if isinstance(members, dict):
-                     sync_list = list(members.values())
-                elif isinstance(members, list):
-                     sync_list = members
+ 
+                     # 1. Add to our own list (Ambassador)
+                     if 'miembros' not in g: g['miembros'] = {}
+                     # We need the full details of the joiner. Paradoxically, the 'origen' header has it.
+                     if origen:
+                         # FIX: Ensure 'status' is separated/included if available or default to ONLINE
+                         status = origen.get('status', 'ONLINE')
+                         g['miembros'][origen['uid']] = {'nick': origen['nick'], 'ip': origen['ip'], 'uid': origen['uid'], 'status': status}
+                         print(f"[GROUP] Agregado nuevo miembro: {origen['nick']} ({origen['ip']})", file=sys.stderr)
                      
-                sync_pkg = empaquetar("SYNC", {"gid": gid, "members": sync_list}, self.memoria.get_origen())
-                try: sock.sendall(sync_pkg + b'\n')
-                except: pass
+                     # 2. Send WELCOME
+                     welcome = empaquetar("WELCOME", {"gid": gid, "name": g['nombre']}, self.memoria.get_origen())
+                     try: sock.sendall(welcome + b'\n')
+                     except: pass
+                     
+                     # 3. Send SYNC (List of current members, including the new one so they know they are in)
+                     members = g.get('miembros', [])
+                     sync_list = []
+                     # If 'miembros' is a dict in memory, convert to list.
+                     if isinstance(members, dict):
+                          sync_list = list(members.values())
+                     elif isinstance(members, list):
+                          sync_list = members
+                          
+                     sync_pkg = empaquetar("SYNC", {"gid": gid, "members": sync_list}, self.memoria.get_origen())
+                     try: sock.sendall(sync_pkg + b'\n')
+                     except: pass
 
         elif tipo == "WELCOME":
              gid = payload.get("gid")
