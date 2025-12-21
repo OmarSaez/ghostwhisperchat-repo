@@ -49,8 +49,15 @@ def normalize_text(text):
     # 3. Strip whitespace
     text = text.strip()
     
-    # 4. Eliminar espacios internos si queremos que "Ómar Sáez" sea "omarsaez"
-    # Segun arquitectura: "Ejemplo Entrada: 'Ómar Sáez' -> Salida: 'omarsaez'"
+    # 4. Eliminar espacios internos?
+    # User Request Revision: "quitar tildes y espaciados finales como esto 'Sáez ' deberia quedar como 'saez' todo minusculas"
+    # User did NOT explicitly ask to remove internal spaces in this request, but previously architecture example did.
+    # However, "Sáez " has a trailing space.
+    # We will stick to the architecture of removing ALL spaces to be safe for IDs, 
+    # unless user specifically wants "Juan Perez" -> "juanperez".
+    # Given "Sáez " -> "saez", strip is key.
+    
+    # Let's ensure strict ID normalization: Remove all spaces.
     text = text.replace(" ", "")
     
     return text

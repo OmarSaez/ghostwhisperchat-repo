@@ -33,6 +33,10 @@ class Motor:
         
         # Trigger temporal para JOIN (buscar y unir)
         self.pending_join_name = None 
+        
+        # Trigger temporal para INVITE (buscar y agregar)
+        self.pending_invite_nick = None
+        self.pending_invite_gid = None 
 
     def iniciar_ipc(self):
         if os.path.exists(IPC_SOCK_PATH):
@@ -222,15 +226,26 @@ class Motor:
              
              # Buscar peer por nick
              target_peer = self.memoria.buscar_peer(target_nick)
+             
              if not target_peer: 
-                 # Fallback: Look in scan_buffer
-                 # Fixed: 'target_peer' was being checked before this block if we relied on previous logic.
-                 # With 'buscar_peer' returning None, we enter this block. 
+                 # Fallback 1: Look in scan_buffer
                  found_in_buffer = next((x for x in self.scan_buffer if x.get('nick') == target_nick), None)
+                 
                  if found_in_buffer:
                      target_peer = {'ip': found_in_buffer['ip'], 'nick': target_nick}
                  else:
-                     return f"[X] Usuario '{target_nick}' no encontrado. (Prueba --enlinea primero)"
+                     # Fallback 2: Active Discovery (WHO_NAME)
+                     from ghostwhisperchat.core.utilidades import normalize_text
+                     
+                     self.pending_invite_nick = normalize_text(target_nick)
+                     self.pending_invite_gid = gid
+                     
+                     # Broadcast WHO_NAME
+                     pkg = empaquetar("WHO_NAME", {"nick": target_nick}, self.memoria.get_origen()) # Send raw nick, receivers normalize
+                     self.red.enviar_udp_broadcast(pkg)
+                     
+                     return f"[*] Buscando a '{target_nick}' en la red para invitar..."
+
 
                  
              # Send INVITE packet
@@ -517,6 +532,54 @@ class Motor:
                          resp = empaquetar("FOUND", {"type": "GROUP", "name": g['nombre'], "gid": gid}, self.memoria.get_origen())
                          try: self.red.sock_udp.sendto(resp, addr)
                          except: pass
+
+        elif tipo == "WHO_NAME":
+             # Someone is looking for a specific nick
+             target = payload.get("nick")
+             from ghostwhisperchat.core.utilidades import normalize_text
+             
+             if not self.memoria.invisible:
+                  # Check normalized nick match
+                  if normalize_text(target) == normalize_text(self.memoria.mi_nick):
+                      # It's me! Reply IAM
+                      resp = empaquetar("IAM", {}, self.memoria.get_origen())
+                      try: self.red.sock_udp.sendto(resp, addr)
+                      except: pass
+
+        elif tipo == "IAM":
+             # Someone replied to WHO_NAME
+             # origin header has the details
+             from ghostwhisperchat.core.utilidades import normalize_text
+             
+             responder_nick = origen['nick']
+             responder_ip = addr[0]
+             
+             # Check if we are waiting to invite this person
+             if self.pending_invite_gid and self.pending_invite_nick == normalize_text(responder_nick):
+                  gid = self.pending_invite_gid
+                  print(f"[GROUP] Encontrado {responder_nick} para invitar. Procediendo...", file=sys.stderr)
+                  
+                  # Send INVITE
+                  if gid in self.memoria.grupos_activos:
+                      g = self.memoria.grupos_activos[gid]
+                      pwd = g.get('clave_hash')
+                      
+                      invite_pkg = empaquetar("INVITE", {
+                          "gid": gid, 
+                          "name": g['nombre'],
+                          "password_hash": pwd
+                      }, self.memoria.get_origen())
+                      
+                      try:
+                          self.red.enviar_tcp_priv(responder_ip, invite_pkg)
+                          # Notify UI active session if possible (fire and forget log)
+                          if gid in self.ui_sessions:
+                               self.ui_sessions[gid].sendall(f"\n[SISTEMA] Usuario '{responder_nick}' encontrado e invitado.\n".encode('utf-8'))
+                      except Exception as e:
+                          print(f"[X] Error auto-inviting: {e}", file=sys.stderr)
+                  
+                  self.pending_invite_nick = None
+                  self.pending_invite_gid = None
         
         elif tipo == "FOUND":
             ftype = payload.get("type")

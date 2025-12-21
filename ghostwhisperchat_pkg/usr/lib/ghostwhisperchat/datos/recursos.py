@@ -22,8 +22,8 @@ class Colores:
     BG_RED = "\033[41m"
 
 # Versionado
-APP_VER_NUM = "2.42"
-APP_VER_TAG = "Arreglo bugs grupos"
+APP_VER_NUM = "2.43"
+APP_VER_TAG = "Normalizado para invitaciones grupos"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 BANNER = r"""
