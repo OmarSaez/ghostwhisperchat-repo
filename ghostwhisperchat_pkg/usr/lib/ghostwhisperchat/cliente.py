@@ -186,15 +186,15 @@ def main():
         full_cmd = " ".join(args_raw)
         
         # 2. Lógica Especial para Escaneo (UX)
-        # Check all aliases for SCAN
-        if args_raw[0] in COMMAND_MAP['SCAN']:
-            # Paso A: Disparar el Scan UDP
-            # Enviamos "--scan" al daemon. Este retorna rapido "Buscando..."
-            enviar_comando_transitorio("--scan")
+        # Check all aliases for SCAN and LIST_GROUPS
+        if args_raw[0] in COMMAND_MAP['SCAN'] or args_raw[0] in COMMAND_MAP['LIST_GROUPS']:
+            # Paso A: Disparar el Scan UDP (ya sea --scan o --vergrupos)
+            enviar_comando_transitorio(full_cmd) # enviamos el comando original
             
             # Paso B: Animación de Espera (1.2s)
             from ghostwhisperchat.datos.recursos import mostrar_animacion_espera
-            mostrar_animacion_espera("Escaneando red", 1.2)
+            msg_anim = "Escaneando red" if args_raw[0] in COMMAND_MAP['SCAN'] else "Buscando grupos"
+            mostrar_animacion_espera(msg_anim, 1.2)
             
             # Paso C: Pedir resultados
             # El daemon ya habrá poblado self.memoria.peers

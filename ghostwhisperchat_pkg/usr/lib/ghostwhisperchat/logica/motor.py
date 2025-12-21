@@ -29,7 +29,10 @@ class Motor:
         self.ui_sessions = {} 
         
         # Buffer efímero para resultados de escaneo (--enlinea)
-        self.scan_buffer = [] 
+        self.scan_buffer = []
+        
+        # Trigger temporal para JOIN (buscar y unir)
+        self.pending_join_name = None 
 
     def iniciar_ipc(self):
         if os.path.exists(IPC_SOCK_PATH):
@@ -160,10 +163,16 @@ class Motor:
 
         elif cmd == "SCAN_RESULTS":
             if not self.scan_buffer:
-                return "[*] No se encontraron usuarios activos."
-            res = "--- USUARIOS EN LINEA ---\n"
-            for u in self.scan_buffer:
-                 res += f"[*] {u['nick']} ({u['ip']})\n"
+                return "[*] No se encontraron resultados."
+            
+            res = "--- RESULTADOS DEL ESCANEO ---\n"
+            for item in self.scan_buffer:
+                 # Check type of item (User or Group)
+                 if item.get("type") == "GROUP":
+                      res += f"[SALA] {item['name']} (Ambassador: {item['ip']})\n"
+                 else:
+                      res += f"[*] {item.get('nick')} ({item.get('ip')})\n"
+                      
             self.scan_buffer = [] # Clear after reading
             return res
 
@@ -171,6 +180,9 @@ class Motor:
              if not args: return "[X] Uso: --unirse <Nombre>"
              nombre = args[0]
              gid = grupos.generar_id_grupo(nombre)
+             
+             # Set trigger for auto-join in FOUND handler
+             self.pending_join_name = nombre
              
              if gid in self.memoria.grupos_activos:
                  abrir_chat_ui(gid, nombre_legible=nombre, es_grupo=True)
@@ -282,13 +294,25 @@ class Motor:
              chat_id = context_ui[1]
              if chat_id in self.memoria.grupos_activos:
                  g = self.memoria.grupos_activos[chat_id]
-                 ms = g.get('miembros', [])
-                 return f"Miembros: {len(ms)}"
+                 ms = g.get('miembros', {})
+                 # ms is dict {uid: {nick, ip, status...}}
+                 res = f"Miembros en '{g['nombre']}': {len(ms)}\n"
+                 for uid, mdata in ms.items():
+                     nick = mdata.get('nick')
+                     ip = mdata.get('ip')
+                     status = mdata.get('status', 'UNK')
+                     tag = " [Tu]" if uid == self.memoria.mi_uid else ""
+                     res += f" - {nick} ({ip}) [{status}]{tag}\n"
+                 return res
              return "Chat Privado."
 
         elif cmd == "LIST_GROUPS":
-            if not self.memoria.grupos_activos: return "Sin grupos activos."
-            return "Grupos: " + ", ".join([g['nombre'] for g in self.memoria.grupos_activos.values()])
+            # 1. Limpiar buffer de escaneo (reusamos scan_buffer o filtramos)
+            self.scan_buffer = [] 
+            # 2. Enviar Broadcast Discovery de Grupos
+            pkg = empaquetar("DISCOVER", {"filter": "GROUPS"}, "ALL")
+            self.red.enviar_udp_broadcast(pkg)
+            return "[*] Buscando grupos públicos..."
 
         elif cmd == "EXIT":
             if context_ui:
@@ -438,10 +462,22 @@ class Motor:
                     except: pass
 
         elif tipo == "DISCOVER":
-            if not self.memoria.invisible:
-                resp = empaquetar("FOUND", {"type": "PEER", "status": "ONLINE"}, self.memoria.get_origen())
-                try: self.red.sock_udp.sendto(resp, addr)
-                except: pass
+            filt = payload.get("filter", "ALL")
+            
+            # Responder Presente si soy visible (PEER scan)
+            if (filt == "ALL" or filt == "PEERS") and not self.memoria.invisible:
+                 resp = empaquetar("FOUND", {"type": "PEER", "status": "ONLINE"}, self.memoria.get_origen())
+                 try: self.red.sock_udp.sendto(resp, addr)
+                 except: pass
+            
+            # Responder con mis grupos PUBLICOS si piden GROUPS
+            if filt == "ALL" or filt == "GROUPS":
+                 for gid, g in self.memoria.grupos_activos.items():
+                     if g['es_publico']:
+                         # Respondemos con FOUND tipo GROUP
+                         resp = empaquetar("FOUND", {"type": "GROUP", "name": g['nombre'], "gid": gid}, self.memoria.get_origen())
+                         try: self.red.sock_udp.sendto(resp, addr)
+                         except: pass
         
         elif tipo == "FOUND":
             ftype = payload.get("type")
@@ -462,17 +498,26 @@ class Motor:
                 ambassador_ip = addr[0]
                 print(f"[RADAR] Grupo encontrado: {name} en {ambassador_ip}", file=sys.stderr)
                 
-                if gid not in self.memoria.grupos_activos:
-                    print(f"[MESH] Enviando solicitud de union a {name}...", file=sys.stderr)
-                    req_pkg = empaquetar("JOIN_REQ", {"gid": gid, "password_hash": None}, self.memoria.get_origen())
-                    try:
-                        from ghostwhisperchat.core.transporte import PORT_GROUP
-                        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                        s.connect((ambassador_ip, PORT_GROUP))
-                        s.sendall(req_pkg + b'\n')
-                        self.red.registrar_socket_tcp(s, f"GRP_OUT_{gid}")
-                    except Exception as e:
-                        print(f"[X] Fallo al conectar con Grupo: {e}", file=sys.stderr)
+                # Add to scan buffer if not present (Discovery)
+                group_entry = {"type": "GROUP", "name": name, "gid": gid, "ip": ambassador_ip}
+                if not any(x.get('gid') == gid for x in self.scan_buffer):
+                      self.scan_buffer.append(group_entry)
+
+                # Auto-Join Logic (Only if triggered by JOIN command)
+                if self.pending_join_name == name:
+                    print(f"[MESH] Auto-Joining found group: {name}...", file=sys.stderr)
+                    self.pending_join_name = None # Clear trigger
+                    
+                    if gid not in self.memoria.grupos_activos:
+                        req_pkg = empaquetar("JOIN_REQ", {"gid": gid, "password_hash": None}, self.memoria.get_origen())
+                        try:
+                            from ghostwhisperchat.core.transporte import PORT_GROUP
+                            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                            s.connect((ambassador_ip, PORT_GROUP))
+                            s.sendall(req_pkg + b'\n')
+                            self.red.registrar_socket_tcp(s, f"GRP_OUT_{gid}")
+                        except Exception as e:
+                            print(f"[X] Fallo al conectar con Grupo: {e}", file=sys.stderr)
 
     def manejar_paquete_tcp(self, data_bytes, sock):
         valid, data = desempaquetar(data_bytes)
