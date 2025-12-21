@@ -15,17 +15,8 @@ def signal_handler(sig, frame):
 def main():
     signal.signal(signal.SIGINT, signal_handler)
     
-    # 1. Cargar Configuración
-    conf = cargar_config()
-    
-    # 2. Inicializar Memoria
+    # 2. Inicializar Memoria (Maneja su propia persistencia)
     memoria = MemoriaGlobal()
-    memoria.set_identidad(
-        conf["user"]["uid"],
-        conf["user"]["nick"],
-        "127.0.0.1" # Se actualizará luego
-    )
-    memoria.no_molestar = conf["preferences"]["no_molestar"]
     
     # 3. Iniciar Motor
     try:

@@ -1,9 +1,7 @@
-# /usr/lib/ghostwhisperchat/core/estado.py
-# Gestión de Estado Global (Singleton)
-
 import threading
 import time
 import os
+import sys
 import json
 import hashlib
 from ghostwhisperchat.datos.recursos import APP_VERSION
@@ -77,6 +75,7 @@ class MemoriaGlobal:
         self.chat_actual_id = None   # GID o IP del peer
 
     def _cargar_configuracion(self):
+        print(f"[ESTADO] Cargando config desde {CONFIG_FILE}...", file=sys.stderr)
         if os.path.exists(CONFIG_FILE):
              try:
                  with open(CONFIG_FILE, 'r') as f:
@@ -86,8 +85,11 @@ class MemoriaGlobal:
                      # Opcional: Cargar settings
                      self.no_molestar = data.get("no_molestar", False)
                      self.invisible = data.get("invisible", False)
+                 print(f"[ESTADO] Config cargada. Nick: {self.mi_nick}", file=sys.stderr)
              except Exception as e:
-                 print(f"[!] Error cargando config: {e}")
+                 print(f"[!] Error cargando config: {e}", file=sys.stderr)
+        else:
+             print(f"[ESTADO] No existe archivo config.", file=sys.stderr)
 
     def guardar_configuracion(self):
         """Persiste identidad y preferencias a disco"""

@@ -178,6 +178,7 @@ class Motor:
                  
              pkg = empaquetar("SEARCH", {"group_name": nombre}, self.memoria.get_origen())
              self.red.enviar_udp_broadcast(pkg)
+             print(f"[GROUP_DEBUG] Enviando SEARCH UDP para '{nombre}'...", file=sys.stderr)
              return f"[*] Buscando grupo '{nombre}' en la red..."
 
         elif cmd == "CREATE_PUB":
@@ -380,8 +381,10 @@ class Motor:
 
         if tipo == "SEARCH":
             target_name = payload.get("group_name")
+            print(f"[GROUP_DEBUG] Recibido SEARCH para '{target_name}'", file=sys.stderr)
             for gid, gdata in self.memoria.grupos_activos.items():
                 if gdata['nombre'] == target_name:
+                    print(f"[GROUP_DEBUG] Grupo encontrado localmente. Respondiendo FOUND.", file=sys.stderr)
                     resp = empaquetar("FOUND", {"type": "GROUP", "name": target_name, "gid": gid}, self.memoria.get_origen())
                     try: self.red.sock_udp.sendto(resp, addr)
                     except: pass
