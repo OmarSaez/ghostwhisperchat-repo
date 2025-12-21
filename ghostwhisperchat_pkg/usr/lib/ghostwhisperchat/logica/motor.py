@@ -687,8 +687,7 @@ class Motor:
                 
                 # 2. Send WELCOME
                 welcome = empaquetar("WELCOME", {"gid": gid, "name": g['nombre']}, self.memoria.get_origen())
-                try: sock.sendall(welcome + b'\n')
-                except: pass
+                self.red.enviar_tcp(sock, welcome)
                 
                 # 3. Send SYNC (List of current members, including the new one so they know they are in)
                 members = g.get('miembros', [])
@@ -700,8 +699,12 @@ class Motor:
                      sync_list = members
                      
                 sync_pkg = empaquetar("SYNC", {"gid": gid, "members": sync_list}, self.memoria.get_origen())
-                try: sock.sendall(sync_pkg + b'\n')
-                except: pass
+                
+                # Tiny delay to avoid packet coalescing issues on some kernels/networks if non-blocking
+                import time
+                time.sleep(0.05) 
+                
+                self.red.enviar_tcp(sock, sync_pkg)
 
         elif tipo == "WELCOME":
              gid = payload.get("gid")
