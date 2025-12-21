@@ -127,9 +127,25 @@ def modo_ui_chat(target_id, es_grupo):
             sys.stdout.write("\033[A\033[K") # Subir una linea y borrarla
             
             if msg.strip():
+                # 1. Check for special scan commands needing orchestration
+                from ghostwhisperchat.datos.recursos import COMMAND_MAP
+                
+                # Check if it matches SCAN or LIST_GROUPS variants
+                cmd_raw = msg.split()[0]
+                if not cmd_raw.startswith("-"): cmd_raw = "--" + cmd_raw 
+                
+                is_scan = cmd_raw in COMMAND_MAP['SCAN'] or cmd_raw in COMMAND_MAP['LIST_GROUPS']
+
+                if is_scan:
+                     # Send trigger
+                     s.sendall(f"__MSG__ {msg}".encode('utf-8'))
+                     # Wait for buffer fill (daemon will reply "Buscando..." which listen thread prints)
+                     time.sleep(1.5)
+                     # Request results
+                     s.sendall(b"__MSG__ --scan-results")
+                     continue
+
                 if msg.startswith("--") or msg.startswith("/"):
-                    # Comandos no llevan prefijo "Tu:" en el servidor, 
-                    # pero el resultado [SISTEMA] se imprimirá.
                     pass
                 
                 payload = f"__MSG__ {msg}"

@@ -14,7 +14,7 @@ from ghostwhisperchat.core.launcher import abrir_chat_ui
 from ghostwhisperchat.logica.comandos import parsear_comando, obtener_ayuda_comando
 from ghostwhisperchat.datos.recursos import AYUDA, ABBREVIATIONS_DISPLAY
 from ghostwhisperchat.logica import grupos
-from ghostwhisperchat.logica.notificaciones import enviar_notificacion, preguntar_invitacion_chat
+from ghostwhisperchat.core.utilidades import enviar_notificacion, preguntar_invitacion_chat
 
 IPC_SOCK_PATH = os.path.expanduser("~/.ghostwhisperchat/gwc.sock")
 
@@ -181,8 +181,9 @@ class Motor:
              nombre = args[0]
              gid = grupos.generar_id_grupo(nombre)
              
-             # Set trigger for auto-join in FOUND handler
-             self.pending_join_name = nombre
+             # Set trigger for auto-join in FOUND handler (Normalize for reliable check)
+             from ghostwhisperchat.core.utilidades import normalize_text
+             self.pending_join_name = normalize_text(nombre)
              
              if gid in self.memoria.grupos_activos:
                  abrir_chat_ui(gid, nombre_legible=nombre, es_grupo=True)
@@ -220,10 +221,13 @@ class Motor:
              target_nick = args[0]
              
              # Buscar peer por nick
-             target_peer = self.memoria.buscar_peer(target_nick)
              if not target_peer: 
-                 # Try scan buffer if peer list misses it? No, force scan first.
-                 return f"[X] Usuario '{target_nick}' no encontrado. (Prueba --enlinea primero)"
+                 # Fallback: Look in scan_buffer
+                 found_in_buffer = next((x for x in self.scan_buffer if x.get('nick') == target_nick), None)
+                 if found_in_buffer:
+                     target_peer = {'ip': found_in_buffer['ip'], 'nick': target_nick}
+                 else:
+                     return f"[X] Usuario '{target_nick}' no encontrado. (Prueba --enlinea primero)"
                  
              # Send INVITE packet
              g = self.memoria.grupos_activos[gid]
@@ -245,8 +249,8 @@ class Motor:
         elif cmd == "SCAN":
              # 1. Limpiar buffer
              self.scan_buffer = []
-             # 2. Enviar Broadcast
-             pkg = empaquetar("DISCOVER", {"filter": "ALL"}, "ALL")
+             # 2. Enviar Broadcast (Solo PEERS)
+             pkg = empaquetar("DISCOVER", {"filter": "PEERS"}, "ALL")
              self.red.enviar_udp_broadcast(pkg)
              return "[*] Búsqueda lanzada."
 
@@ -535,7 +539,11 @@ class Motor:
                       self.scan_buffer.append(group_entry)
 
                 # Auto-Join Logic (Only if triggered by JOIN command)
-                if self.pending_join_name == name:
+                # Use normalization for robustness
+                from ghostwhisperchat.core.utilidades import normalize_text
+                norm_target = normalize_text(name)
+                
+                if self.pending_join_name and self.pending_join_name == norm_target:
                     print(f"[MESH] Auto-Joining found group: {name}...", file=sys.stderr)
                     self.pending_join_name = None # Clear trigger
                     
