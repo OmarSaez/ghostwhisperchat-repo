@@ -211,6 +211,37 @@ class Motor:
              abrir_chat_ui(gid, nombre_legible=nombre, es_grupo=True)
              return f"[*] Grupo privado '{nombre}' creado."
 
+        elif cmd == "ADD":
+             if not context_ui: return "[X] Solo en un grupo."
+             gid = context_ui[1] # Chat ID is GID in group context
+             if gid not in self.memoria.grupos_activos: return "[X] No es un grupo válido."
+             
+             if not args: return "[X] Uso: --agregar <Nick>"
+             target_nick = args[0]
+             
+             # Buscar peer por nick
+             target_peer = self.memoria.buscar_peer(target_nick)
+             if not target_peer: 
+                 # Try scan buffer if peer list misses it? No, force scan first.
+                 return f"[X] Usuario '{target_nick}' no encontrado. (Prueba --enlinea primero)"
+                 
+             # Send INVITE packet
+             g = self.memoria.grupos_activos[gid]
+             pwd = g.get('clave_hash') # Send hash so they can join automatically if accepted
+             
+             invite_pkg = empaquetar("INVITE", {
+                 "gid": gid, 
+                 "name": g['nombre'],
+                 "password_hash": pwd
+             }, self.memoria.get_origen())
+             
+             print(f"[GROUP] Invitando a {target_nick} ({target_peer['ip']})...", file=sys.stderr)
+             try:
+                 self.red.enviar_tcp_priv(target_peer['ip'], invite_pkg)
+                 return f"[*] Invitación enviada a {target_nick}."
+             except Exception as e:
+                 return f"[X] Error enviando invitación: {e}"
+
         elif cmd == "SCAN":
              # 1. Limpiar buffer
              self.scan_buffer = []
@@ -513,7 +544,7 @@ class Motor:
                         try:
                             from ghostwhisperchat.core.transporte import PORT_GROUP
                             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                            s.connect((ambassador_ip, PORT_GROUP))
+                            s.connect((_ip, PORT_GROUP))
                             s.sendall(req_pkg + b'\n')
                             self.red.registrar_socket_tcp(s, f"GRP_OUT_{gid}")
                         except Exception as e:
@@ -629,6 +660,50 @@ class Motor:
                      del g['miembros'][uid]
                      if gid in self.ui_sessions:
                          self.ui_sessions[gid].sendall(f"\n[SISTEMA] {origen['nick']} abandonó el grupo.\n".encode('utf-8'))
+
+        elif tipo == "INVITE":
+            gid = payload.get("gid")
+            gname = payload.get("name")
+            pwd_hash = payload.get("password_hash")
+            
+            if self.memoria.no_molestar:
+                # Auto-reject if DND
+                rej = empaquetar("CHAT_NO", {"reason": "Busy/DND"}, self.memoria.get_origen())
+                try: sock.sendall(rej + b'\n')
+                except: pass
+                return
+
+            # Popup Trigger (20s timeout handled by utilidades)
+            acepta = preguntar_invitacion_chat(origen['nick'], origen['uid'], grupo_nombre=gname)
+            
+            if acepta:
+                # User said YES
+                # 1. Send ACK (optional, but polite)
+                ack = empaquetar("CHAT_ACK", {}, self.memoria.get_origen()) # Generic ACK
+                try: sock.sendall(ack + b'\n')
+                except: pass
+                
+                # 2. Add Group to Memory locally
+                if gid not in self.memoria.grupos_activos:
+                     # Join procedurE
+                     print(f"[MESH] Aceptada invitación a {gname}. Uniendo...", file=sys.stderr)
+                     # Send JOIN_REQ to the inviter (who is presumably in the group)
+                     # Or should we broadcast SEARCH?
+                     # Better: Connect to the inviter directly as entry point.
+                     req_pkg = empaquetar("JOIN_REQ", {"gid": gid, "password_hash": pwd_hash}, self.memoria.get_origen())
+                     try:
+                         from ghostwhisperchat.core.transporte import PORT_GROUP
+                         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                         s.connect((origen['ip'], PORT_GROUP))
+                         s.sendall(req_pkg + b'\n')
+                         self.red.registrar_socket_tcp(s, f"GRP_OUT_{gid}")
+                     except Exception as e:
+                         enviar_notificacion("Error", f"No se pudo unir al grupo: {e}")
+            else:
+                # User said NO or TIMEOUT
+                rej = empaquetar("CHAT_NO", {"reason": "Rechazada por usuario o Timeout"}, self.memoria.get_origen())
+                try: sock.sendall(rej + b'\n')
+                except: pass
 
         elif tipo == "CHAT_REQ":
             if self.memoria.no_molestar:

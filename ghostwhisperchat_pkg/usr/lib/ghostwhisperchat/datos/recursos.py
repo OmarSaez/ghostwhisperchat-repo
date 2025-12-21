@@ -22,8 +22,8 @@ class Colores:
     BG_RED = "\033[41m"
 
 # Versionado
-APP_VER_NUM = "2.38"
-APP_VER_TAG = "Ahora puedes escanear grupos!"
+APP_VER_NUM = "2.39"
+APP_VER_TAG = "Ahora puedes invitar amigos a grupos!"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 BANNER = r"""

@@ -74,3 +74,44 @@ def validar_nick(nick):
         return False
         
     return True
+
+import subprocess
+import os
+
+def enviar_notificacion(titulo, mensaje):
+    """Envía una notificación de escritorio simple."""
+    try:
+        subprocess.Popen(['notify-send', titulo, mensaje])
+    except: pass
+
+def preguntar_invitacion_chat(remitente_nick, remitente_id, grupo_nombre=None):
+    """
+    Muestra un popup Zenity preguntando si acepta la invitación.
+    Retorna True (Aceptar) o False (Rechazar/Timeout).
+    Timeout de 20 segundos.
+    """
+    # Si es grupo, mensaje diferente
+    if grupo_nombre:
+        msg = f"[{remitente_nick}] te está invitando a la sala '{grupo_nombre}'.\n¿Quieres unirte?"
+        titulo = "Invitación a Grupo"
+    else:
+        msg = f"[{remitente_nick}] quiere iniciar un chat privado.\n¿Aceptar?"
+        titulo = "Invitación Privada"
+
+    cmd = [
+        'zenity', 
+        '--question', 
+        '--title', titulo, 
+        '--text', msg, 
+        '--ok-label', 'Sí', 
+        '--cancel-label', 'No', 
+        '--timeout', '20'
+    ]
+    
+    try:
+        # Zenity return codes: 0=OK, 1=Cancel, 5=Timeout
+        ret = subprocess.call(cmd)
+        return (ret == 0)
+    except FileNotFoundError:
+        # Fallback si no hay zenity
+        return False
