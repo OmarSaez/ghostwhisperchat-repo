@@ -112,3 +112,13 @@ class MemoriaGlobal:
                     ret['ip'] = ip
                     return ret
         return None
+    def get_origen(self):
+        """Devuelve el dict estándar 'origen' para paquetes"""
+        return {
+            "uid": self.mi_uid,
+            "nick": self.mi_nick,
+            "ip": self.mi_ip # Asumimos que motor lo setea correctament
+        }
+
+    # Alias para compatibilidad
+    limpiar_peers_inactivos = limpiar_peers_antiguos

@@ -131,3 +131,27 @@ class GestorRed:
             return client, addr
         except OSError:
             return None, None
+
+    def enviar_tcp_priv(self, ip, data_bytes):
+        """
+        Envía un mensaje TCP transitorio al puerto Privado (44494).
+        Patrón: Connect -> Send -> Close. Ideal para Handshakes (REQ/ACK/NO)
+        """
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.settimeout(3.0)
+            s.connect((ip, PORT_PRIVATE))
+            s.sendall(data_bytes + b'\n')
+            s.close()
+            return True
+        except Exception as e:
+            print(f"[X] Error TCP Priv Transient a {ip}: {e}", file=sys.stderr)
+            return False
+
+    def registrar_socket_tcp(self, sock, label=None):
+        """Registra un socket creado externamente en el pool de monitoreo"""
+        if sock not in self.inputs:
+            self.inputs.append(sock)
+        if sock not in self.tcp_connections:
+            self.tcp_connections.append(sock)
+        # Nota: label no se usa en select, es para debug si quisiéramos loggear
