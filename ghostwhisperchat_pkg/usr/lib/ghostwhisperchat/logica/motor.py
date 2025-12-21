@@ -808,6 +808,7 @@ class Motor:
                          s_join = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                          s_join.connect((origen_data['ip'], PORT_GROUP))
                          s_join.sendall(req_pkg + b'\n')
+                         s_join.setblocking(False) # <--- CRITICAL: Set non-blocking before select loop
                          self.red.registrar_socket_tcp(s_join, f"GRP_OUT_{g_id}")
                     except Exception as e:
                          enviar_notificacion("Error", f"No se pudo unir al grupo: {e}")
