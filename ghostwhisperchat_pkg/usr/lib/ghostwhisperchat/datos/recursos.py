@@ -22,8 +22,8 @@ class Colores:
     BG_RED = "\033[41m"
 
 # Versionado
-APP_VER_NUM = "2.47"
-APP_VER_TAG = "Fix y mas fix"
+APP_VER_NUM = "2.48"
+APP_VER_TAG = "Llegan los mensajes destacados"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 BANNER = r"""

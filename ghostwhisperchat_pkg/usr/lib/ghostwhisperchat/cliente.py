@@ -112,6 +112,12 @@ def modo_ui_chat(target_id, es_grupo):
                 if "Conectado al Daemon. ID:" in msg_in:
                     continue
 
+                # HIGHLIGHT: MENTION
+                if "__MENTION__" in msg_in:
+                    msg_in = msg_in.replace("__MENTION__ ", "")
+                    # Yellow Background, Black Text for high contrast
+                    msg_in = f"{C.BG_YELLOW}{C.BLACK}{msg_in}{C.RESET}"
+                    
                 sys.stdout.write(f"\r\033[K{msg_in}\n")
                 sys.stdout.write("Tu: ") # Prompt
                 sys.stdout.flush()

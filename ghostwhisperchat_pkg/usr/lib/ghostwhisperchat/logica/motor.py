@@ -37,6 +37,9 @@ class Motor:
         # Trigger temporal para INVITE (buscar y agregar)
         self.pending_invite_nick = None
         self.pending_invite_gid = None 
+        
+        # Menciones Cooldowns: {chat_id: timestamp_ultimo_pop}
+        self.mention_cooldowns = {} 
 
     def iniciar_ipc(self):
         if os.path.exists(IPC_SOCK_PATH):
@@ -650,52 +653,51 @@ class Motor:
                             print(f"[X] Fallo al conectar con Grupo: {e}", file=sys.stderr)
 
     def manejar_paquete_tcp(self, data_bytes, sock):
-        try:
-             valid, data = desempaquetar(data_bytes)
-             if not valid: 
-                 print("[TCP_ERR] Paquete invalido recibido", file=sys.stderr)
-                 return
-             
-             tipo = data.get("tipo")
-             payload = data.get("payload")
-             origen = data.get("origen")
-             
-             # print(f"[TCP_DEBUG] Recibido {tipo} de {origen.get('nick', 'UNK')}", file=sys.stderr)
-             
-             if origen:
-                  self.memoria.actualizar_peer(origen['ip'], origen['uid'], origen['nick'])
-     
-             if tipo == "JOIN_REQ":
-                 gid = payload.get("gid")
-                 if gid in self.memoria.grupos_activos:
-                     g = self.memoria.grupos_activos[gid]
- 
-                     # 1. Add to our own list (Ambassador)
-                     if 'miembros' not in g: g['miembros'] = {}
-                     # We need the full details of the joiner. Paradoxically, the 'origen' header has it.
-                     if origen:
-                         # FIX: Ensure 'status' is separated/included if available or default to ONLINE
-                         status = origen.get('status', 'ONLINE')
-                         g['miembros'][origen['uid']] = {'nick': origen['nick'], 'ip': origen['ip'], 'uid': origen['uid'], 'status': status}
-                         print(f"[GROUP] Agregado nuevo miembro: {origen['nick']} ({origen['ip']})", file=sys.stderr)
+        valid, data = desempaquetar(data_bytes)
+        if not valid: 
+            print("[TCP_ERR] Paquete invalido recibido", file=sys.stderr)
+            return
+        
+        tipo = data.get("tipo")
+        payload = data.get("payload")
+        origen = data.get("origen")
+        
+        # print(f"[TCP_DEBUG] Recibido {tipo} de {origen.get('nick', 'UNK')}", file=sys.stderr)
+        
+        if origen:
+             self.memoria.actualizar_peer(origen['ip'], origen['uid'], origen['nick'])
+
+        if tipo == "JOIN_REQ":
+            gid = payload.get("gid")
+            if gid in self.memoria.grupos_activos:
+                g = self.memoria.grupos_activos[gid]
+
+                # 1. Add to our own list (Ambassador)
+                if 'miembros' not in g: g['miembros'] = {}
+                # We need the full details of the joiner. Paradoxically, the 'origen' header has it.
+                if origen:
+                    # FIX: Ensure 'status' is separated/included if available or default to ONLINE
+                    status = origen.get('status', 'ONLINE')
+                    g['miembros'][origen['uid']] = {'nick': origen['nick'], 'ip': origen['ip'], 'uid': origen['uid'], 'status': status}
+                    print(f"[GROUP] Agregado nuevo miembro: {origen['nick']} ({origen['ip']})", file=sys.stderr)
+                
+                # 2. Send WELCOME
+                welcome = empaquetar("WELCOME", {"gid": gid, "name": g['nombre']}, self.memoria.get_origen())
+                try: sock.sendall(welcome + b'\n')
+                except: pass
+                
+                # 3. Send SYNC (List of current members, including the new one so they know they are in)
+                members = g.get('miembros', [])
+                sync_list = []
+                # If 'miembros' is a dict in memory, convert to list.
+                if isinstance(members, dict):
+                     sync_list = list(members.values())
+                elif isinstance(members, list):
+                     sync_list = members
                      
-                     # 2. Send WELCOME
-                     welcome = empaquetar("WELCOME", {"gid": gid, "name": g['nombre']}, self.memoria.get_origen())
-                     try: sock.sendall(welcome + b'\n')
-                     except: pass
-                     
-                     # 3. Send SYNC (List of current members, including the new one so they know they are in)
-                     members = g.get('miembros', [])
-                     sync_list = []
-                     # If 'miembros' is a dict in memory, convert to list.
-                     if isinstance(members, dict):
-                          sync_list = list(members.values())
-                     elif isinstance(members, list):
-                          sync_list = members
-                          
-                     sync_pkg = empaquetar("SYNC", {"gid": gid, "members": sync_list}, self.memoria.get_origen())
-                     try: sock.sendall(sync_pkg + b'\n')
-                     except: pass
+                sync_pkg = empaquetar("SYNC", {"gid": gid, "members": sync_list}, self.memoria.get_origen())
+                try: sock.sendall(sync_pkg + b'\n')
+                except: pass
 
         elif tipo == "WELCOME":
              gid = payload.get("gid")
@@ -769,10 +771,7 @@ class Motor:
                          # YELLOW INDICATOR [-]
                          self.ui_sessions[gid].sendall(f"\n[SISTEMA] [-] {origen['nick']} abandonó el grupo.\n".encode('utf-8'))
 
-        except Exception as e:
-            print(f"[TCP_ERR] Error handling packet: {e}", file=sys.stderr)
-
-        if tipo == "INVITE":
+        elif tipo == "INVITE":
             gid = payload.get("gid")
             gname = payload.get("name")
             pwd_hash = payload.get("password_hash")
@@ -853,7 +852,58 @@ class Motor:
              target_id = gid if gid else origen['uid']
              
              if target_id in self.ui_sessions:
-                 self.ui_sessions[target_id].sendall(f"\n({origen['nick']}): {text}\n".encode('utf-8'))
+                 # Logic for Mention Detection
+                 import re
+                 from ghostwhisperchat.core.utilidades import normalize_text, enviar_notificacion
+                 
+                 # Regex: @ + MyNick (normalized check)
+                 # Note: User request: "debe internamente normalizar el nombre".
+                 # Pattern: r"@\b" + nick + r"\b"
+                 my_nick = normalize_text(self.memoria.mi_nick)
+                 
+                 # We must scan 'text' for any word that matches after normalization?
+                 # Simpler: Normalize text is strictly for IDs. Visual text might preserve case?
+                 # But detection logic: "si uno pone @palabra debe ver si esa palabra es un nick normalizado"
+                 # So we check if text contains @...
+                 
+                 # Let's clean it up:
+                 # Check if "@my_nick" is in text (case insensitive)
+                 # normalize_text strips spaces, keeps chars.
+                 # We assume my_nick "omar" -> text has "@omar" or "@Omar".
+                 
+                 is_mention = False
+                 pattern = r"@\b" + re.escape(my_nick) + r"\b"
+                 if re.search(pattern, normalize_text(text), re.IGNORECASE):
+                      is_mention = True
+                 
+                 # If we normalise text completely ("hello @omar here" -> "hello@omarhere"), detection is hard.
+                 # Better to search in raw text, normalizing the comparison target.
+                 if re.search(r"@\b" + re.escape(self.memoria.mi_nick) + r"\b", text, re.IGNORECASE):
+                     is_mention = True
+                 
+                 # Actually, normalize_text(self.memoria.mi_nick) gives the canonical ID.
+                 # Users might type @Omar or @omar.
+                 # Let's assume standard IRC style: Case insensitive match of canonical nick against words.
+                 
+                 if is_mention:
+                      # Cooldown Check
+                      now = time.time()
+                      last_pop = self.mention_cooldowns.get(target_id, 0)
+                      
+                      # Send with Prefix
+                      prefix = "__MENTION__ "
+                      self.ui_sessions[target_id].sendall(f"\n{prefix}({origen['nick']}): {text}\n".encode('utf-8'))
+                      
+                      if now - last_pop > 120: # 2 minutes
+                          # POPUP
+                          g_name = "Chat Privado"
+                          if gid and gid in self.memoria.grupos_activos:
+                              g_name = self.memoria.grupos_activos[gid]['nombre']
+                              
+                          enviar_notificacion("Mensaje destacado", f"{origen['nick']} te ha mencionado en {g_name}")
+                          self.mention_cooldowns[target_id] = now
+                 else:
+                      self.ui_sessions[target_id].sendall(f"\n({origen['nick']}): {text}\n".encode('utf-8'))
              else:
                  enviar_notificacion(f"Mensaje de {origen['nick']}", text)
 
