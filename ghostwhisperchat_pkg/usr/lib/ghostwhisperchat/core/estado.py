@@ -3,7 +3,12 @@
 
 import threading
 import time
+import os
+import json
+import hashlib
 from ghostwhisperchat.datos.recursos import APP_VERSION
+
+CONFIG_FILE = os.path.expanduser("~/.ghostwhisperchat/config.json")
 
 class MemoriaGlobal:
     _instance = None
@@ -28,6 +33,15 @@ class MemoriaGlobal:
         self.log_chat = False
         self.auto_download = False
         self.version = APP_VERSION
+        
+        # Cargar Persistencia
+        self._cargar_configuracion()
+        
+        # Si no hay UID (primer inicio), generarlo
+        if not self.mi_uid:
+            random_seed = f"{time.time()}-{os.getpid()}"
+            self.mi_uid = hashlib.sha256(random_seed.encode()).hexdigest()[:16]
+            self.guardar_configuracion() # Guardar el nuevo UID
 
         # Tablas de Red
         self.peers = {} 
@@ -62,9 +76,39 @@ class MemoriaGlobal:
         self.chat_actual_tipo = None # 'GRUPO' o 'PRIVADO' o None
         self.chat_actual_id = None   # GID o IP del peer
 
+    def _cargar_configuracion(self):
+        if os.path.exists(CONFIG_FILE):
+             try:
+                 with open(CONFIG_FILE, 'r') as f:
+                     data = json.load(f)
+                     self.mi_uid = data.get("uid")
+                     self.mi_nick = data.get("nick", "Usuario")
+                     # Opcional: Cargar settings
+                     self.no_molestar = data.get("no_molestar", False)
+                     self.invisible = data.get("invisible", False)
+             except Exception as e:
+                 print(f"[!] Error cargando config: {e}")
+
+    def guardar_configuracion(self):
+        """Persiste identidad y preferencias a disco"""
+        data = {
+            "uid": self.mi_uid,
+            "nick": self.mi_nick,
+            "no_molestar": self.no_molestar,
+            "invisible": self.invisible
+        }
+        try:
+             os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
+             with open(CONFIG_FILE, 'w') as f:
+                 json.dump(data, f)
+        except Exception as e:
+             print(f"[!] Error guardando config: {e}")
+
     def set_identidad(self, uid, nick, ip):
-        self.mi_uid = uid
-        self.mi_nick = nick
+        # Este metodo se suele llamar al inicio desde motor para setear IP
+        # UID y Nick ya deberian estar cargados, pero por si acaso
+        if uid: self.mi_uid = uid
+        if nick: self.mi_nick = nick
         self.mi_ip = ip
 
     def actualizar_peer(self, ip, uid, nick, status="ONLINE"):

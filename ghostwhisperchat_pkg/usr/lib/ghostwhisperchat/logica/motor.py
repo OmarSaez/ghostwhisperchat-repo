@@ -26,7 +26,6 @@ class Motor:
         self.running = False
         
         # Mapeo de UI Sockets: { "ID_CHAT": socket_ipc }
-        # Esto permite enrutar mensajes al proceso de UI correcto
         self.ui_sessions = {} 
 
     def iniciar_ipc(self):
@@ -38,13 +37,19 @@ class Motor:
         
         self.ipc_sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.ipc_sock.bind(IPC_SOCK_PATH)
-        self.ipc_sock.listen(5) # Aceptamos varias conexiones simultaneas (transitorias + UIs)
+        self.ipc_sock.listen(5)
         self.ipc_sock.setblocking(False)
 
     def bucle_principal(self):
         """Loop principal del Demonio"""
         print("[*] Iniciando Motor GWC v2.1...", file=sys.stderr)
         
+        # Determine local IP and Identity
+        from ghostwhisperchat.core.utilidades import get_local_ip
+        local_ip = get_local_ip()
+        self.memoria.mi_ip = local_ip
+        print(f"[*] Identidad: {self.memoria.mi_nick} ({self.memoria.mi_uid}) @ {local_ip}", file=sys.stderr)
+
         if not self.red.iniciar_servidores():
             print("[X] Fallo en red. Abortando.", file=sys.stderr)
             return
@@ -56,7 +61,7 @@ class Motor:
         threading.Thread(target=self._hilo_ping, daemon=True).start()
         
         print(f"[MOTOR_DEBUG] Entrando a Bucle Principal. Running={self.running}", file=sys.stderr)
-        # ... (rest of loop code remains typical, updating select logic below if needed) ...
+        
         try:
             while self.running:
                 sockets_red = self.red.get_sockets_lectura()
@@ -64,7 +69,7 @@ class Motor:
                 rlist = sockets_red + [self.ipc_sock] + sockets_ui
                 
                 try:
-                    readable, _, _ = select.select(rlist, [], [], 2.0) # Faster tick for maintenance
+                    readable, _, _ = select.select(rlist, [], [], 2.0)
                 except select.error as e:
                     if e.args[0] == 4: continue
                     raise e
@@ -111,16 +116,15 @@ class Motor:
 
         except Exception as e:
              print(f"[CRASH] {e}", file=sys.stderr)
+             import traceback
+             traceback.print_exc(file=sys.stderr)
         finally:
              self.running = False
 
+
     def procesar_ipc_mensaje(self, mensaje, conn):
-        """
-        Maneja tanto comandos transitorios ("--dm ...") 
-        como registros de UI ("__REGISTER_UI__ ...")
-        """
+        """Maneja comandos transitorios y registros de UI"""
         if mensaje.startswith("__REGISTER_UI__"):
-            # Retro-compatibilidad con cliente.py existente
             partes = mensaje.split(" ", 2)
             if len(partes) >= 3:
                 chat_id = partes[2]
@@ -130,7 +134,6 @@ class Motor:
             return
 
         elif mensaje.startswith("REGISTER_UI"):
-            # Nuevo formato (por si acaso)
             parts = mensaje.split(":", 1)
             if len(parts) == 2:
                 chat_id = parts[1]
@@ -139,12 +142,11 @@ class Motor:
             return
 
         elif mensaje.startswith("--"):
-            # Es un comando transitorio normal
             respuesta = self.ejecutar_comando_transitorio(mensaje)
             conn.sendall(respuesta.encode('utf-8'))
             conn.close()
         else:
-            print(f"[IPC] Mensaje desconocido o MSG directo: {mensaje}", file=sys.stderr)
+            print(f"[IPC] Mensaje desconocido: {mensaje}", file=sys.stderr)
             conn.close()
 
     def ejecutar_comando_transitorio(self, comando_str, context_ui=None):
@@ -154,27 +156,203 @@ class Motor:
         if cmd == "HELP":
             return obtener_ayuda_comando(args[0] if args else None)
 
+        elif cmd == "JOIN":
+             if not args: return "[X] Uso: --unirse <Nombre>"
+             nombre = args[0]
+             gid = grupos.generar_id_grupo(nombre)
+             
+             if gid in self.memoria.grupos_activos:
+                 abrir_chat_ui(gid, nombre_legible=nombre, es_grupo=True)
+                 return f"[*] Ya estás en '{nombre}'. Abriendo chat."
+                 
+             pkg = empaquetar("SEARCH", {"group_name": nombre}, self.memoria.get_origen())
+             self.red.enviar_udp_broadcast(pkg)
+             return f"[*] Buscando grupo '{nombre}' en la red..."
+
+        elif cmd == "CREATE_PUB":
+             if not args: return "[X] Uso: --crearpublico <Nombre>"
+             nombre = args[0]
+             gid = grupos.generar_id_grupo(nombre)
+             self.memoria.agregar_grupo_activo(gid, nombre)
+             abrir_chat_ui(gid, nombre_legible=nombre, es_grupo=True)
+             return f"[*] Grupo público '{nombre}' creado."
+
+        elif cmd == "CREATE_PRIV":
+             if len(args) < 2: return "[X] Uso: --crearprivado <Nombre> <Clave>"
+             nombre = args[0]
+             clave = args[1]
+             gid = grupos.generar_id_grupo(nombre)
+             pwd_hash = grupos.hash_password(clave)
+             self.memoria.agregar_grupo_activo(gid, nombre, pwd_hash)
+             abrir_chat_ui(gid, nombre_legible=nombre, es_grupo=True)
+             return f"[*] Grupo privado '{nombre}' creado."
+
+        elif cmd == "SCAN":
+             pkg = empaquetar("DISCOVER", {"filter": "ALL"}, "ALL")
+             self.red.enviar_udp_broadcast(pkg)
+             return "[*] Búsqueda lanzada. Espera respuestas."
+
+        elif cmd == "GLOBAL_STATUS":
+             m = self.memoria
+             res =  f"--- ESTADO GLOBAL ---\n"
+             res += f"UID: {m.mi_uid}\n"
+             res += f"Nick: {m.mi_nick}\n"
+             res += f"IP: {m.mi_ip}\n"
+             res += f"Version: {m.version}\n"
+             res += f"Peers: {len(m.peers)}\n"
+             return res
+             
         elif cmd == "DM": 
              if not args: return "[X] Uso: --dm <Usuario>"
              target = args[0]
-             
-             # 1. Search in Peers (Nick or UID)
              peer = self.memoria.buscar_peer(target)
              if not peer:
-                 # Try partial match or IP direct?
-                 # Fail for now
-                 return f"[X] Usuario '{target}' no encontrado en caché. Usa --enlinea primero."
+                 return f"[X] '{target}' no encontrado (Use --enlinea)."
              
-             # 2. Send CHAT_REQ
-             print(f"[WHISPER] Solicitando chat privado a {peer['nick']} ({peer['ip']})...", file=sys.stderr)
+             print(f"[WHISPER] Solicitando chat a {peer['nick']}...", file=sys.stderr)
              pkg = empaquetar("CHAT_REQ", {}, self.memoria.get_origen())
              try:
-                 self.red.enviar_tcp_priv(peer['ip'], pkg) # Uses Port 44494
-                 return f"[*] Solicitud enviada a {peer['nick']}. Esperando respuesta..."
+                 self.red.enviar_tcp_priv(peer['ip'], pkg)
+                 return f"[*] Solicitud enviada a {peer['nick']}."
              except Exception as e:
-                 return f"[X] Fallo al enviar solicitud: {e}"
+                 return f"[X] Fallo: {e}"
 
-    # ... (other commands) ...
+        elif cmd == "CHANGE_NICK":
+            if not args: return "[X] Uso: --nick <Nuevo>"
+            old = self.memoria.mi_nick
+            self.memoria.mi_nick = args[0]
+            self.memoria.guardar_configuracion()
+            return f"[*] Nick cambiado: {old} -> {self.memoria.mi_nick}"
+
+        elif cmd == "MUTE_TOGGLE":
+            self.memoria.no_molestar = not self.memoria.no_molestar
+            self.memoria.guardar_configuracion()
+            return f"[*] No Molestar: {self.memoria.no_molestar}"
+
+        elif cmd == "VISIBILITY_TOGGLE":
+            self.memoria.invisible = not self.memoria.invisible
+            self.memoria.guardar_configuracion()
+            return f"[*] Invisible: {self.memoria.invisible}"
+            
+        elif cmd == "LOG_TOGGLE":
+             self.memoria.log_chat = not self.memoria.log_chat
+             return f"[*] Log: {self.memoria.log_chat}"
+             
+        elif cmd == "DL_TOGGLE":
+             self.memoria.auto_download = not self.memoria.auto_download
+             return f"[*] Auto-Descarga: {self.memoria.auto_download}"
+             
+        elif cmd == "LS":
+             if not context_ui: return "[X] Solo en chat."
+             chat_id = context_ui[1]
+             if chat_id in self.memoria.grupos_activos:
+                 g = self.memoria.grupos_activos[chat_id]
+                 ms = g.get('miembros', [])
+                 return f"Miembros: {len(ms)}"
+             return "Chat Privado."
+
+        elif cmd == "LIST_GROUPS":
+            if not self.memoria.grupos_activos: return "Sin grupos activos."
+            return "Grupos: " + ", ".join([g['nombre'] for g in self.memoria.grupos_activos.values()])
+
+        elif cmd == "EXIT":
+            self.running = False
+            return "[*] Apagando..."
+            
+        elif cmd == "CLEAR":
+            return "\033c"
+
+        return f"[?] Comando: {comando_str}"
+
+
+    def procesar_input_chat_ui(self, ui_sock, mensaje):
+        msg_content = ""
+        chat_id = None
+        
+        if mensaje.startswith("__MSG__"):
+            msg_content = mensaje.replace("__MSG__ ", "", 1)
+            for uid, s in self.ui_sessions.items():
+                if s == ui_sock:
+                    chat_id = uid
+                    break
+        elif ":" in mensaje:
+            parts = mensaje.split(":", 1)
+            chat_id = parts[0]
+            msg_content = parts[1]
+        
+        if chat_id and msg_content:
+             if msg_content.startswith("--"):
+                 contexto = ("UI", chat_id)
+                 res = self.ejecutar_comando_transitorio(msg_content, context_ui=contexto)
+                 ui_sock.sendall(f"\n[SISTEMA] {res}\n".encode('utf-8'))
+                 return
+
+             ui_sock.sendall(f"Tu: {msg_content}\n".encode('utf-8'))
+             
+             if chat_id in self.memoria.grupos_activos:
+                 # TODO: Group Mesh Logic (Send to all peers)
+                 pass 
+             else:
+                 peer = self.memoria.buscar_peer(chat_id)
+                 if peer:
+                     pkg = empaquetar("MSG", {"text": msg_content}, self.memoria.get_origen())
+                     try: self.red.enviar_tcp_priv(peer['ip'], pkg)
+                     except: pass
+
+    def desconectar_ui(self, ui_sock):
+        for chat_id, sock in list(self.ui_sessions.items()):
+            if sock == ui_sock:
+                del self.ui_sessions[chat_id]
+                try: ui_sock.close()
+                except: pass
+                return
+
+    # --- MANEJO RED (UDP + TCP) ---
+
+    def manejar_paquete_udp(self, data_bytes, addr):
+        valid, data = desempaquetar(data_bytes)
+        if not valid: return
+
+        tipo = data.get("tipo")
+        payload = data.get("payload")
+        origen = data.get("origen")
+
+        if origen:
+            self.memoria.actualizar_peer(addr[0], origen['uid'], origen['nick'])
+
+        if tipo == "SEARCH":
+            target_name = payload.get("group_name")
+            for gid, gdata in self.memoria.grupos_activos.items():
+                if gdata['nombre'] == target_name:
+                    resp = empaquetar("FOUND", {"type": "GROUP", "name": target_name, "gid": gid}, self.memoria.get_origen())
+                    try: self.red.sock_udp.sendto(resp, addr)
+                    except: pass
+
+        elif tipo == "DISCOVER":
+            if not self.memoria.invisible:
+                resp = empaquetar("FOUND", {"type": "PEER", "status": "ONLINE"}, self.memoria.get_origen())
+                try: self.red.sock_udp.sendto(resp, addr)
+                except: pass
+        
+        elif tipo == "FOUND":
+            ftype = payload.get("type")
+            if ftype == "GROUP":
+                gid = payload.get("gid")
+                name = payload.get("name")
+                ambassador_ip = addr[0]
+                print(f"[RADAR] Grupo encontrado: {name} en {ambassador_ip}", file=sys.stderr)
+                
+                if gid not in self.memoria.grupos_activos:
+                    print(f"[MESH] Enviando solicitud de union a {name}...", file=sys.stderr)
+                    req_pkg = empaquetar("JOIN_REQ", {"gid": gid, "password_hash": None}, self.memoria.get_origen())
+                    try:
+                        from ghostwhisperchat.core.transporte import PORT_GROUP
+                        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                        s.connect((ambassador_ip, PORT_GROUP))
+                        s.sendall(req_pkg + b'\n')
+                        self.red.registrar_socket_tcp(s, f"GRP_OUT_{gid}")
+                    except Exception as e:
+                        print(f"[X] Fallo al conectar con Grupo: {e}", file=sys.stderr)
 
     def manejar_paquete_tcp(self, data_bytes, sock):
         valid, data = desempaquetar(data_bytes)
@@ -187,86 +365,64 @@ class Motor:
         if origen:
              self.memoria.actualizar_peer(origen['ip'], origen['uid'], origen['nick'])
 
-        # --- GROUP LOGIC ---
         if tipo == "JOIN_REQ":
             gid = payload.get("gid")
             if gid in self.memoria.grupos_activos:
                 g = self.memoria.grupos_activos[gid]
-                print(f"[MESH] Aceptando a {origen['nick']} en {g['nombre']}", file=sys.stderr)
                 welcome = empaquetar("WELCOME", {"gid": gid, "name": g['nombre']}, self.memoria.get_origen())
-                try: sock.sendall(welcome)
+                try: sock.sendall(welcome + b'\n')
                 except: pass
         
         elif tipo == "WELCOME":
              gid = payload.get("gid")
              name = payload.get("name")
-             print(f"[MESH] ¡Acceso concedido a {name}!", file=sys.stderr)
              self.memoria.agregar_grupo_activo(gid, name)
              abrir_chat_ui(gid, nombre_legible=name, es_grupo=True)
              enviar_notificacion("GhostWhisperChat", f"Te has unido a {name}")
 
-        # --- PRIVATE LOGIC ---
         elif tipo == "CHAT_REQ":
-            # Peticion de chat privado
-            # 1. Check "No Molestar"
             if self.memoria.no_molestar:
-                # Auto-deny
                 rej = empaquetar("CHAT_NO", {"reason": "Busy"}, self.memoria.get_origen())
-                try: sock.sendall(rej)
+                try: sock.sendall(rej + b'\n')
                 except: pass
                 return
 
-            # 2. User Prompt (Zenity)
             acepta = preguntar_invitacion_chat(origen['nick'], origen['uid'])
-            
             if acepta:
-                # Send ACK
                 ack = empaquetar("CHAT_ACK", {}, self.memoria.get_origen())
-                try: sock.sendall(ack)
+                try: sock.sendall(ack + b'\n')
                 except: pass
-                
-                # Open UI
                 abrir_chat_ui(origen['uid'], nombre_legible=origen['nick'], es_grupo=False)
             else:
-                # Send NO
                 rej = empaquetar("CHAT_NO", {"reason": "Rejected"}, self.memoria.get_origen())
-                try: sock.sendall(rej)
+                try: sock.sendall(rej + b'\n')
                 except: pass
 
         elif tipo == "CHAT_ACK":
-            # Me aceptaron!
-            print(f"[WHISPER] ¡{origen['nick']} aceptó el chat!", file=sys.stderr)
             abrir_chat_ui(origen['uid'], nombre_legible=origen['nick'], es_grupo=False)
             enviar_notificacion("GhostWhisperChat", f"{origen['nick']} aceptó tu solicitud.")
 
         elif tipo == "CHAT_NO":
-            # Me rechazaron
             razon = payload.get("reason", "Sin razón")
-            print(f"[WHISPER] {origen['nick']} rechazó el chat: {razon}", file=sys.stderr)
             enviar_notificacion("GhostWhisperChat", f"{origen['nick']} rechazó la conexión.")
 
         elif tipo == "MSG":
-             try:
-                 target_id = payload.get('gid') or origen['uid']
-                 if target_id in self.ui_sessions:
-                     self.ui_sessions[target_id].sendall(f"\n[{origen['nick']}]: {payload.get('text')}\n".encode('utf-8'))
-                 else:
-                     enviar_notificacion(f"Mensaje de {origen['nick']}", payload.get('text'))
-             except: pass
+             text = payload.get("text")
+             gid = payload.get("gid")
+             target_id = gid if gid else origen['uid']
+             
+             if target_id in self.ui_sessions:
+                 self.ui_sessions[target_id].sendall(f"\n[{origen['nick']}]: {text}\n".encode('utf-8'))
+             else:
+                 enviar_notificacion(f"Mensaje de {origen['nick']}", text)
 
     def _hilo_ping(self):
-        """Heartbeat UDP"""
         while self.running:
             if not self.memoria.invisible:
-                # Broadcast PING implies "I am here"
-                # Use DISCOVER packet just to keep cache fresh? Or explicit PING?
-                # Using DISCOVER as a 'KeepAlive' signal is efficient
                 pkg = empaquetar("DISCOVER", {"filter": "PING"}, self.memoria.get_origen())
-                try:
-                    self.red.enviar_udp_broadcast(pkg)
+                try: self.red.enviar_udp_broadcast(pkg)
                 except: pass
             time.sleep(15)
 
     def tareas_mantenimiento(self):
-        # Clean old peers
         self.memoria.limpiar_peers_inactivos()
