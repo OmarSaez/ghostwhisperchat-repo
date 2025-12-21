@@ -87,6 +87,14 @@ def modo_ui_chat(target_id, es_grupo):
                 
                 msg_in = data.decode('utf-8')
                 
+                # Check for special Close Trigger
+                if "__CLOSE_UI__" in msg_in:
+                    # Daemon is telling us to close.
+                    # It likely sent [SISTEMA] xxx closed session before this.
+                    # Wait 2 seconds as requested, then exit.
+                    time.sleep(2.0)
+                    os._exit(0)
+
                 # Si es un eco nuestro (empieza con Tu:), asumimos que el input local ya lo mostró?
                 # NO, decidimos que el daemon hace eco. Asi que borramos input local.
                 

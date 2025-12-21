@@ -291,6 +291,13 @@ class Motor:
             return "Grupos: " + ", ".join([g['nombre'] for g in self.memoria.grupos_activos.values()])
 
         elif cmd == "EXIT":
+            if context_ui:
+                 # User typed --salir IN CHAT
+                 # We trigger client close, which triggers disconnect_ui, which triggers LEAVE/BYE
+                 return "[*] Cerrando chat... __CLOSE_UI__"
+            
+            # Global Shutdown
+            self._shutdown_all_sessions()
             self.running = False
             return "[*] Apagando..."
             
@@ -355,12 +362,53 @@ class Motor:
                      try: self.red.enviar_tcp_priv(peer['ip'], pkg)
                      except: pass
 
+    def _shutdown_all_sessions(self):
+        print("[SHUTDOWN] Cerrando todas las sesiones...", file=sys.stderr)
+        # Iterate copy of keys because desconectar_ui modifies dict
+        for chat_id, sock in list(self.ui_sessions.items()):
+            # Simulate disconnect which triggers LEAVE/BYE
+            # We can't rely on socket close triggering select loop because we are stopping loop
+            # So we call logic manually
+            self.desconectar_ui(sock)
+
     def desconectar_ui(self, ui_sock):
         for chat_id, sock in list(self.ui_sessions.items()):
             if sock == ui_sock:
                 del self.ui_sessions[chat_id]
                 try: ui_sock.close()
                 except: pass
+                
+                # Logic for notifying exit
+                # 1. Is it a Group?
+                if chat_id in self.memoria.grupos_activos:
+                     g = self.memoria.grupos_activos[chat_id]
+                     # Send LEAVE to all members
+                     leave_pkg = empaquetar("LEAVE", {"gid": chat_id}, self.memoria.get_origen())
+                     from ghostwhisperchat.core.transporte import PORT_GROUP
+                     members = g.get('miembros', {})
+                     m_list = members.values() if isinstance(members, dict) else members
+                     
+                     for m in m_list:
+                         uid = m.get('uid')
+                         if uid == self.memoria.mi_uid: continue
+                         ip = m.get('ip')
+                         if not ip: continue
+                         try:
+                             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                             s.settimeout(0.5)
+                             s.connect((ip, PORT_GROUP))
+                             s.sendall(leave_pkg + b'\n')
+                             s.close()
+                         except: pass
+                         
+                # 2. Is it a Private Peer? (chat_id is UID)
+                else:
+                    peer = self.memoria.buscar_peer(chat_id)
+                    if peer:
+                        bye_pkg = empaquetar("CHAT_BYE", {}, self.memoria.get_origen())
+                        try: self.red.enviar_tcp_priv(peer['ip'], bye_pkg)
+                        except: pass
+                
                 return
 
     # --- MANEJO RED (UDP + TCP) ---
@@ -567,7 +615,10 @@ class Motor:
              # Notify termination
              uid = origen['uid']
              if uid in self.ui_sessions:
-                 self.ui_sessions[uid].sendall(f"\n[SISTEMA] {origen['nick']} cerró la sesión.\n".encode('utf-8'))
+                 s = self.ui_sessions[uid]
+                 s.sendall(f"\n[SISTEMA] {origen['nick']} cerró la sesión.\n".encode('utf-8'))
+                 # Instruct client to close after delay
+                 s.sendall(b"__CLOSE_UI__")
                  # We keep our UI open so user can see history or exit manually.
 
         elif tipo == "MSG":
