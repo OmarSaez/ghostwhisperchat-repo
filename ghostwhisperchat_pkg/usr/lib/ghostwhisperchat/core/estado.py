@@ -142,7 +142,14 @@ class MemoriaGlobal:
                 self.grupos_activos[gid] = {
                     "nombre": nombre,
                     "es_publico": (clave_hash is None),
-                    "miembros": [],
+                    "miembros": {
+                        self.mi_uid: {
+                            "uid": self.mi_uid,
+                            "nick": self.mi_nick,
+                            "ip": self.mi_ip,
+                            "status": "ONLINE"
+                        }
+                    },
                     "mensajes": [],
                     "clave_hash": clave_hash
                 }

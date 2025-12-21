@@ -442,16 +442,20 @@ class Motor:
             if gid in self.memoria.grupos_activos:
                 g = self.memoria.grupos_activos[gid]
                 
-                # 1. Send WELCOME
+                # 1. Add to our own list (Ambassador)
+                if 'miembros' not in g: g['miembros'] = {}
+                # We need the full details of the joiner. Paradoxically, the 'origen' header has it.
+                if origen:
+                    g['miembros'][origen['uid']] = {'nick': origen['nick'], 'ip': origen['ip'], 'uid': origen['uid']}
+                    print(f"[GROUP] Agregado nuevo miembro: {origen['nick']} ({origen['ip']})", file=sys.stderr)
+                
+                # 2. Send WELCOME
                 welcome = empaquetar("WELCOME", {"gid": gid, "name": g['nombre']}, self.memoria.get_origen())
                 try: sock.sendall(welcome + b'\n')
                 except: pass
                 
-                # 2. Send SYNC (List of current members)
+                # 3. Send SYNC (List of current members, including the new one so they know they are in)
                 members = g.get('miembros', [])
-                # Ensure we send a list of dicts or tuples that json can handle
-                # Assuming members is {uid: {nick, ip, ...}} or similar. 
-                # Let's standardize members as a list of dicts for transport.
                 sync_list = []
                 # If 'miembros' is a dict in memory, convert to list.
                 if isinstance(members, dict):
@@ -462,12 +466,6 @@ class Motor:
                 sync_pkg = empaquetar("SYNC", {"gid": gid, "members": sync_list}, self.memoria.get_origen())
                 try: sock.sendall(sync_pkg + b'\n')
                 except: pass
-                
-                # 3. Add to our own list (Ambassador)
-                if 'miembros' not in g: g['miembros'] = {}
-                # We need the full details of the joiner. Paradoxically, the 'origen' header has it.
-                if origen:
-                    g['miembros'][origen['uid']] = {'nick': origen['nick'], 'ip': origen['ip'], 'uid': origen['uid']}
 
         elif tipo == "WELCOME":
              gid = payload.get("gid")
