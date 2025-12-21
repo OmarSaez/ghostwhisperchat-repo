@@ -27,8 +27,8 @@ class Colores:
     BG_RED = "\033[41m"
 
 # Versionado
-APP_VER_NUM = "2.52"
-APP_VER_TAG = "Arreglo de sincronizacion en grupos"
+APP_VER_NUM = "2.53"
+APP_VER_TAG = "MAS DEBUG!"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 BANNER = r"""

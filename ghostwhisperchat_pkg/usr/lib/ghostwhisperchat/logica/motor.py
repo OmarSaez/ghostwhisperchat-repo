@@ -651,8 +651,7 @@ class Motor:
                             print(f"[X] Fallo al conectar con Grupo: {e}", file=sys.stderr)
 
     def manejar_paquete_tcp(self, data_bytes, sock):
-        # Raw Debug to confirm reception
-        if len(data_bytes) < 500:
+        if len(data_bytes) < 2000:
              print(f"[TCP_RAW] {data_bytes.strip()}", file=sys.stderr)
         else:
              print(f"[TCP_RAW] (Large Packet) {len(data_bytes)} bytes", file=sys.stderr)
@@ -700,9 +699,12 @@ class Motor:
                      
                 sync_pkg = empaquetar("SYNC", {"gid": gid, "members": sync_list}, self.memoria.get_origen())
                 
+                if sync_pkg:
+                     print(f"[DEBUG_SYNC] Sync PKG generated: {len(sync_pkg)} bytes. Sending...", file=sys.stderr)
+                
                 # Tiny delay to avoid packet coalescing issues on some kernels/networks if non-blocking
                 import time
-                time.sleep(0.05) 
+                time.sleep(0.2) 
                 
                 self.red.enviar_tcp(sock, sync_pkg)
 

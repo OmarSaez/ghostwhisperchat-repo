@@ -59,7 +59,10 @@ class GestorRed:
         """Envía datagrama a 255.255.255.255"""
         try:
             # Enviar a broadcast
-            print(f"[OUT_UDP_BC] {data_bytes.strip()}", file=sys.stderr)
+            # Reduce Noise: Don't log PING broadcasts
+            if b'"filter": "PING"' not in data_bytes:
+                print(f"[OUT_UDP_BC] {data_bytes.strip()}", file=sys.stderr)
+            
             self.sock_udp.sendto(data_bytes, ('<broadcast>', PORT_DISCOVERY))
         except OSError as e:
             print(f"[!] Error UDP Broadcast: {e}")
