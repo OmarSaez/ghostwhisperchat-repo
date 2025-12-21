@@ -324,8 +324,29 @@ class Motor:
              ui_sock.sendall(f"Tu: {msg_content}\n".encode('utf-8'))
              
              if chat_id in self.memoria.grupos_activos:
-                 # TODO: Group Mesh Logic (Send to all peers)
-                 pass 
+                 g = self.memoria.grupos_activos[chat_id]
+                 pkg = empaquetar("MSG", {"text": msg_content, "gid": chat_id}, self.memoria.get_origen())
+                 
+                 from ghostwhisperchat.core.transporte import PORT_GROUP
+                 members = g.get('miembros', {})
+                 # Normalize to list
+                 m_list = members.values() if isinstance(members, dict) else members
+                 
+                 # Send to all peers
+                 for m in m_list:
+                     uid = m.get('uid')
+                     if uid == self.memoria.mi_uid: continue
+                     ip = m.get('ip')
+                     if not ip: continue
+                     
+                     try:
+                         # Transient connection for message
+                         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                         s.settimeout(1.0) # Fast timeout
+                         s.connect((ip, PORT_GROUP))
+                         s.sendall(pkg + b'\n')
+                         s.close()
+                     except: pass 
              else:
                  peer = self.memoria.buscar_peer(chat_id)
                  if peer:
@@ -417,16 +438,103 @@ class Motor:
             gid = payload.get("gid")
             if gid in self.memoria.grupos_activos:
                 g = self.memoria.grupos_activos[gid]
+                
+                # 1. Send WELCOME
                 welcome = empaquetar("WELCOME", {"gid": gid, "name": g['nombre']}, self.memoria.get_origen())
                 try: sock.sendall(welcome + b'\n')
                 except: pass
-        
+                
+                # 2. Send SYNC (List of current members)
+                members = g.get('miembros', [])
+                # Ensure we send a list of dicts or tuples that json can handle
+                # Assuming members is {uid: {nick, ip, ...}} or similar. 
+                # Let's standardize members as a list of dicts for transport.
+                sync_list = []
+                # If 'miembros' is a dict in memory, convert to list.
+                if isinstance(members, dict):
+                     sync_list = list(members.values())
+                elif isinstance(members, list):
+                     sync_list = members
+                     
+                sync_pkg = empaquetar("SYNC", {"gid": gid, "members": sync_list}, self.memoria.get_origen())
+                try: sock.sendall(sync_pkg + b'\n')
+                except: pass
+                
+                # 3. Add to our own list (Ambassador)
+                if 'miembros' not in g: g['miembros'] = {}
+                # We need the full details of the joiner. Paradoxically, the 'origen' header has it.
+                if origen:
+                    g['miembros'][origen['uid']] = {'nick': origen['nick'], 'ip': origen['ip'], 'uid': origen['uid']}
+
         elif tipo == "WELCOME":
              gid = payload.get("gid")
              name = payload.get("name")
              self.memoria.agregar_grupo_activo(gid, name)
              abrir_chat_ui(gid, nombre_legible=name, es_grupo=True)
              enviar_notificacion("GhostWhisperChat", f"Te has unido a {name}")
+
+        elif tipo == "SYNC":
+             gid = payload.get("gid")
+             members = payload.get("members", [])
+             if gid in self.memoria.grupos_activos:
+                 g = self.memoria.grupos_activos[gid]
+                 if 'miembros' not in g: g['miembros'] = {}
+                 
+                 # Importante: Conectar y Anunciarse
+                 for m in members:
+                     uid = m.get('uid')
+                     if uid == self.memoria.mi_uid: continue
+                     
+                     g['miembros'][uid] = m
+                     # TODO: Logic to connect to these peers if not connected, and send ANNOUNCE
+                     # Por simplicidad v2, asumimos que ANNOUNCE es broadcast o multicast.
+                     # Pero en TCP Mesh, debemos conectar punto a punto.
+                     
+                 # Si acabamos de unirnos (SYNC recibido), anunciamos nuestra llegada
+                 # A todos los miembros conocidos
+                 ann_pkg = empaquetar("ANNOUNCE", {"gid": gid, "user": self.memoria.get_origen()}, self.memoria.get_origen())
+                 
+                 from ghostwhisperchat.core.transporte import PORT_GROUP
+                 for m in members:
+                     uid = m.get('uid')
+                     if uid == self.memoria.mi_uid: continue
+                     
+                     target_ip = m.get('ip')
+                     if not target_ip: continue
+
+                     # Intento de conexion mesh
+                     try:
+                         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                         s.settimeout(2.0) # Timeout corto
+                         s.connect((target_ip, PORT_GROUP))
+                         s.sendall(ann_pkg + b'\n')
+                         self.red.registrar_socket_tcp(s, f"GRP_MESHSEND_{gid}_{uid}")
+                     except Exception as e:
+                         print(f"[MESH] Fallo anuncio a {target_ip}: {e}", file=sys.stderr)
+                 
+        elif tipo == "ANNOUNCE":
+             gid = payload.get("gid")
+             new_user = payload.get("user")
+             if gid in self.memoria.grupos_activos:
+                 g = self.memoria.grupos_activos[gid]
+                 if 'miembros' not in g: g['miembros'] = {}
+                 if new_user:
+                     g['miembros'][new_user['uid']] = new_user
+                     
+                     # Notificar en el chat
+                     if gid in self.ui_sessions:
+                         self.ui_sessions[gid].sendall(f"\n[SISTEMA] {new_user['nick']} se unió al grupo.\n".encode('utf-8'))
+
+        elif tipo == "LEAVE":
+             gid = payload.get("gid")
+             uid = origen['uid'] if origen else None
+             
+             if gid in self.memoria.grupos_activos and uid:
+                 g = self.memoria.grupos_activos[gid]
+                 if 'miembros' in g and uid in g['miembros']:
+                     del g['miembros'][uid]
+                     if gid in self.ui_sessions:
+                         self.ui_sessions[gid].sendall(f"\n[SISTEMA] {origen['nick']} abandonó el grupo.\n".encode('utf-8'))
 
         elif tipo == "CHAT_REQ":
             if self.memoria.no_molestar:
@@ -453,6 +561,13 @@ class Motor:
         elif tipo == "CHAT_NO":
             razon = payload.get("reason", "Sin razón")
             enviar_notificacion("GhostWhisperChat", f"{origen['nick']} rechazó la conexión.")
+            
+        elif tipo == "CHAT_BYE":
+             # Notify termination
+             uid = origen['uid']
+             if uid in self.ui_sessions:
+                 self.ui_sessions[uid].sendall(f"\n[SISTEMA] {origen['nick']} cerró la sesión.\n".encode('utf-8'))
+                 # We keep our UI open so user can see history or exit manually.
 
         elif tipo == "MSG":
              text = payload.get("text")

@@ -22,8 +22,8 @@ class Colores:
     BG_RED = "\033[41m"
 
 # Versionado
-APP_VER_NUM = "2.33"
-APP_VER_TAG = "Fix --enlinea"
+APP_VER_NUM = "2.34"
+APP_VER_TAG = "Animaciones de espera + Group Mesh"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 BANNER = r"""
@@ -237,6 +237,8 @@ def mostrar_animacion_espera(mensaje="Procesando", segundos=1.2):
         f"{Colores.YELLOW}[*] {mensaje} {Colores.GREEN}   {Colores.RESET}",
         f"{Colores.YELLOW}[*] {mensaje} {Colores.GREEN}g   {Colores.RESET}",
         f"{Colores.YELLOW}[*] {mensaje} {Colores.GREEN}gw  {Colores.RESET}",
+        f"{Colores.YELLOW}[*] {mensaje} {Colores.GREEN}gwc {Colores.RESET}",
+        f"{Colores.YELLOW}[*] {mensaje} {Colores.GREEN}   {Colores.RESET}",
         f"{Colores.YELLOW}[*] {mensaje} {Colores.GREEN}gwc {Colores.RESET}",
     ]
     
