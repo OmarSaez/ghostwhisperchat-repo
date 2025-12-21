@@ -166,11 +166,32 @@ def main():
         from ghostwhisperchat.datos.recursos import APP_VERSION
         print(f"GhostWhisperChat {APP_VERSION}")
     else:
-        # Modo Transitorio: Unir todos los args en un string y mandar
-        # Ej: ['--dm', 'Pepe'] -> "--dm Pepe"
-        # Cuidado con comillas, pero shlex en daemon lo manejará.
-        # Mejor mandamos tal cual.
+        # Modo Transitorio
+        
+        # 1. Normalización de Comandos (Auto-prefix)
+        # Si el usuario escribe "gwc info" -> convertimos a "--info"
+        cmd = args_raw[0]
+        if not cmd.startswith("-"):
+            args_raw[0] = "--" + cmd
+            
         full_cmd = " ".join(args_raw)
+        
+        # 2. Lógica Especial para Escaneo (UX)
+        if args_raw[0] in ["--enlinea", "--scan"]:
+            # Paso A: Disparar el Scan UDP
+            # Enviamos "--scan" al daemon. Este retorna rapido "Buscando..."
+            enviar_comando_transitorio("--scan")
+            
+            # Paso B: Animación de Espera (1.2s)
+            from ghostwhisperchat.datos.recursos import mostrar_animacion_espera
+            mostrar_animacion_espera("Escaneando red", 1.2)
+            
+            # Paso C: Pedir resultados
+            # El daemon ya habrá poblado self.memoria.peers
+            enviar_comando_transitorio("--contacts")
+            return
+
+        # 3. Comando Normal
         enviar_comando_transitorio(full_cmd)
 
 if __name__ == "__main__":

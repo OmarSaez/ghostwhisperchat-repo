@@ -2,7 +2,7 @@
 # Intérprete de Comandos (Parser)
 
 import shlex
-from ghostwhisperchat.datos.recursos import COMMAND_MAP, ABBREVIATIONS_DISPLAY
+from ghostwhisperchat.datos.recursos import COMMAND_MAP, ABBREVIATIONS_DISPLAY, AYUDA
 
 def parsear_comando(texto_input):
     """
@@ -41,12 +41,20 @@ def parsear_comando(texto_input):
             
     return found_cmd, args
 
-def obtener_ayuda_comando(cmd_key):
-    # Iterar el diccionario de display para encontrar la desc
-    # Esto es ineficiente pero el dict es pequeño
-    for category in ABBREVIATIONS_DISPLAY.values():
-        for item in category.values():
-            # item es {'aliases': [], 'desc': ''}
-            # No tenemos la key lógica aquí fácil, pero podemos inferir
-            pass 
-    return "Ayuda detallada pendiente."
+def obtener_ayuda_comando(cmd_raw=None):
+    if not cmd_raw:
+        return AYUDA
+        
+    # Buscar ayuda especifica
+    buscar = cmd_raw.lower().lstrip('-')
+    
+    for cat, cmds in ABBREVIATIONS_DISPLAY.items():
+        for sub, data in cmds.items():
+            # Check aliases stripping dashes
+            clean_aliases = [a.lstrip('-') for a in data['aliases']]
+            if buscar in clean_aliases:
+                return f"\n{Colores.BOLD}[{sub}]{Colores.RESET}\n  {data['desc']}\n  Alias: {', '.join(data['aliases'])}\n"
+    
+    return f"No se encontró ayuda para '{cmd_raw}'. Escribe --ayuda para ver todo."
+
+from ghostwhisperchat.datos.recursos import Colores

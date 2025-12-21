@@ -22,8 +22,8 @@ class Colores:
     BG_RED = "\033[41m"
 
 # Versionado
-APP_VER_NUM = "2.31"
-APP_VER_TAG = "Fix Comandos en red"
+APP_VER_NUM = "2.32"
+APP_VER_TAG = "Animaciones de espera"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 BANNER = r"""
@@ -224,3 +224,32 @@ COMMAND_MAP = {
     'LOG_TOGGLE':   ['--log', '-r', '--guardar', '--registro', '--grabar'],
     'DL_TOGGLE':    ['--descarga', '-b', '--bajar', '--autobajar', '--dl']
 }
+
+import time
+import sys
+
+def mostrar_animacion_espera(mensaje="Procesando", segundos=1.2):
+    """
+    Muestra una animación 'g w c' personalizada con efecto de onda.
+    """
+    frames = [
+        f"{Colores.YELLOW}[*] {mensaje} {Colores.GREEN}g{Colores.RESET}",
+        f"{Colores.YELLOW}[*] {mensaje} {Colores.GREEN} w{Colores.RESET}",
+        f"{Colores.YELLOW}[*] {mensaje} {Colores.GREEN}  c{Colores.RESET}",
+    ]
+    
+    # Calcular delay para que cícle al menos 2 veces o dure 'segundos'
+    cycle_time = 0.4 # segs por frame
+    total_frames = int(segundos / cycle_time)
+    if total_frames < 3: total_frames = 6 # Minimo 2 ciclos
+    
+    for i in range(total_frames):
+        frame = frames[i % len(frames)]
+        sys.stdout.write(f"\r{frame}") # \r vuelve al inicio
+        sys.stdout.flush()
+        time.sleep(cycle_time)
+    
+    # Limpiar linea al final o dejarla? 
+    # Mejor dejar el mensaje base limpio
+    sys.stdout.write(f"\r{Colores.YELLOW}[*] {mensaje} {Colores.GREEN}Done!{Colores.RESET}\n")
+    sys.stdout.flush()
