@@ -107,6 +107,10 @@ def modo_ui_chat(target_id, es_grupo):
                     else:
                          # INFO/JOIN/POSITIVE (Green) -> Default System
                          msg_in = f"{C.GREEN}{msg_in}{C.RESET}"
+                
+                # FILTER: Hide ID confirmation message
+                if "Conectado al Daemon. ID:" in msg_in:
+                    continue
 
                 sys.stdout.write(f"\r\033[K{msg_in}\n")
                 sys.stdout.write("Tu: ") # Prompt

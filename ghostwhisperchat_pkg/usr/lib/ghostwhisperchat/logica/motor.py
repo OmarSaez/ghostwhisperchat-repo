@@ -452,40 +452,63 @@ class Motor:
     def desconectar_ui(self, ui_sock):
         for chat_id, sock in list(self.ui_sessions.items()):
             if sock == ui_sock:
+                print(f"[UI] Desconectando sesión {chat_id}...", file=sys.stderr)
                 del self.ui_sessions[chat_id]
                 try: ui_sock.close()
                 except: pass
                 
-                # Logic for notifying exit
-                # 1. Is it a Group?
-                if chat_id in self.memoria.grupos_activos:
-                     g = self.memoria.grupos_activos[chat_id]
-                     # Send LEAVE to all members
-                     leave_pkg = empaquetar("LEAVE", {"gid": chat_id}, self.memoria.get_origen())
-                     from ghostwhisperchat.core.transporte import PORT_GROUP
-                     members = g.get('miembros', {})
-                     m_list = members.values() if isinstance(members, dict) else members
-                     
-                     for m in m_list:
-                         uid = m.get('uid')
-                         if uid == self.memoria.mi_uid: continue
-                         ip = m.get('ip')
-                         if not ip: continue
-                         try:
-                             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                             s.settimeout(0.5)
-                             s.connect((ip, PORT_GROUP))
-                             s.sendall(leave_pkg + b'\n')
-                             s.close()
-                         except: pass
+                # Logic for notifying exit (Robust Wrapper)
+                try:
+                    # 1. Is it a Group?
+                    if chat_id in self.memoria.grupos_activos:
+                         g = self.memoria.grupos_activos[chat_id]
+                         print(f"[MESH] Enviando LEAVE a grupo {g['nombre']}", file=sys.stderr)
                          
-                # 2. Is it a Private Peer? (chat_id is UID)
-                else:
-                    peer = self.memoria.buscar_peer(chat_id)
-                    if peer:
-                        bye_pkg = empaquetar("CHAT_BYE", {}, self.memoria.get_origen())
-                        try: self.red.enviar_tcp_priv(peer['ip'], bye_pkg)
-                        except: pass
+                         # Send LEAVE to all members
+                         leave_pkg = empaquetar("LEAVE", {"gid": chat_id}, self.memoria.get_origen())
+                         from ghostwhisperchat.core.transporte import PORT_GROUP
+                         
+                         members = g.get('miembros', {})
+                         m_list = members.values() if isinstance(members, dict) else members
+                         
+                         for m in m_list:
+                             if not isinstance(m, dict): continue
+                             
+                             uid = m.get('uid')
+                             if uid == self.memoria.mi_uid: continue
+                             
+                             ip = m.get('ip')
+                             if not ip: continue
+                             
+                             try:
+                                 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                                 s.settimeout(0.5)
+                                 s.connect((ip, PORT_GROUP))
+                                 s.sendall(leave_pkg + b'\n')
+                                 s.close()
+                             except Exception as e:
+                                 # print(f"[X] LEAVE fail to {ip}: {e}", file=sys.stderr) 
+                                 pass
+                         
+                         # Also remove group from active memory if we leave? 
+                         # No, architecture says we stay "in" the group data-wise until explicit leave command?
+                         # Usually "Closing a window" might just mean closing session, not Leaving group permanently.
+                         # But user said "nobody knew I left".
+                         # If it's "Closing Window", maybe we should send LEAVE (Temporarily Offline)?
+                         # Or CHAT_BYE?
+                         # Architecture says: [-] Nick has left.
+                         # So yes, LEAVE is correct for "Session Ended".
+                         
+                    # 2. Is it a Private Peer? (chat_id is UID)
+                    else:
+                        peer = self.memoria.buscar_peer(chat_id)
+                        if peer:
+                            print(f"[MESH] Enviando CHAT_BYE a {peer['nick']}", file=sys.stderr)
+                            bye_pkg = empaquetar("CHAT_BYE", {}, self.memoria.get_origen())
+                            try: self.red.enviar_tcp_priv(peer['ip'], bye_pkg)
+                            except: pass
+                except Exception as e:
+                    print(f"[X] Error en desconexion UI: {e}", file=sys.stderr)
                 
                 return
 
@@ -574,7 +597,8 @@ class Motor:
                           self.red.enviar_tcp_priv(responder_ip, invite_pkg)
                           # Notify UI active session if possible (fire and forget log)
                           if gid in self.ui_sessions:
-                               self.ui_sessions[gid].sendall(f"\n[SISTEMA] Usuario '{responder_nick}' encontrado e invitado.\n".encode('utf-8'))
+                               # GREEN INDICATOR [+]
+                               self.ui_sessions[gid].sendall(f"\n[SISTEMA] [+] Usuario '{responder_nick}' encontrado e invitado.\n".encode('utf-8'))
                       except Exception as e:
                           print(f"[X] Error auto-inviting: {e}", file=sys.stderr)
                   
@@ -645,7 +669,9 @@ class Motor:
                 if 'miembros' not in g: g['miembros'] = {}
                 # We need the full details of the joiner. Paradoxically, the 'origen' header has it.
                 if origen:
-                    g['miembros'][origen['uid']] = {'nick': origen['nick'], 'ip': origen['ip'], 'uid': origen['uid']}
+                    # FIX: Ensure 'status' is separated/included if available or default to ONLINE
+                    status = origen.get('status', 'ONLINE')
+                    g['miembros'][origen['uid']] = {'nick': origen['nick'], 'ip': origen['ip'], 'uid': origen['uid'], 'status': status}
                     print(f"[GROUP] Agregado nuevo miembro: {origen['nick']} ({origen['ip']})", file=sys.stderr)
                 
                 # 2. Send WELCOME
@@ -723,7 +749,8 @@ class Motor:
                      
                      # Notificar en el chat
                      if gid in self.ui_sessions:
-                         self.ui_sessions[gid].sendall(f"\n[SISTEMA] {new_user['nick']} se unió al grupo.\n".encode('utf-8'))
+                         # GREEN INDICATOR [+]
+                         self.ui_sessions[gid].sendall(f"\n[SISTEMA] [+] {new_user['nick']} se unió al grupo.\n".encode('utf-8'))
 
         elif tipo == "LEAVE":
              gid = payload.get("gid")
@@ -734,7 +761,8 @@ class Motor:
                  if 'miembros' in g and uid in g['miembros']:
                      del g['miembros'][uid]
                      if gid in self.ui_sessions:
-                         self.ui_sessions[gid].sendall(f"\n[SISTEMA] {origen['nick']} abandonó el grupo.\n".encode('utf-8'))
+                         # YELLOW INDICATOR [-]
+                         self.ui_sessions[gid].sendall(f"\n[SISTEMA] [-] {origen['nick']} abandonó el grupo.\n".encode('utf-8'))
 
         elif tipo == "INVITE":
             gid = payload.get("gid")
@@ -811,7 +839,8 @@ class Motor:
              uid = origen['uid']
              if uid in self.ui_sessions:
                  s = self.ui_sessions[uid]
-                 s.sendall(f"\n[SISTEMA] {origen['nick']} cerró la sesión.\n".encode('utf-8'))
+                 # YELLOW INDICATOR [-]
+                 s.sendall(f"\n[SISTEMA] [-] {origen['nick']} cerró la sesión.\n".encode('utf-8'))
                  # Instruct client to close after delay
                  s.sendall(b"__CLOSE_UI__")
                  # We keep our UI open so user can see history or exit manually.
