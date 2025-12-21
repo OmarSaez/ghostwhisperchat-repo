@@ -650,20 +650,26 @@ class Motor:
                             print(f"[X] Fallo al conectar con Grupo: {e}", file=sys.stderr)
 
     def manejar_paquete_tcp(self, data_bytes, sock):
-        valid, data = desempaquetar(data_bytes)
-        if not valid: return
-        
-        tipo = data.get("tipo")
-        payload = data.get("payload")
-        origen = data.get("origen")
-        
-        if origen:
-             self.memoria.actualizar_peer(origen['ip'], origen['uid'], origen['nick'])
+        try:
+             valid, data = desempaquetar(data_bytes)
+             if not valid: 
+                 print("[TCP_ERR] Paquete invalido recibido", file=sys.stderr)
+                 return
+             
+             tipo = data.get("tipo")
+             payload = data.get("payload")
+             origen = data.get("origen")
+             
+             # print(f"[TCP_DEBUG] Recibido {tipo} de {origen.get('nick', 'UNK')}", file=sys.stderr)
+             
+             if origen:
+                  self.memoria.actualizar_peer(origen['ip'], origen['uid'], origen['nick'])
+     
+             if tipo == "JOIN_REQ":
+                 gid = payload.get("gid")
+                 if gid in self.memoria.grupos_activos:
+                     g = self.memoria.grupos_activos[gid]
 
-        if tipo == "JOIN_REQ":
-            gid = payload.get("gid")
-            if gid in self.memoria.grupos_activos:
-                g = self.memoria.grupos_activos[gid]
                 
                 # 1. Add to our own list (Ambassador)
                 if 'miembros' not in g: g['miembros'] = {}
@@ -764,49 +770,46 @@ class Motor:
                          # YELLOW INDICATOR [-]
                          self.ui_sessions[gid].sendall(f"\n[SISTEMA] [-] {origen['nick']} abandonó el grupo.\n".encode('utf-8'))
 
-        elif tipo == "INVITE":
+        except Exception as e:
+            print(f"[TCP_ERR] Error handling packet: {e}", file=sys.stderr)
+
+        if tipo == "INVITE":
             gid = payload.get("gid")
             gname = payload.get("name")
             pwd_hash = payload.get("password_hash")
             
             if self.memoria.no_molestar:
                 # Auto-reject if DND
-                rej = empaquetar("CHAT_NO", {"reason": "Busy/DND"}, self.memoria.get_origen())
-                try: sock.sendall(rej + b'\n')
+                try: sock.sendall(empaquetar("CHAT_NO", {"reason": "Busy/DND"}, self.memoria.get_origen()) + b'\n')
                 except: pass
                 return
 
-            # Popup Trigger (20s timeout handled by utilidades)
-            acepta = preguntar_invitacion_chat(origen['nick'], origen['uid'], grupo_nombre=gname)
-            
-            if acepta:
-                # User said YES
-                # 1. Send ACK (optional, but polite)
-                ack = empaquetar("CHAT_ACK", {}, self.memoria.get_origen()) # Generic ACK
-                try: sock.sendall(ack + b'\n')
-                except: pass
+            # Threading the blocking UI popup to avoid freezing the daemon
+            def _handle_invite(origen_data, g_id, g_name, p_hash):
+                # This blocks for up to 20s
+                acepta = preguntar_invitacion_chat(origen_data['nick'], origen_data['uid'], grupo_nombre=g_name)
                 
-                # 2. Add Group to Memory locally
-                if gid not in self.memoria.grupos_activos:
-                     # Join procedurE
-                     print(f"[MESH] Aceptada invitación a {gname}. Uniendo...", file=sys.stderr)
-                     # Send JOIN_REQ to the inviter (who is presumably in the group)
-                     # Or should we broadcast SEARCH?
-                     # Better: Connect to the inviter directly as entry point.
-                     req_pkg = empaquetar("JOIN_REQ", {"gid": gid, "password_hash": pwd_hash}, self.memoria.get_origen())
-                     try:
+                if acepta:
+                    # 1. Send ACK (Best effort, sender might have closed)
+                    # We can't use 'sock' here efficiently as it might be dead. 
+                    # But the real action is the JOIN.
+                    
+                    # 2. Join Logic
+                    print(f"[MESH] Aceptada invitación a {g_name}. Uniendo...", file=sys.stderr)
+                    req_pkg = empaquetar("JOIN_REQ", {"gid": g_id, "password_hash": p_hash}, self.memoria.get_origen())
+                    try:
                          from ghostwhisperchat.core.transporte import PORT_GROUP
-                         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                         s.connect((origen['ip'], PORT_GROUP))
-                         s.sendall(req_pkg + b'\n')
-                         self.red.registrar_socket_tcp(s, f"GRP_OUT_{gid}")
-                     except Exception as e:
+                         s_join = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                         s_join.connect((origen_data['ip'], PORT_GROUP))
+                         s_join.sendall(req_pkg + b'\n')
+                         self.red.registrar_socket_tcp(s_join, f"GRP_OUT_{g_id}")
+                    except Exception as e:
                          enviar_notificacion("Error", f"No se pudo unir al grupo: {e}")
-            else:
-                # User said NO or TIMEOUT
-                rej = empaquetar("CHAT_NO", {"reason": "Rechazada por usuario o Timeout"}, self.memoria.get_origen())
-                try: sock.sendall(rej + b'\n')
-                except: pass
+                else:
+                    pass # User rejected
+
+            threading.Thread(target=_handle_invite, args=(origen, gid, gname, pwd_hash), daemon=True).start()
+
 
         elif tipo == "CHAT_REQ":
             if self.memoria.no_molestar:
