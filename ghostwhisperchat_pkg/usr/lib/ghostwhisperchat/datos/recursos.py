@@ -16,14 +16,19 @@ class Colores:
     GREEN = "\033[92m"    # Éxitos [+]
     YELLOW = "\033[93m"   # Alerta [-] / Menciones
     BLUE = "\033[94m"     # Info temporal [*] / Barras
+    MAGENTA = "\033[95m"
+    CYAN = "\033[96m"
+    
+    # Lista para asignar colores a Nicks
+    NICK_COLORS = [GREEN, YELLOW, BLUE, MAGENTA, CYAN, RED]
     
     # Fondos (para resaltar menciones)
     BG_YELLOW = "\033[43m"
     BG_RED = "\033[41m"
 
 # Versionado
-APP_VER_NUM = "2.48"
-APP_VER_TAG = "Llegan los mensajes destacados"
+APP_VER_NUM = "2.49"
+APP_VER_TAG = "Llegan los mensajes destacados y colores!"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 BANNER = r"""

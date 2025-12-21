@@ -600,8 +600,8 @@ class Motor:
                           self.red.enviar_tcp_priv(responder_ip, invite_pkg)
                           # Notify UI active session if possible (fire and forget log)
                           if gid in self.ui_sessions:
-                               # GREEN INDICATOR [+]
-                               self.ui_sessions[gid].sendall(f"\n[SISTEMA] [+] Usuario '{responder_nick}' encontrado e invitado.\n".encode('utf-8'))
+                               # INFO INDICATOR [*] - User invited, but not yet joined
+                               self.ui_sessions[gid].sendall(f"\n[SISTEMA] [*] Invitacion enviada a '{responder_nick}'.\n".encode('utf-8'))
                       except Exception as e:
                           print(f"[X] Error auto-inviting: {e}", file=sys.stderr)
                   
@@ -724,7 +724,7 @@ class Motor:
                      # Pero en TCP Mesh, debemos conectar punto a punto.
                      
                  # Si acabamos de unirnos (SYNC recibido), anunciamos nuestra llegada
-                 # A todos los miembros conocidos
+                 # A todos los miembros conocidos (MESH INIT)
                  ann_pkg = empaquetar("ANNOUNCE", {"gid": gid, "user": self.memoria.get_origen()}, self.memoria.get_origen())
                  
                  from ghostwhisperchat.core.transporte import PORT_GROUP
@@ -734,16 +734,32 @@ class Motor:
                      
                      target_ip = m.get('ip')
                      if not target_ip: continue
+                     
+                     # Update local memory first
+                     g['miembros'][uid] = m
 
-                     # Intento de conexion mesh
+                     # Intento de conexion mesh (Connect -> Announce -> Add to Pool)
                      try:
+                         # We need a Persistent connection for Chat
+                         # But ANNOUNCE is usually the first packet.
+                         # Check if we already have a connection? 
+                         # For v2 simplification, we initiate a new one if not present.
+                         # Actually, we should check `self.red.tcp_connections`? NO, we don't map by UID easily there.
+                         # Just connect.
                          s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                         s.settimeout(2.0) # Timeout corto
+                         s.settimeout(2.0)
                          s.connect((target_ip, PORT_GROUP))
-                         s.sendall(ann_pkg + b'\n')
-                         self.red.registrar_socket_tcp(s, f"GRP_MESHSEND_{gid}_{uid}")
+                         s.setblocking(False)
+                         
+                         # Send ANNOUNCE
+                         self.red.enviar_tcp(s, ann_pkg)
+                         
+                         # Register for reading future messages
+                         self.red.registrar_socket_tcp(s, f"GRP_PEER_{gid}_{uid}")
+                         print(f"[MESH] Conectado con peer {m.get('nick')} ({target_ip})", file=sys.stderr)
+                         
                      except Exception as e:
-                         print(f"[MESH] Fallo anuncio a {target_ip}: {e}", file=sys.stderr)
+                         print(f"[MESH] Fallo conexion mesh a {target_ip}: {e}", file=sys.stderr)
                  
         elif tipo == "ANNOUNCE":
              gid = payload.get("gid")
@@ -855,6 +871,19 @@ class Motor:
                  # Logic for Mention Detection
                  import re
                  from ghostwhisperchat.core.utilidades import normalize_text, enviar_notificacion
+                 from ghostwhisperchat.datos.recursos import Colores
+                 
+                 # Nick Color Calculation (Deterministic)
+                 sender_nick = origen['nick']
+                 n_len = len(sender_nick)
+                 color_idx = n_len % len(Colores.NICK_COLORS)
+                 nick_color = Colores.NICK_COLORS[color_idx]
+                 
+                 # Formatted Nick with Color
+                 # We use this for normal messages.
+                 nick_display = f"{nick_color}{sender_nick}{Colores.RESET}"
+                 
+                 # Regex: @ + MyNick (normalized check)
                  
                  # Regex: @ + MyNick (normalized check)
                  # Note: User request: "debe internamente normalizar el nombre".
@@ -890,11 +919,11 @@ class Motor:
                       now = time.time()
                       last_pop = self.mention_cooldowns.get(target_id, 0)
                       
-                      # Send with Prefix
+                      # Send with Prefix (Plain Nick to avoid breaking BG Highlight with resets)
                       prefix = "__MENTION__ "
                       self.ui_sessions[target_id].sendall(f"\n{prefix}({origen['nick']}): {text}\n".encode('utf-8'))
                       
-                      if now - last_pop > 120: # 2 minutes
+                      if now - last_pop > 40: # 40 seconds
                           # POPUP
                           g_name = "Chat Privado"
                           if gid and gid in self.memoria.grupos_activos:
@@ -903,7 +932,8 @@ class Motor:
                           enviar_notificacion("Mensaje destacado", f"{origen['nick']} te ha mencionado en {g_name}")
                           self.mention_cooldowns[target_id] = now
                  else:
-                      self.ui_sessions[target_id].sendall(f"\n({origen['nick']}): {text}\n".encode('utf-8'))
+                      # Normal Message: Use Colored Nick
+                      self.ui_sessions[target_id].sendall(f"\n({nick_display}): {text}\n".encode('utf-8'))
              else:
                  enviar_notificacion(f"Mensaje de {origen['nick']}", text)
 
