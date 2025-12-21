@@ -651,6 +651,12 @@ class Motor:
                             print(f"[X] Fallo al conectar con Grupo: {e}", file=sys.stderr)
 
     def manejar_paquete_tcp(self, data_bytes, sock):
+        # Raw Debug to confirm reception
+        if len(data_bytes) < 500:
+             print(f"[TCP_RAW] {data_bytes.strip()}", file=sys.stderr)
+        else:
+             print(f"[TCP_RAW] (Large Packet) {len(data_bytes)} bytes", file=sys.stderr)
+
         valid, data = desempaquetar(data_bytes)
         if not valid: 
             print("[TCP_ERR] Paquete invalido recibido", file=sys.stderr)
