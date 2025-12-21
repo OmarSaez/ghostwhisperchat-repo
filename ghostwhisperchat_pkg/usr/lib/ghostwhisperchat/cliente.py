@@ -167,6 +167,7 @@ def main():
         print(f"GhostWhisperChat {APP_VERSION}")
     else:
         # Modo Transitorio
+        from ghostwhisperchat.datos.recursos import COMMAND_MAP
         
         # 1. Normalización de Comandos (Auto-prefix)
         # Si el usuario escribe "gwc info" -> convertimos a "--info"
@@ -177,7 +178,8 @@ def main():
         full_cmd = " ".join(args_raw)
         
         # 2. Lógica Especial para Escaneo (UX)
-        if args_raw[0] in ["--enlinea", "--scan"]:
+        # Check all aliases for SCAN
+        if args_raw[0] in COMMAND_MAP['SCAN']:
             # Paso A: Disparar el Scan UDP
             # Enviamos "--scan" al daemon. Este retorna rapido "Buscando..."
             enviar_comando_transitorio("--scan")
@@ -188,7 +190,7 @@ def main():
             
             # Paso C: Pedir resultados
             # El daemon ya habrá poblado self.memoria.peers
-            enviar_comando_transitorio("--contacts")
+            enviar_comando_transitorio("--scan-results")
             return
 
         # 3. Comando Normal

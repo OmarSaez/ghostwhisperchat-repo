@@ -27,6 +27,9 @@ class Motor:
         
         # Mapeo de UI Sockets: { "ID_CHAT": socket_ipc }
         self.ui_sessions = {} 
+        
+        # Buffer efímero para resultados de escaneo (--enlinea)
+        self.scan_buffer = [] 
 
     def iniciar_ipc(self):
         if os.path.exists(IPC_SOCK_PATH):
@@ -150,11 +153,19 @@ class Motor:
             conn.close()
 
     def ejecutar_comando_transitorio(self, comando_str, context_ui=None):
-        print(f"[MOTOR_DEBUG] Procesando comando raw: {comando_str}", file=sys.stderr)
         cmd, args = parsear_comando(comando_str)
         
         if cmd == "HELP":
             return obtener_ayuda_comando(args[0] if args else None)
+
+        elif cmd == "SCAN_RESULTS":
+            if not self.scan_buffer:
+                return "[*] No se encontraron usuarios activos."
+            res = "--- USUARIOS EN LINEA ---\n"
+            for u in self.scan_buffer:
+                 res += f"[*] {u['nick']} ({u['ip']})\n"
+            self.scan_buffer = [] # Clear after reading
+            return res
 
         elif cmd == "JOIN":
              if not args: return "[X] Uso: --unirse <Nombre>"
@@ -188,9 +199,12 @@ class Motor:
              return f"[*] Grupo privado '{nombre}' creado."
 
         elif cmd == "SCAN":
+             # 1. Limpiar buffer
+             self.scan_buffer = []
+             # 2. Enviar Broadcast
              pkg = empaquetar("DISCOVER", {"filter": "ALL"}, "ALL")
              self.red.enviar_udp_broadcast(pkg)
-             return "[*] Búsqueda lanzada. Espera respuestas."
+             return "[*] Búsqueda lanzada."
 
         elif cmd == "GLOBAL_STATUS":
              m = self.memoria
@@ -200,6 +214,26 @@ class Motor:
              res += f"IP: {m.mi_ip}\n"
              res += f"Version: {m.version}\n"
              res += f"Peers: {len(m.peers)}\n"
+             return res
+
+        elif cmd == "CONTACTS":
+             # Usamos peers para historial reciente por ahora
+             ct = self.memoria.peers
+             if not ct: return "No hay contactos recientes."
+             res = "--- CONTACTOS (Caché) ---\n"
+             for ip, data in ct.items():
+                  if data['uid'] == self.memoria.mi_uid: continue
+                  res += f"[{data['nick']}] ({ip})\n"
+             return res
+
+        elif cmd == "SHORTCUTS":
+             res = "ABREVIACIONES:\n"
+             # Import locally to avoid circular dep if needed, or assume global import
+             # from ghostwhisperchat.datos.recursos import ABBREVIATIONS_DISPLAY
+             for cat, cmds in ABBREVIATIONS_DISPLAY.items():
+                 res += f"\n[{cat}]\n"
+                 for sub, data in cmds.items():
+                      res += f"  - {sub}: {', '.join(data['aliases'])}\n"
              return res
              
         elif cmd == "DM": 
@@ -318,7 +352,10 @@ class Motor:
         origen = data.get("origen")
 
         if origen:
-            self.memoria.actualizar_peer(addr[0], origen['uid'], origen['nick'])
+            # User Request: Do NOT save UDP scan results to persistent contacts.
+            # Only TCP interactions (Chat) should save to contacts.
+            # self.memoria.actualizar_peer(addr[0], origen['uid'], origen['nick'])
+            pass
 
         if tipo == "SEARCH":
             target_name = payload.get("group_name")
@@ -336,6 +373,17 @@ class Motor:
         
         elif tipo == "FOUND":
             ftype = payload.get("type")
+            
+            if ftype == "PEER":
+                peer_data = {
+                    "nick": origen['nick'],
+                    "ip": addr[0],
+                    "status": payload.get("status")
+                }
+                # Evitar duplicados en el buffer
+                if not any(x['ip'] == addr[0] for x in self.scan_buffer):
+                    self.scan_buffer.append(peer_data)
+
             if ftype == "GROUP":
                 gid = payload.get("gid")
                 name = payload.get("name")

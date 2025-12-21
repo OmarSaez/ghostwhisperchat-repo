@@ -22,8 +22,8 @@ class Colores:
     BG_RED = "\033[41m"
 
 # Versionado
-APP_VER_NUM = "2.32"
-APP_VER_TAG = "Animaciones de espera"
+APP_VER_NUM = "2.33"
+APP_VER_TAG = "Fix --enlinea"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 BANNER = r"""
@@ -210,9 +210,10 @@ COMMAND_MAP = {
     'MUTE_TOGGLE':  ['--silenciar', '-m', '--shh', '--nomolestar', '--mute'],
     'LS':           ['--ls', '-l', '--gente', '--lista', '--usuarios'],
     'EXIT':         ['--salir', '-x', '--chau', '--adios', '--exit'],
-    'SCAN':             ['--enlinea', '-s', '--buscar', '--radar', '--quienes'],
+    'SCAN':             ['--enlinea', '-s', '--buscar', '--radar', '--quienes', '--scan'],
+    'SCAN_RESULTS':     ['--scan-results', '--resultados-scan'],
     'LIST_GROUPS':      ['--vergrupos', '-g', '--grupos', '--explorar', '--salas'],
-    'CONTACTS':         ['--contactos', '-c', '--amigos', '--agenda', '--historial'],
+    'CONTACTS':         ['--contactos', '-c', '--amigos', '--agenda', '--historial', '--contacts'],
     'VISIBILITY_TOGGLE':['--invisible', '-v', '--fantasma', '--oculto', '--visibilidad'],
     'FILE':         ['--archivo', '-f', '--enviar', '--mandar', '--adjuntar'],
     'CHANGE_NICK':  ['--cambiarnombre', '-n', '--nick', '--apodo', '--nombre'],
@@ -233,9 +234,10 @@ def mostrar_animacion_espera(mensaje="Procesando", segundos=1.2):
     Muestra una animación 'g w c' personalizada con efecto de onda.
     """
     frames = [
-        f"{Colores.YELLOW}[*] {mensaje} {Colores.GREEN}g{Colores.RESET}",
-        f"{Colores.YELLOW}[*] {mensaje} {Colores.GREEN} w{Colores.RESET}",
-        f"{Colores.YELLOW}[*] {mensaje} {Colores.GREEN}  c{Colores.RESET}",
+        f"{Colores.YELLOW}[*] {mensaje} {Colores.GREEN}   {Colores.RESET}",
+        f"{Colores.YELLOW}[*] {mensaje} {Colores.GREEN}g   {Colores.RESET}",
+        f"{Colores.YELLOW}[*] {mensaje} {Colores.GREEN}gw  {Colores.RESET}",
+        f"{Colores.YELLOW}[*] {mensaje} {Colores.GREEN}gwc {Colores.RESET}",
     ]
     
     # Calcular delay para que cícle al menos 2 veces o dure 'segundos'
