@@ -27,8 +27,8 @@ class Colores:
     BG_RED = "\033[41m"
 
 # Versionado
-APP_VER_NUM = "2.55"
-APP_VER_TAG = "Chat privados"
+APP_VER_NUM = "2.56"
+APP_VER_TAG = "Fix TCP Blocking Send"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 BANNER = r"""

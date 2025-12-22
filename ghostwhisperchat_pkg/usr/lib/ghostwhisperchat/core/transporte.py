@@ -120,14 +120,23 @@ class GestorRed:
                 peer = "Unknown"
             
             log_data = data_bytes.strip()
-            if len(log_data) > 500:
+            if len(log_data) > 2000:
                 log_data = f"(Large) {len(log_data)} bytes"
                 
             print(f"[OUT_TCP] -> {peer}: {log_data}", file=sys.stderr)
             
-            sock.sendall(data_bytes + b'\n') 
-            return True
-        except OSError:
+            # Reliable Send: Block momentarily to ensure full delivery without complex buffering
+            try:
+                sock.setblocking(True)
+                sock.sendall(data_bytes + b'\n')
+                sock.setblocking(False)
+                return True
+            except Exception as e:
+                print(f"[X] Sendall failed to {peer}: {e}", file=sys.stderr)
+                sock.setblocking(False) # Restore just in case
+                raise e # Re-raise to trigger generic handler or just return False
+        except Exception as e:
+            print(f"[X] Error critico enviar_tcp: {e}", file=sys.stderr)
             self.cerrar_tcp(sock)
             return False
 

@@ -602,6 +602,10 @@ class Motor:
                                self.ui_sessions[gid].sendall(f"\n[SISTEMA] [*] Invitacion enviada a '{responder_nick}'.\n".encode('utf-8'))
                       except Exception as e:
                           print(f"[X] Error auto-inviting: {e}", file=sys.stderr)
+                          
+                      # Reset triggers to prevent loops
+                      self.pending_invite_gid = None
+                      self.pending_invite_nick = None
                   
                   self.pending_invite_nick = None
                   self.pending_invite_gid = None
