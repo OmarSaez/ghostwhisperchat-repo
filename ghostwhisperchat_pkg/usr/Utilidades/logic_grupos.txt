@@ -1,0 +1,83 @@
+LOGICA DE PROTOCOLOS DE GRUPO (GWC v2.57+)
+==========================================
+
+Este documento detalla el flujo robusto de "Pull-Model" implementado para la unión y sincronización de grupos, diseñado para mitigar problemas de packet coalescing (pegado de paquetes) y race conditions en sockets.
+
+1. INVITACIÓN Y ACEPTACIÓN
+--------------------------
+1.  **Ambassador (Admin/Miembro)**:
+    -   Envía paquete `INVITE` (TCP Privado) al Peer objetivo.
+    -   Contiene: GID, Nombre del Grupo, Hash de Clave (si aplica).
+
+2.  **Peer Invitado**:
+    -   Recibe `INVITE`. Muestra Popup de confirmación.
+    -   Si Acepta:
+        -   Inicia conexión TCP al puerto del grupo del Ambassador.
+        -   Envía `JOIN_REQ`.
+        -   **Importante**: Cambia socket a modo bloqueante temporal o asegura buffer vacío antes de unirse al loop `select`.
+
+2. HANDSHAKE INICIAL (MODELO PULL)
+----------------------------------
+El cambio clave respecto a versiones anteriores es que el Ambassador NO envía los datos de sincronización automáticamente. Espera a que el nuevo miembro los pida.
+
+3.  **Ambassador (Recibe JOIN_REQ)**:
+    -   Valida credenciales.
+    -   Agrega al usuario a su memoria local (`grupos_activos`).
+    -   Envía paquete `WELCOME` confirmando entrada.
+    -   **NO envía SYNC**. Espera.
+
+4.  **Nuevo Miembro (Recibe WELCOME)**:
+    -   Registra el grupo como activo en memoria.
+    -   **PASO CRÍTICO (Prioridad 1)**: Envía inmediatamente paquete `SYNC_REQ` al Ambassador.
+        -   Usa `sock.setblocking(True)` momentáneamente para garantizar que la solicitud salga de la tarjeta de red antes de procesar gráficos.
+    -   **PASO SECUNDARIO (Prioridad 2)**: Lanza el proceso de la Interfaz Gráfica (`abrir_chat_ui`).
+
+3. SINCRONIZACIÓN DE ESTADO
+---------------------------
+5.  **Ambassador (Recibe SYNC_REQ)**:
+    -   Recopila la lista actual de todos los miembros del grupo (con IPs, Nicks, UIDs).
+    -   Envía paquete `SYNC` conteniendo esta lista.
+
+6.  **Nuevo Miembro (Recibe SYNC)**:
+    -   Procesa la lista de miembros y la guarda en memoria.
+    -   Ya tiene la "foto completa" del grupo.
+
+4. FORMACIÓN DEL MESH (ANNOUNCE)
+--------------------------------
+7.  **Nuevo Miembro (Post-SYNC)**:
+    -   Itera sobre la lista de miembros recibida.
+    -   Para cada miembro (excepto él mismo y el Ambassador con quien ya habla):
+        -   Abre conexión TCP directa.
+        -   Envía paquete `ANNOUNCE` ("Hola, soy nuevo aquí").
+        -   Registra la conexión para futuros mensajes directos.
+
+8.  **Resto del Grupo (Recibe ANNOUNCE)**:
+    -   Agrega al nuevo miembro a su lista local.
+    -   Notifica en su chat: "[+] Fulanito se unió al grupo".
+
+DIAGRAMA DE FLUJO RESUMIDO
+--------------------------
+[Peer A]            [Peer B (Ambassador)]
+   |                        |
+   | <---- INVITE ----------|
+   |                        |
+   | ---- JOIN_REQ ------>  |
+   |                        | [Agrega A a memoria]
+   | <---- WELCOME -------  |
+   |                        |
+(A asegura conexión)        |
+   | ---- SYNC_REQ ------>  |
+   |                        | [Prepara Lista]
+   | <---- SYNC (Lista) --  |
+   |                        |
+[A tiene Lista]             |
+   |                        |
+   | --- ANNOUNCE (a C) --> | [Peer C]
+   | --- ANNOUNCE (a D) --> | [Peer D]
+   v                        v
+
+VENTAJAS DE ESTE MODELO
+-----------------------
+-   **Robustez**: Evita que `WELCOME` y `SYNC` lleguen pegados en el mismo buffer TCP, lo que causaba pérdida de datos en el receptor.
+-   **Sincronización UI/Red**: Al pedir el SYNC antes de abrir la UI, aseguramos que la red tenga prioridad. Si la UI tarda en cargar, los datos ya están viajando.
+-   **Control de Flujo**: El receptor dicta el ritmo de la recepción de datos masivos (lista de miembros).

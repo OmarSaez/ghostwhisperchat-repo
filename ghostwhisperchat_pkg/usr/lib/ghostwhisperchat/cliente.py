@@ -7,12 +7,132 @@ import os
 import sys
 import threading
 import time
-import readline # Habilita historial con flechas automaticamente
+import termios # Raw mode input
+import tty     # Raw mode utility
 import shutil
 import argparse
 from ghostwhisperchat.datos.recursos import Colores as C, BANNER
 
 IPC_SOCK_PATH = os.path.expanduser("~/.ghostwhisperchat/gwc.sock")
+
+# --- CLASE GESTOR DE INPUT (Raw Mode) ---
+class GestorInput:
+    def __init__(self, socket_client):
+        self.sock = socket_client
+        self.buffer = []
+        self.prompt = "Tu: "
+        self.lock = threading.Lock()
+        self.running = True
+        self.history = []
+        self.history_index = 0
+        
+    def _limpiar_linea(self):
+        # Mover al inicio, borrar linea completa
+        sys.stdout.write("\r\033[K")
+        
+    def _pintar_linea(self):
+        # Pintar prompt + buffer actual
+        sys.stdout.write(f"{self.prompt}{''.join(self.buffer)}")
+        sys.stdout.flush()
+
+    def print_incoming(self, msg):
+        """Imprime mensaje entrante sin romper el input actual"""
+        with self.lock:
+            self._limpiar_linea()
+            # Asegurar retorno de carro para raw mode (\n -> \r\n) nếu necesario
+            # Pero normalmente print maneja \n. En raw mode, sys.stdout necesita \r\n
+            # msg suele venir limpio.
+            sys.stdout.write(f"{msg}\r\n") 
+            self._pintar_linea()
+            
+    def input_loop(self):
+        fd = sys.stdin.fileno()
+        old_settings = termios.tcgetattr(fd)
+        try:
+            tty.setraw(sys.stdin.fileno())
+            while self.running:
+                ch = sys.stdin.read(1)
+                
+                with self.lock:
+                    if ch == '\x03': # Ctrl+C
+                        self.running = False
+                        break
+                        
+                    elif ch == '\r' or ch == '\n': # Enter
+                        linea = "".join(self.buffer)
+                        self.buffer = [] # Limpiar buffer visualmente
+                        self._limpiar_linea()
+                        self._pintar_linea() # Queda "Tu: " vacio esperando eco o siguiente msg
+                        
+                        # Procesar comando (sin bloquear el lock mucho tiempo)
+                        # Soltar lock para enviar? No, enviar es rapido.
+                        if linea.strip():
+                             self.history.append(linea)
+                             self.history_index = len(self.history)
+                             self._enviar_mensaje(linea)
+                             
+                    elif ch == '\x7f': # Backspace
+                        if self.buffer:
+                            self.buffer.pop()
+                            # Hack visual: borrar ultimo caracter
+                            # \b \b es backspace, espacio, backspace
+                            sys.stdout.write("\b \b")
+                            sys.stdout.flush()
+                        # Si buffer vacio, NO HACER NADA (Arregla bug de borrar "Tu:")
+                        
+                    elif ch == '\x1b': # Escape seq (Flechas)
+                        # Leer siguientes 2
+                        seq1 = sys.stdin.read(1)
+                        seq2 = sys.stdin.read(1)
+                        if seq1 == '[':
+                            if seq2 == 'A': # Arriba
+                                if self.history and self.history_index > 0:
+                                    self.history_index -= 1
+                                    self.buffer = list(self.history[self.history_index])
+                                    self._limpiar_linea()
+                                    self._pintar_linea()
+                            elif seq2 == 'B': # Abajo
+                                if self.history_index < len(self.history):
+                                    self.history_index += 1
+                                    if self.history_index == len(self.history):
+                                        self.buffer = []
+                                    else:
+                                        self.buffer = list(self.history[self.history_index])
+                                    self._limpiar_linea()
+                                    self._pintar_linea()
+                                    
+                    else:
+                        # Caracter imprimible normal
+                        # Check si es imprimible simple
+                        if ch.isprintable():
+                            self.buffer.append(ch)
+                            sys.stdout.write(ch)
+                            sys.stdout.flush()
+                            
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+            print("\nCerrando interfaz...")
+
+    def _enviar_mensaje(self, msg):
+        # Logica original de envio
+        try:
+             # Check Scan
+             from ghostwhisperchat.datos.recursos import COMMAND_MAP
+             cmd_raw = msg.split()[0]
+             if not cmd_raw.startswith("-"): cmd_raw = "--" + cmd_raw 
+             is_scan = cmd_raw in COMMAND_MAP['SCAN'] or cmd_raw in COMMAND_MAP['LIST_GROUPS']
+             
+             if is_scan:
+                  self.sock.sendall(f"__MSG__ {msg}".encode('utf-8'))
+                  # Animation is tricky in raw mode. Skipping for stability or implementing simple print.
+                  sys.stdout.write("\r\n[*] Escaneando...\r\n")
+                  self.sock.sendall(b"__MSG__ --scan-results")
+                  return
+
+             payload = f"__MSG__ {msg}"
+             self.sock.sendall(payload.encode('utf-8'))
+        except:
+             pass
 
 def enviar_comando_transitorio(cmd_str):
     """Envía un comando, espera respuesta inmediata y sale."""
@@ -50,12 +170,10 @@ def get_local_ip():
 
 def modo_ui_chat(target_id, es_grupo):
     """
-    Modo Persistente: UI de Chat Dedicada.
+    Modo Persistente: UI de Chat Dedicada (Raw Mode v2.1)
     """
     mi_ip = get_local_ip()
     print(C.GREEN + BANNER + C.RESET)
-    # Header moved to after connection for cleanliness
-
     
     # 1. Conectar Persistente
     try:
@@ -74,22 +192,26 @@ def modo_ui_chat(target_id, es_grupo):
     # Header Limpio (Sin IDs)
     print(f"{C.BOLD}[*] IP LOCAL: {mi_ip}{C.RESET}")
     print(f"{C.GREY}(Escribe y presiona Enter. Ctrl+C para cerrar){C.RESET}\n")
+    
+    # Init Input Helper
+    helper = GestorInput(s)
 
     # 2. Thread de Lectura (Incoming Messages)
     def escuchar():
-        while True:
+        while helper.running:
             try:
                 data = s.recv(4096)
                 if not data:
-                    print(f"\n{C.RED}[!] Desconectado.{C.RESET}")
-                    os._exit(0)
+                    helper.running = False
+                    # Raw mode makes printing hard here, relying on main loop break
+                    break
                 
                 msg_in = data.decode('utf-8')
                 
                 # Check for special Close Trigger
                 if "__CLOSE_UI__" in msg_in:
-                    time.sleep(2.0)
-                    os._exit(0)
+                    helper.running = False
+                    break
 
                 # FIX SPACING: Strip trailing newlines from message itself
                 msg_in = msg_in.strip()
@@ -97,15 +219,11 @@ def modo_ui_chat(target_id, es_grupo):
                 
                 # --- SISTEMA COLORING (UX/UI Standard) ---
                 if msg_in.startswith("[SISTEMA]"):
-                    # Check indicators for specific colors
                     if "[X]" in msg_in or "Error" in msg_in:
-                         # ERROR (Red)
                          msg_in = f"{C.RED}{msg_in}{C.RESET}"
                     elif "[-]" in msg_in or "[!]" in msg_in:
-                         # WARNING/LEAVE (Yellow)
                          msg_in = f"{C.YELLOW}{msg_in}{C.RESET}"
                     else:
-                         # INFO/JOIN/POSITIVE (Green) -> Default System
                          msg_in = f"{C.GREEN}{msg_in}{C.RESET}"
                 
                 # FILTER: Hide ID confirmation message
@@ -118,75 +236,26 @@ def modo_ui_chat(target_id, es_grupo):
                     # Yellow Background, Black Text for high contrast
                     msg_in = f"{C.BG_YELLOW}{C.BLACK}{msg_in}{C.RESET}"
                     
-                sys.stdout.write(f"\r\033[K{msg_in}\n")
-                sys.stdout.write("Tu: ") # Prompt
-                sys.stdout.flush()
+                # Use Helper to print safely
+                helper.print_incoming(msg_in)
                 
             except:
                 break
-        os._exit(0)
+        
+        helper.running = False
+        os._exit(0) # Force exit to kill raw mode loop
         
     t = threading.Thread(target=escuchar, daemon=True)
     t.start()
     
-    # 3. Loop de Escritura (User Input)
+    # 3. Loop de Escritura (Raw Input via Helper)
+    # Print initial prompt
     sys.stdout.write("Tu: ")
     sys.stdout.flush()
     
-    while True:
-        try:
-            # readline ya maneja el historial con flechas
-            msg = input() 
-            
-            # Al dar enter, readline deja el texto ahi.
-            # Nosotros mandamos al daemon, que nos hará eco con "Tu: lo que escribi"
-            # ENTONCES: Para que no salga duplicado "Tu: hola" (local) y "Tu: hola" (red),
-            # deberiamos borrar la linea local o confiar en el eco.
-            # V2.27: Confiamos en el ECO del daemon.
-            # Borramos la linea que acabamos de escribir para que el eco la reemplace limpiamente
-            sys.stdout.write("\033[A\033[K") # Subir una linea y borrarla
-            
-            if msg.strip():
-                # 1. Check for special scan commands needing orchestration
-                from ghostwhisperchat.datos.recursos import COMMAND_MAP
-                
-                # Check if it matches SCAN or LIST_GROUPS variants
-                cmd_raw = msg.split()[0]
-                if not cmd_raw.startswith("-"): cmd_raw = "--" + cmd_raw 
-                
-                is_scan = cmd_raw in COMMAND_MAP['SCAN'] or cmd_raw in COMMAND_MAP['LIST_GROUPS']
-
-                if is_scan:
-                     # Send trigger
-                     s.sendall(f"__MSG__ {msg}".encode('utf-8'))
-                     
-                     # USER REQUEST: Unify console experience with Animation
-                     from ghostwhisperchat.datos.recursos import mostrar_animacion_espera
-                     # Detect type based on command string
-                     msg_anim = "Escaneando red" if cmd_raw in COMMAND_MAP['SCAN'] else "Buscando grupos"
-                     
-                     # Run animation temporarily blocks input loop, fitting nicely.
-                     # But incoming messages might ruin it. 
-                     # Ideally we should pause the 'escuchar' thread printing, but that's complex.
-                     # We will just run it. The user accepted race conditions.
-                     mostrar_animacion_espera(msg_anim, 1.2)
-                     
-                     # Request results
-                     s.sendall(b"__MSG__ --scan-results")
-                     continue
-
-                if msg.startswith("--") or msg.startswith("/"):
-                    pass
-                
-                payload = f"__MSG__ {msg}"
-                s.sendall(payload.encode('utf-8'))
-                
-        except KeyboardInterrupt:
-            print("\nCerrando chat...")
-            break
-        except EOFError:
-            break
-            
+    # Run loop
+    helper.input_loop()
+    
     s.close()
     
 def main():
