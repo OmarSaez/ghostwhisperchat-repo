@@ -602,11 +602,8 @@ class Motor:
                                self.ui_sessions[gid].sendall(f"\n[SISTEMA] [*] Invitacion enviada a '{responder_nick}'.\n".encode('utf-8'))
                       except Exception as e:
                           print(f"[X] Error auto-inviting: {e}", file=sys.stderr)
-                          
-                      # Reset triggers to prevent loops
-                      self.pending_invite_gid = None
-                      self.pending_invite_nick = None
                   
+                  # Reset triggers regardless of outcome
                   self.pending_invite_nick = None
                   self.pending_invite_gid = None
         
@@ -692,32 +689,35 @@ class Motor:
                 welcome = empaquetar("WELCOME", {"gid": gid, "name": g['nombre']}, self.memoria.get_origen())
                 self.red.enviar_tcp(sock, welcome)
                 
-                # 3. Send SYNC (List of current members, including the new one so they know they are in)
-                members = g.get('miembros', [])
-                sync_list = []
-                # If 'miembros' is a dict in memory, convert to list.
-                if isinstance(members, dict):
-                     sync_list = list(members.values())
-                elif isinstance(members, list):
-                     sync_list = members
-                     
-                sync_pkg = empaquetar("SYNC", {"gid": gid, "members": sync_list}, self.memoria.get_origen())
-                
-                if sync_pkg:
-                     print(f"[DEBUG_SYNC] Sync PKG generated: {len(sync_pkg)} bytes. Sending...", file=sys.stderr)
-                
-                # Tiny delay to avoid packet coalescing issues on some kernels/networks if non-blocking
-                import time
-                time.sleep(0.2) 
-                
-                self.red.enviar_tcp(sock, sync_pkg)
+                # NO AUTO-SYNC. Wait for SYNC_REQ from the new member to ensure they are ready.
 
         elif tipo == "WELCOME":
              gid = payload.get("gid")
              name = payload.get("name")
+             
+             # Register group
              self.memoria.agregar_grupo_activo(gid, name)
+             print(f"[MESH] Aceptada invitación a {name}. Uniendo...", file=sys.stderr)
+             
+             # Open UI
              abrir_chat_ui(gid, nombre_legible=name, es_grupo=True)
              enviar_notificacion("GhostWhisperChat", f"Te has unido a {name}")
+             
+             # IMMEDIATELY REQUEST SYNC (Pull Model)
+             print(f"[MESH] Solicitando lista de miembros (SYNC_REQ)...", file=sys.stderr)
+             sync_req = empaquetar("SYNC_REQ", {"gid": gid}, self.memoria.get_origen())
+             self.red.enviar_tcp(sock, sync_req)
+
+        elif tipo == "SYNC_REQ":
+             gid = payload.get("gid")
+             if gid in self.memoria.grupos_activos:
+                 g = self.memoria.grupos_activos[gid]
+                 members = g.get('miembros', [])
+                 sync_list = list(members.values()) if isinstance(members, dict) else members
+                 
+                 sync_pkg = empaquetar("SYNC", {"gid": gid, "members": sync_list}, self.memoria.get_origen())
+                 print(f"[MESH] Respondiendo SYNC_REQ con {len(sync_list)} miembros.", file=sys.stderr)
+                 self.red.enviar_tcp(sock, sync_pkg)
 
         elif tipo == "SYNC":
              gid = payload.get("gid")
