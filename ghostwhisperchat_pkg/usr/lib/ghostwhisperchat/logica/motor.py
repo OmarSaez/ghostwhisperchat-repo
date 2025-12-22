@@ -821,20 +821,24 @@ class Motor:
         elif tipo == "CHAT_REQ":
             if self.memoria.no_molestar:
                 rej = empaquetar("CHAT_NO", {"reason": "Busy"}, self.memoria.get_origen())
-                try: sock.sendall(rej + b'\n')
-                except: pass
+                # Use new connection to reply, as sender likely closed transient sock
+                self.red.enviar_tcp_priv(origen['ip'], rej)
                 return
 
-            acepta = preguntar_invitacion_chat(origen['nick'], origen['uid'])
-            if acepta:
-                ack = empaquetar("CHAT_ACK", {}, self.memoria.get_origen())
-                try: sock.sendall(ack + b'\n')
-                except: pass
-                abrir_chat_ui(origen['uid'], nombre_legible=origen['nick'], es_grupo=False)
-            else:
-                rej = empaquetar("CHAT_NO", {"reason": "Rejected"}, self.memoria.get_origen())
-                try: sock.sendall(rej + b'\n')
-                except: pass
+            # Thread user prompt to avoid blocking Main Event Loop
+            def _prompt_private():
+                acepta = preguntar_invitacion_chat(origen['nick'], origen['uid'])
+                if acepta:
+                    ack = empaquetar("CHAT_ACK", {}, self.memoria.get_origen())
+                    self.red.enviar_tcp_priv(origen['ip'], ack)
+                    
+                    # Launch UI
+                    abrir_chat_ui(origen['uid'], nombre_legible=origen['nick'], es_grupo=False)
+                else:
+                    rej = empaquetar("CHAT_NO", {"reason": "Rejected"}, self.memoria.get_origen())
+                    self.red.enviar_tcp_priv(origen['ip'], rej)
+
+            threading.Thread(target=_prompt_private, daemon=True).start()
 
         elif tipo == "CHAT_ACK":
             abrir_chat_ui(origen['uid'], nombre_legible=origen['nick'], es_grupo=False)

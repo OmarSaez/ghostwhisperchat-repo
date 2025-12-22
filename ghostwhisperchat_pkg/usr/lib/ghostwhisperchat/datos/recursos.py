@@ -27,8 +27,8 @@ class Colores:
     BG_RED = "\033[41m"
 
 # Versionado
-APP_VER_NUM = "2.54"
-APP_VER_TAG = "MAS DEBUG! grupal"
+APP_VER_NUM = "2.55"
+APP_VER_TAG = "Chat privados"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 BANNER = r"""
