@@ -697,16 +697,27 @@ class Motor:
              
              # Register group
              self.memoria.agregar_grupo_activo(gid, name)
-             print(f"[MESH] Aceptada invitación a {name}. Uniendo...", file=sys.stderr)
+             # Register group
+             self.memoria.agregar_grupo_activo(gid, name)
+             print(f"[MESH] WELCOME recibido de {name}. Procesando...", file=sys.stderr)
              
-             # Open UI
-             abrir_chat_ui(gid, nombre_legible=name, es_grupo=True)
-             enviar_notificacion("GhostWhisperChat", f"Te has unido a {name}")
+             # IMMEDIATELY REQUEST SYNC (Pull Model) - Priority #1
+             try:
+                 print(f"[MESH] Solicitando lista de miembros (SYNC_REQ)...", file=sys.stderr)
+                 sync_req = empaquetar("SYNC_REQ", {"gid": gid}, self.memoria.get_origen())
+                 # Use reliable blocking send for this critical handshake
+                 sock.setblocking(True)
+                 sock.sendall(sync_req + b'\n')
+                 sock.setblocking(False)
+             except Exception as e:
+                 print(f"[X] Fallo critico enviando SYNC_REQ: {e}", file=sys.stderr)
              
-             # IMMEDIATELY REQUEST SYNC (Pull Model)
-             print(f"[MESH] Solicitando lista de miembros (SYNC_REQ)...", file=sys.stderr)
-             sync_req = empaquetar("SYNC_REQ", {"gid": gid}, self.memoria.get_origen())
-             self.red.enviar_tcp(sock, sync_req)
+             # Open UI - Priority #2
+             try:
+                 abrir_chat_ui(gid, nombre_legible=name, es_grupo=True)
+                 enviar_notificacion("GhostWhisperChat", f"Te has unido a {name}")
+             except Exception as e:
+                 print(f"[X] Error lanzando UI: {e}", file=sys.stderr)
 
         elif tipo == "SYNC_REQ":
              gid = payload.get("gid")
