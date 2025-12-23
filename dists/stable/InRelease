@@ -5,37 +5,37 @@ Origin: GhostWhisperChat
 Label: GhostWhisperChat Repo
 Suite: stable
 Codename: stable
-Version: 2.94
+Version: 2.95
 Architectures: amd64 all arm64 i386
 Components: main
 Description: Official GhostWhisperChat Repository
-Date: Tue, 23 Dec 2025 12:38:28 +0000
+Date: Tue, 23 Dec 2025 12:52:14 +0000
 MD5Sum:
- 22ac71c2d6d81adfe1d2cbf2e43e9c45 1599 main/binary-amd64/Packages
- 3626034320840246b76c008d29d32028 618 main/binary-amd64/Packages.gz
- 22ac71c2d6d81adfe1d2cbf2e43e9c45 1599 main/binary-all/Packages
- 3626034320840246b76c008d29d32028 618 main/binary-all/Packages.gz
- 22ac71c2d6d81adfe1d2cbf2e43e9c45 1599 main/binary-arm64/Packages
- 3626034320840246b76c008d29d32028 618 main/binary-arm64/Packages.gz
- 22ac71c2d6d81adfe1d2cbf2e43e9c45 1599 main/binary-i386/Packages
- 3626034320840246b76c008d29d32028 618 main/binary-i386/Packages.gz
+ 593d4c0b118cfc362b3220c772c963a6 1599 main/binary-amd64/Packages
+ 233239379da916ff7b9664f9dd61e043 617 main/binary-amd64/Packages.gz
+ 593d4c0b118cfc362b3220c772c963a6 1599 main/binary-all/Packages
+ 233239379da916ff7b9664f9dd61e043 617 main/binary-all/Packages.gz
+ 593d4c0b118cfc362b3220c772c963a6 1599 main/binary-arm64/Packages
+ 233239379da916ff7b9664f9dd61e043 617 main/binary-arm64/Packages.gz
+ 593d4c0b118cfc362b3220c772c963a6 1599 main/binary-i386/Packages
+ 233239379da916ff7b9664f9dd61e043 617 main/binary-i386/Packages.gz
 SHA256:
- 5ccfa15b3897b9acbe32768f7c5c16fcff64cbbd255b32bdd1a1a12af9176234 1599 main/binary-amd64/Packages
- 867c724761f8828bf9281d16a478208fe13461f8902ae7e28f23ea1202654748 618 main/binary-amd64/Packages.gz
- 5ccfa15b3897b9acbe32768f7c5c16fcff64cbbd255b32bdd1a1a12af9176234 1599 main/binary-all/Packages
- 867c724761f8828bf9281d16a478208fe13461f8902ae7e28f23ea1202654748 618 main/binary-all/Packages.gz
- 5ccfa15b3897b9acbe32768f7c5c16fcff64cbbd255b32bdd1a1a12af9176234 1599 main/binary-arm64/Packages
- 867c724761f8828bf9281d16a478208fe13461f8902ae7e28f23ea1202654748 618 main/binary-arm64/Packages.gz
- 5ccfa15b3897b9acbe32768f7c5c16fcff64cbbd255b32bdd1a1a12af9176234 1599 main/binary-i386/Packages
- 867c724761f8828bf9281d16a478208fe13461f8902ae7e28f23ea1202654748 618 main/binary-i386/Packages.gz
+ 3054c1c4e1742ac66a2d3af6919db51ac63b7f1e1ce7fb4b50211699a36a98a8 1599 main/binary-amd64/Packages
+ 70f6c23c5f82754c63104f44d4038c379c83de8d667f76dcf2def4be329f4702 617 main/binary-amd64/Packages.gz
+ 3054c1c4e1742ac66a2d3af6919db51ac63b7f1e1ce7fb4b50211699a36a98a8 1599 main/binary-all/Packages
+ 70f6c23c5f82754c63104f44d4038c379c83de8d667f76dcf2def4be329f4702 617 main/binary-all/Packages.gz
+ 3054c1c4e1742ac66a2d3af6919db51ac63b7f1e1ce7fb4b50211699a36a98a8 1599 main/binary-arm64/Packages
+ 70f6c23c5f82754c63104f44d4038c379c83de8d667f76dcf2def4be329f4702 617 main/binary-arm64/Packages.gz
+ 3054c1c4e1742ac66a2d3af6919db51ac63b7f1e1ce7fb4b50211699a36a98a8 1599 main/binary-i386/Packages
+ 70f6c23c5f82754c63104f44d4038c379c83de8d667f76dcf2def4be329f4702 617 main/binary-i386/Packages.gz
 -----BEGIN PGP SIGNATURE-----
 
-iQFHBAEBCgAxFiEEjGJmMf1aX2vrte5afXi95Q2641kFAmlKjUQTHG9tYXIuc2Fl
-ekB1c2FjaC5jbAAKCRB9eL3lDbrjWWAICACcg04B47CznM3/l2v5X9FCcuapbqpN
-8tx11JmOIztnr/EVOg0Svz6La8yrvLweyY/tfdw3JBtB+IjJBJHKfW5UY/NrIpW/
-OcQRFGwl/Zbjd0izTkCtx9T8MjnoVlHGi6bCYUuFUdZz5u5jMm2CIppE5oADDMba
-oYeeG1ixUzyZ3zwRMNDuRbNUIUiTAJG+BgOhkI47msEgUIvsG2AU6dVJaZUL2Z2+
-OpJTF7dMZTCaZNdb2ZIejW/Cy+qzmWYv7EjHyTXNNQP/km+If2qGfm4eJlZQSn8o
-+oWL9/v8uqUy1p35rUMGwo2jkrJkK95tmfpkxF8Yb/dAWUgO+8Ocq+0u
-=ETb4
+iQFHBAEBCgAxFiEEjGJmMf1aX2vrte5afXi95Q2641kFAmlKkH4THG9tYXIuc2Fl
+ekB1c2FjaC5jbAAKCRB9eL3lDbrjWbCrB/42kVcOp8Zwp6Hm9slZ/CgodSTSY0Zx
+/Z2tmOcJos9osfU82L2J/3QOdeEKKfvogaoZhM+hlfUr+gNXYBgwVI+uV+9WinD2
+cQHdwEmMKZdHf+rP13vyDSLG6VZdxGqak+jDLww43pddTNCFWWOsNhJkQ3RA6mlT
+BWAeOcMtZKYKvEVT9NASnRbintjWvSCv5Di1mwNcimAZ6T/SuWNME0pKiRSniEyS
+fxQ9NS4bg/w0hDxjM9ecRv6T2Do1k+mW8wwZliGwWidkb2//7ygrxcNPQoCV4Km6
+RINK8T7FVrNzlLJIjIZ8yFCSfJpqWYim972wu6sQh1Wuq8MerSIqVXxX
+=yDpG
 -----END PGP SIGNATURE-----

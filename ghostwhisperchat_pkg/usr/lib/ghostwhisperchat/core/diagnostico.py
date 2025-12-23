@@ -81,28 +81,43 @@ def check_display():
         print(f"   {C.YELLOW}↳ Las ventanas de chat NO se abrirán sin DISPLAY.{C.RESET}")
 
     # Verificar Terminales
-    from ghostwhisperchat.core.launcher import TERMINALES
-    found_term = None
+    # Verificar Terminales
+    from ghostwhisperchat.core.launcher import detectar_terminal, TERMINALES
+    
+    print(f"\nBusqueda de Terminales soportadas:")
     for t_name, _ in TERMINALES:
-        if shutil.which(t_name):
-            print(f" - Terminal '{t_name}': {C.GREEN}INSTALADA{C.RESET}")
-            if not found_term: found_term = t_name
-        else:
-            print(f" - Terminal '{t_name}': {C.RED}NO ENCONTRADA{C.RESET}")
+        res = f"{C.GREEN}INSTALADA{C.RESET}" if shutil.which(t_name) else f"{C.RED}NO ENCONTRADA{C.RESET}"
+        print(f" - {t_name}: {res}")
+
+    found_term, found_flag = detectar_terminal()
 
     if found_term:
-        print(f" -> Se usará: {C.BOLD}{found_term}{C.RESET}")
+        print(f" -> Se usará: {C.BOLD}{found_term}{C.RESET} (Flag: {found_flag})")
         # Test Live
         input_chk = input(f"\n¿Deseas probar lanzar una ventana real con {found_term}? (s/n): ")
         if input_chk.lower() == 's':
             try:
-                cmd = [found_term, '--', 'sh', '-c', 'echo "TEST GWC EXITOSO"; sleep 5']
-                if 'gnome' in found_term: cmd = [found_term, '--', 'sh', '-c', 'echo "TEST GWC"; sleep 5']
-                # Ajuste rapido para test
+                cmd_inner = 'echo "GWC TEST EXITOSO"; echo "Cerrando en 5 segundos..."; sleep 5'
+                
+                cmd = [found_term]
+                
+                # Logic mirroring launcher.py
+                if found_flag == "--":
+                    # Gnome/Mate/XFCE
+                    cmd.extend([found_flag, "sh", "-c", cmd_inner])
+                elif found_flag == "-e" or found_flag == "-x":
+                    # Wrapper for QTerminal/Konsole/etc
+                    cmd.append(found_flag)
+                    cmd.append(f"sh -c '{cmd_inner}'")
+                
+                print(f"   [DEBUG] Ejecutando: {cmd}")
                 subprocess.Popen(cmd)
-                print(f"   {C.GREEN}[INFO] Ventana lanzada. Debería cerrarse en 5 seg.{C.RESET}")
+                print(f"   {C.GREEN}[INFO] Ventana lanzada. Si no se cierra en 5s, el comando falló.{C.RESET}")
             except Exception as e:
                 print(f"   {C.RED}[ERROR] Falló lanzamiento: {e}{C.RESET}")
+    else:
+        print(f" -> {C.RED}ERROR: No se encontró ninguna terminal soportada.{C.RESET}")
+        print(f"    Instala: gnome-terminal, qterminal, konsole, kitty o xterm.")
 
 def ejecutar_diagnostico_completo():
     print(f"{C.BOLD}=== REPORTE DE INTEGRIDAD ({APP_VERSION}) ==={C.RESET}")
