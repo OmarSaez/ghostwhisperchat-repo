@@ -76,6 +76,14 @@ class Motor:
             print("[X] Fallo en red. Abortando.", file=sys.stderr)
             return
 
+        # Set Dynamic Ports in Memory (Identity)
+        self.memoria.set_identidad(
+            None, None, local_ip, 
+            port_priv=self.red.real_port_priv, 
+            port_group=self.red.real_port_group
+        )
+        print(f"[*] Puertos Dinamicos: Priv={self.red.real_port_priv}, Group={self.red.real_port_group}", file=sys.stderr)
+
         self.iniciar_ipc()
         self.running = True
         
@@ -501,16 +509,21 @@ class Motor:
                              g = self.memoria.grupos_activos[chat_id]
                              for uid, m in g['miembros'].items():
                                  if uid == self.memoria.mi_uid: continue
-                                 if m.get('ip'): targets.append(m['ip'])
+                                 if m.get('ip'):
+                                     # Send to their Private Port (Transient)
+                                     port = m.get('port_priv', 44494)
+                                     targets.append((m['ip'], port))
                         else:
                              peer = self.memoria.buscar_peer(chat_id)
-                             target_ip = peer['ip'] if peer else None
-                             if not target_ip and chat_id in self.memoria.contactos:
-                                 target_ip = self.memoria.contactos[chat_id]['ip']
-                             if target_ip: targets.append(target_ip)
+                             if peer:
+                                 targets.append((peer['ip'], peer.get('port_priv', 44494)))
+                             else:
+                                 if chat_id in self.memoria.contactos:
+                                     c = self.memoria.contactos[chat_id]
+                                     targets.append((c['ip'], c.get('port_priv', 44494)))
                         
-                        for ip in targets:
-                            try: self.red.enviar_tcp_priv(ip, pkg)
+                        for ip, port in targets:
+                            try: self.red.enviar_tcp_priv(ip, pkg, port=port)
                             except: pass
                         
                         # Progress Update
@@ -597,23 +610,29 @@ class Motor:
                          # Transient connection for message
                          s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                          s.settimeout(1.0) # Fast timeout
-                         s.connect((ip, PORT_GROUP))
+                         # Dynamic Group Port
+                         port_g = m.get('port_group', PORT_GROUP)
+                         s.connect((ip, port_g))
                          s.sendall(pkg + b'\n')
                          s.close()
                      except: pass 
              else:
                  target_ip = None
+                 target_port = 44494
+                 
                  peer = self.memoria.buscar_peer(chat_id)
                  if peer:
                      target_ip = peer['ip']
+                     target_port = peer.get('port_priv', 44494)
                  else:
                      # Fallback: Check persistent contacts (Offline/Sleeping Peer)
                      if chat_id in self.memoria.contactos:
                          target_ip = self.memoria.contactos[chat_id]['ip']
+                         target_port = self.memoria.contactos[chat_id].get('port_priv', 44494)
                  
                  if target_ip:
                      pkg = empaquetar("MSG", {"text": msg_content}, self.memoria.get_origen())
-                     try: self.red.enviar_tcp_priv(target_ip, pkg)
+                     try: self.red.enviar_tcp_priv(target_ip, pkg, port=target_port)
                      except: pass
 
     def _shutdown_all_sessions(self):

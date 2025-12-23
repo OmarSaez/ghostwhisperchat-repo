@@ -22,33 +22,60 @@ class GestorRed:
         self.inputs = []           # Lista para select()
 
     def iniciar_servidores(self):
-        """Levanta los 3 sockets principales en modo escucha"""
+        """Levanta los 3 sockets principales en modo escucha, buscando puertos libres."""
         try:
-            # 1. UDP Discovery
+            # 1. UDP Discovery (Fixed Port 44495)
             self.sock_udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             self.sock_udp.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
             self.sock_udp.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            try:
+                # Allow multiple instances to share UDP port for listening
+                if hasattr(socket, "SO_REUSEPORT"):
+                    self.sock_udp.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+            except: pass
+            
             self.sock_udp.bind(('0.0.0.0', PORT_DISCOVERY))
             self.sock_udp.setblocking(False)
             
-            # 2. TCP Groups
-            self.sock_tcp_group = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.sock_tcp_group.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            self.sock_tcp_group.bind(('0.0.0.0', PORT_GROUP))
-            self.sock_tcp_group.listen(10)
-            self.sock_tcp_group.setblocking(False)
+            # Helper to find free port
+            def bind_socket_range(base_port, max_attempts=10):
+                for i in range(max_attempts):
+                    port = base_port + i
+                    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                    try:
+                        sock.bind(('0.0.0.0', port))
+                        sock.listen(10)
+                        sock.setblocking(False)
+                        return sock, port
+                    except OSError as e:
+                        sock.close()
+                        if e.errno == errno.EADDRINUSE: continue
+                        raise e
+                raise OSError(f"No free ports available starting from {base_port}")
+
+            # 2. TCP Groups (Searching 44496+)
+            self.sock_tcp_group, self.real_port_group = bind_socket_range(PORT_GROUP)
             
-            # 3. TCP Private
-            self.sock_tcp_priv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.sock_tcp_priv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            self.sock_tcp_priv.bind(('0.0.0.0', PORT_PRIVATE))
-            self.sock_tcp_priv.listen(5)
-            self.sock_tcp_priv.setblocking(False)
+            # 3. TCP Private (Searching 44494 - wait, if we increment they might overlap with 44495/6?)
+            # PORT_PRIVATE=44494, PORT_DISCOVERY=44495, PORT_GROUP=44496
+            # If Maria takes 44494, Jose wants 44494->Busy.
+            # If Jose takes 44495 (TCP), it is fine (UDP is distinct).
+            # But just to be clean, let's step by a larger offset or just sequential.
+            # Actually, let's check port map.
+            # 44494 (Priv), 44495 (UDP), 44496 (Group).
+            # If Maria has all 3.
+            # Jose wants 44494 -> Busy. 44495 (TCP) -> Free? Yes.
+            # So Jose takes 44495 TCP for Private.
+            # Jose wants 44496 -> Busy. 44497 (TCP) -> Free.
+            # It works. TCP and UDP namespaces are separate.
+            
+            self.sock_tcp_priv, self.real_port_priv = bind_socket_range(PORT_PRIVATE)
             
             # Preparar inputs para select
             self.inputs = [self.sock_udp, self.sock_tcp_group, self.sock_tcp_priv]
             
-            print(f"[*] Transportes iniciados: UDP:{PORT_DISCOVERY}, TCP:{PORT_GROUP}, TCP:{PORT_PRIVATE}")
+            print(f"[*] Transportes iniciados: UDP:{PORT_DISCOVERY}, TCP_G:{self.real_port_group}, TCP_P:{self.real_port_priv}")
             return True
             
         except OSError as e:
@@ -155,26 +182,26 @@ class GestorRed:
         except OSError:
             return None, None
 
-    def enviar_tcp_priv(self, ip, data_bytes):
+    def enviar_tcp_priv(self, ip, data_bytes, port=PORT_PRIVATE):
         """
-        Envía un mensaje TCP transitorio al puerto Privado (44494).
+        Envía un mensaje TCP transitorio al puerto Privado (Dynamic).
         Patrón: Connect -> Send -> Close. Ideal para Handshakes (REQ/ACK/NO)
         """
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.settimeout(15.0) # More time for large files
-            s.connect((ip, PORT_PRIVATE))
+            s.connect((ip, port))
             
             if len(data_bytes) > 2000:
-                print(f"[OUT_TCP_PRIV] -> {ip}: (Large Payload) {len(data_bytes)} bytes", file=sys.stderr)
+                print(f"[OUT_TCP_PRIV] -> {ip}:{port}: (Large Payload) {len(data_bytes)} bytes", file=sys.stderr)
             else:
-                print(f"[OUT_TCP_PRIV] -> {ip}: {data_bytes.strip()}", file=sys.stderr)
+                print(f"[OUT_TCP_PRIV] -> {ip}:{port}: {data_bytes.strip()}", file=sys.stderr)
             
             s.sendall(data_bytes + b'\n')
             s.close()
             return True
         except Exception as e:
-            print(f"[X] Error TCP Priv Transient a {ip}: {e}", file=sys.stderr)
+            print(f"[X] Error TCP Priv Transient a {ip}:{port}: {e}", file=sys.stderr)
             return False
 
     def registrar_socket_tcp(self, sock, label=None):

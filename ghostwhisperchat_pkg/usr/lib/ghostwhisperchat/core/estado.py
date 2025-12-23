@@ -194,34 +194,43 @@ class MemoriaGlobal:
         suggestions.sort(key=lambda x: x['ratio'], reverse=True)
         return suggestions
 
-    def set_identidad(self, uid, nick, ip):
-        # Este metodo se suele llamar al inicio desde motor para setear IP
+    def set_identidad(self, uid, nick, ip, port_priv=None, port_group=None):
+        # Este metodo se suele llamar al inicio desde motor para setear IP y Puertos
         # UID y Nick ya deberian estar cargados, pero por si acaso
         if uid: self.mi_uid = uid
         if nick: self.mi_nick = nick
         self.mi_ip = ip
+        if port_priv: self.mi_port_priv = port_priv
+        if port_group: self.mi_port_group = port_group
 
-    def actualizar_peer(self, ip, uid, nick, status="ONLINE"):
+    def actualizar_peer(self, ip, uid, nick, status="ONLINE", port_priv=None, port_group=None):
         with self._lock:
-            self.peers[ip] = {
+            # Key is UID to allow multiple users per IP (Different Ports)
+            if uid not in self.peers:
+                self.peers[uid] = {}
+            
+            self.peers[uid].update({
                 "uid": uid,
                 "nick": nick,
+                "ip": ip,
                 "status": status,
                 "last_seen": time.time()
-            }
+            })
+            if port_priv: self.peers[uid]['port_priv'] = port_priv
+            if port_group: self.peers[uid]['port_group'] = port_group
 
-    def obtener_peer(self, ip):
-        return self.peers.get(ip)
+    def obtener_peer(self, uid):
+        return self.peers.get(uid)
 
     def limpiar_peers_antiguos(self, timeout_segundos=86400):
         """Elimina peers que no han dado señales de vida"""
         ahora = time.time()
         with self._lock:
-            # Crear lista a eliminar para no modificar dict mientras iteramos
-            borrar = [ip for ip, data in self.peers.items() 
-                      if (ahora - data['last_seen']) > timeout_segundos]
-            for ip in borrar:
-                del self.peers[ip]
+            # Iterate UIDs
+            borrar = [uid for uid, data in self.peers.items() 
+                      if (ahora - data.get('last_seen', 0)) > timeout_segundos]
+            for uid in borrar:
+                del self.peers[uid]
 
     def agregar_grupo_activo(self, gid, nombre, clave_hash=None):
         """Registra un grupo en la memoria local"""
@@ -235,7 +244,8 @@ class MemoriaGlobal:
                             "uid": self.mi_uid,
                             "nick": self.mi_nick,
                             "ip": self.mi_ip,
-                            "status": "ONLINE"
+                            "status": "ONLINE",
+                            "port_priv": getattr(self, 'mi_port_priv', 44494)
                         }
                     },
                     "mensajes": [],
@@ -247,25 +257,27 @@ class MemoriaGlobal:
         query = query.lower()
         candidates = []
         with self._lock:
-            for ip, p in self.peers.items():
-                if p['nick'].lower() == query or p['uid'] == query:
-                    cand = p.copy()
-                    cand['ip'] = ip
-                    candidates.append(cand)
+            for uid, p in self.peers.items():
+                if p['nick'].lower() == query or uid == query:
+                    candidates.append(p)
         
         if not candidates:
             return None
         
-        # Sort by last_seen descending (Newest first)
+        # Sort by last_seen descending
         candidates.sort(key=lambda x: x.get('last_seen', 0), reverse=True)
         return candidates[0]
+        
     def get_origen(self):
         """Devuelve el dict estándar 'origen' para paquetes"""
         return {
-            "uid": self.mi_uid,
             "nick": self.mi_nick,
-            "ip": self.mi_ip # Asumimos que motor lo setea correctament
+            "uid": self.mi_uid,
+            "ip": self.mi_ip,
+            "port_priv": getattr(self, 'mi_port_priv', 44494),
+            "port_group": getattr(self, 'mi_port_group', 44496)
         }
 
     # Alias para compatibilidad
     limpiar_peers_inactivos = limpiar_peers_antiguos
+```
