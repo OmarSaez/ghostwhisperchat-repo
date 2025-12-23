@@ -27,8 +27,8 @@ class Colores:
     BG_RED = "\033[41m"
 
 # Versionado
-APP_VER_NUM = "2.30"
-APP_VER_TAG = "Multi terminal! 2.5"
+APP_VER_NUM = "2.31"
+APP_VER_TAG = "Nuevas verificaciones!"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 BANNER = r"""
