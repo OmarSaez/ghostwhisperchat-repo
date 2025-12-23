@@ -280,4 +280,3 @@ class MemoriaGlobal:
 
     # Alias para compatibilidad
     limpiar_peers_inactivos = limpiar_peers_antiguos
-```
