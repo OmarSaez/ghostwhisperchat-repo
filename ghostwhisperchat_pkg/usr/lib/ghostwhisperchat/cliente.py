@@ -69,7 +69,7 @@ class GestorInput:
                              self.history_index = len(self.history)
                              self._enviar_mensaje(linea)
                              
-                    elif ch == '\x7f': # Backspace
+                    elif ch == '\x7f' or ch == '\x08': # Backspace
                         if self.buffer:
                             self.buffer.pop()
                             sys.stdout.write("\b \b")
