@@ -162,10 +162,13 @@ class GestorRed:
         """
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.settimeout(3.0)
+            s.settimeout(15.0) # More time for large files
             s.connect((ip, PORT_PRIVATE))
             
-            print(f"[OUT_TCP_PRIV] -> {ip}: {data_bytes.strip()}", file=sys.stderr)
+            if len(data_bytes) > 2000:
+                print(f"[OUT_TCP_PRIV] -> {ip}: (Large Payload) {len(data_bytes)} bytes", file=sys.stderr)
+            else:
+                print(f"[OUT_TCP_PRIV] -> {ip}: {data_bytes.strip()}", file=sys.stderr)
             
             s.sendall(data_bytes + b'\n')
             s.close()

@@ -213,7 +213,7 @@ class MemoriaGlobal:
     def obtener_peer(self, ip):
         return self.peers.get(ip)
 
-    def limpiar_peers_antiguos(self, timeout_segundos=300):
+    def limpiar_peers_antiguos(self, timeout_segundos=86400):
         """Elimina peers que no han dado señales de vida"""
         ahora = time.time()
         with self._lock:
@@ -243,16 +243,22 @@ class MemoriaGlobal:
                 }
 
     def buscar_peer(self, query):
-        """Busca un peer por Nick (comienzo) o UID exacto"""
+        """Busca un peer por Nick (comienzo) o UID exacto. Retorna el mas reciente."""
         query = query.lower()
+        candidates = []
         with self._lock:
             for ip, p in self.peers.items():
                 if p['nick'].lower() == query or p['uid'] == query:
-                    # Devolvemos una copia enriquecida con IP
-                    ret = p.copy()
-                    ret['ip'] = ip
-                    return ret
-        return None
+                    cand = p.copy()
+                    cand['ip'] = ip
+                    candidates.append(cand)
+        
+        if not candidates:
+            return None
+        
+        # Sort by last_seen descending (Newest first)
+        candidates.sort(key=lambda x: x.get('last_seen', 0), reverse=True)
+        return candidates[0]
     def get_origen(self):
         """Devuelve el dict estándar 'origen' para paquetes"""
         return {

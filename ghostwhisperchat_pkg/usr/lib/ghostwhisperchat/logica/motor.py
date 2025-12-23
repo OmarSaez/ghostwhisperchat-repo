@@ -24,6 +24,9 @@ class Motor:
         self.red = GestorRed()
         self.ipc_sock = None
         
+        # Buffer de TCP para evitar fragmentacion (10MB packets)
+        self.tcp_buffers = {}
+        
         # Actividad para notificaciones inteligentes (3 min cooldown)
         self.last_activity = {} # chat_id -> timestamp
         self.running = False
@@ -124,12 +127,24 @@ class Motor:
 
                     else: 
                         try:
-                            data = s.recv(8192)
+                            data = s.recv(65536)
                             if data:
-                                parts = data.split(b'\n')
-                                for p in parts:
-                                    if p: self.manejar_paquete_tcp(p, s)
-                        except: self.red.cerrar_tcp(s)
+                                if s not in self.tcp_buffers: self.tcp_buffers[s] = b""
+                                self.tcp_buffers[s] += data
+                                
+                                while b'\n' in self.tcp_buffers[s]:
+                                    line, self.tcp_buffers[s] = self.tcp_buffers[s].split(b'\n', 1)
+                                    if line: self.manejar_paquete_tcp(line, s)
+                            else:
+                                # Connection Closed
+                                if s in self.tcp_buffers:
+                                    if self.tcp_buffers[s].strip():
+                                        self.manejar_paquete_tcp(self.tcp_buffers[s], s)
+                                    del self.tcp_buffers[s]
+                                self.red.cerrar_tcp(s)
+                        except: 
+                            if s in self.tcp_buffers: del self.tcp_buffers[s]
+                            self.red.cerrar_tcp(s)
 
                 self.tareas_mantenimiento()
 

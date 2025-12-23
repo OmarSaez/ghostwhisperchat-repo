@@ -27,8 +27,8 @@ class Colores:
     BG_RED = "\033[41m"
 
 # Versionado
-APP_VER_NUM = "2.85"
-APP_VER_TAG = "Soporte Archivos Largos (2GB)"
+APP_VER_NUM = "2.86"
+APP_VER_TAG = "Fix recibir archivos y conexiones olvidadas"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 BANNER = r"""
