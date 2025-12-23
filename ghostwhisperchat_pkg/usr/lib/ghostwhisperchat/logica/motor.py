@@ -840,6 +840,10 @@ class Motor:
                      if gid in self.ui_sessions:
                          # GREEN INDICATOR [+]
                          self.ui_sessions[gid].sendall(f"\n[SISTEMA] [+] {new_user['nick']} se unió al grupo.\n".encode('utf-8'))
+                     
+                     # Notificacion de Escritorio
+                     from ghostwhisperchat.core.utilidades import enviar_notificacion
+                     enviar_notificacion(f"Grupo {g['nombre']}", f"{new_user['nick']} se unió al grupo.")
 
         elif tipo == "LEAVE":
              gid = payload.get("gid")
@@ -852,6 +856,10 @@ class Motor:
                      if gid in self.ui_sessions:
                          # YELLOW INDICATOR [-]
                          self.ui_sessions[gid].sendall(f"\n[SISTEMA] [-] {origen['nick']} abandonó el grupo.\n".encode('utf-8'))
+                     
+                     # Notificacion de Escritorio
+                     from ghostwhisperchat.core.utilidades import enviar_notificacion
+                     enviar_notificacion(f"Grupo {g['nombre']}", f"{origen['nick']} abandonó el grupo.")
 
         elif tipo == "INVITE":
             gid = payload.get("gid")
@@ -929,6 +937,11 @@ class Motor:
                  s = self.ui_sessions[uid]
                  # YELLOW INDICATOR [-]
                  s.sendall(f"\n[SISTEMA] [-] {origen['nick']} cerró la sesión.\n".encode('utf-8'))
+                 
+                 # Notificacion de Escritorio
+                 from ghostwhisperchat.core.utilidades import enviar_notificacion
+                 enviar_notificacion("GhostWhisperChat", f"{origen['nick']} dejó el chat privado.")
+
                  # Instruct client to close after delay
                  s.sendall(b"__CLOSE_UI__")
                  # We keep our UI open so user can see history or exit manually.
