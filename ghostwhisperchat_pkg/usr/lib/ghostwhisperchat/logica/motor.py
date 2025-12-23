@@ -202,6 +202,13 @@ class Motor:
                 display_val = parts[1].split()[0] # Take until next space if any (though usually at end)
                 env_injection['DISPLAY'] = display_val.strip()
                 
+                # GLOBAL FIX: Update Daemon's environment so Zenity and future Popen calls work
+                # This persists the "last known good display" for async events (Invites, etc.)
+                if display_val.strip():
+                    os.environ['DISPLAY'] = display_val.strip()
+                    # Also try XAUTHORITY? Usually display is enough if cookie is standard.
+                    print(f"[*] Entorno Grafico Actualizado: DISPLAY={os.environ['DISPLAY']}", file=sys.stderr)
+                
         cmd, args = parsear_comando(comando_str)
         print(f"[CMD_DEBUG] Ejecutando: '{cmd}' Args: {args} Env: {env_injection}", file=sys.stderr)
         
