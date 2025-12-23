@@ -234,7 +234,7 @@ def modo_ui_chat(target_id, es_grupo):
                 if "__MENTION__" in msg_in:
                     msg_in = msg_in.replace("__MENTION__ ", "")
                     # Yellow Background, Black Text for high contrast
-                    msg_in = f"{C.BG_YELLOW}{C.BLACK}{msg_in}{C.RESET}"
+                    msg_in = f"{C.BG_YELLOW}{C.BLACK_TXT}{msg_in}{C.RESET}"
                     
                 # Use Helper to print safely
                 helper.print_incoming(msg_in)

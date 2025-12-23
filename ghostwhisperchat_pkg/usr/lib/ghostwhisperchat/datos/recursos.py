@@ -12,23 +12,61 @@ class Colores:
     BLACK = "\033[30m"
     
     # Sistema
-    RED = "\033[91m"      # Errores [X]
-    GREEN = "\033[92m"    # Éxitos [+]
-    YELLOW = "\033[93m"   # Alerta [-] / Menciones
-    BLUE = "\033[94m"     # Info temporal [*] / Barras
-    MAGENTA = "\033[95m"
-    CYAN = "\033[96m"
+    # --- SUPER PALETA 20 (v2.113) ---
+    # Diseñada para máximo contraste en fondo negro
     
-    # Lista para asignar colores a Nicks
-    NICK_COLORS = [GREEN, YELLOW, BLUE, MAGENTA, CYAN, RED]
+    # 1. Verdes
+    C_GREEN_NEON  = "\033[38;5;46m"
+    C_GREEN_LIME  = "\033[38;5;118m"
+    C_OLIVE       = "\033[38;5;100m"
+    
+    # 2. Azules/Cyans
+    C_BLUE_ROYAL  = "\033[38;5;33m" # Ajustado a 33 para legibilidad
+    C_BLUE_ICE    = "\033[38;5;81m"
+    C_CYAN_ELEC   = "\033[38;5;51m"
+    C_TEAL_DARK   = "\033[38;5;30m"
+    
+    # 3. Rojos/Naranjas
+    C_RED_FIRE    = "\033[38;5;196m"
+    C_CORAL       = "\033[38;5;209m"
+    C_ORANGE      = "\033[38;5;214m"
+    
+    # 4. Amarillos/Tierras
+    C_GOLD        = "\033[38;5;220m"
+    C_CREAM       = "\033[38;5;229m"
+    C_BROWN       = "\033[38;5;130m" # Un poco mas rojizo para no ser invisible
+    C_BEIGE       = "\033[38;5;137m"
+    
+    # 5. Rosas/Violetas
+    C_PINK_HOT    = "\033[38;5;199m"
+    C_PINK_PASTEL = "\033[38;5;218m"
+    C_MAGENTA     = "\033[38;5;201m"
+    C_PURPLE      = "\033[38;5;93m"
+    C_LAVENDER    = "\033[38;5;147m"
+    
+    # 6. Neutro
+    C_SILVER      = "\033[38;5;250m"
+
+    NICK_COLORS = [
+        C_GREEN_NEON, C_GREEN_LIME, C_OLIVE,
+        C_BLUE_ROYAL, C_BLUE_ICE, C_CYAN_ELEC, C_TEAL_DARK,
+        C_RED_FIRE, C_CORAL, C_ORANGE,
+        C_GOLD, C_CREAM, C_BROWN, C_BEIGE,
+        C_PINK_HOT, C_PINK_PASTEL, C_MAGENTA, C_PURPLE, C_LAVENDER,
+        C_SILVER
+    ]
     
     # Fondos (para resaltar menciones)
-    BG_YELLOW = "\033[43m"
-    BG_RED = "\033[41m"
+    # Style: GOLD PREMIUM (v2.113)
+    BG_YELLOW = "\033[48;5;220m" # Gold
+    BG_RED    = "\033[41m"       # Error standard
+    
+    # Texto High Contrast para fondos claros
+    BLACK_TXT = "\033[38;5;0m"
 
 # Versionado
 APP_VER_NUM = "2.112"
-APP_VER_TAG = "Llego el @todos"
+APP_VER_TAG = "Llego el @todos y mas colores de nombres!!"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 BANNER = r"""
