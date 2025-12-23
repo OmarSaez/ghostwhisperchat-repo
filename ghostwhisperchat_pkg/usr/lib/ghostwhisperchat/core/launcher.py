@@ -77,11 +77,14 @@ def abrir_chat_ui(id_destino, nombre_legible=None, es_grupo=False):
                 args_term.append(flag)
                 args_term.extend(inner_args)
             elif flag == "-e" or flag == "-x":
-                # Konsole, QTerminal, Xterm, Kitty often prefer single string for -e
-                # Also wrapping in sh to ensure path resolution
+                # Konsole, QTerminal, Xterm, Kitty need a shell to parse the command string
+                # We wrap it in sh -c to be safe and universal
                 args_term.append(flag)
-                # Pass whole command as one string
-                args_term.append(cmd_inner_str)
+                
+                # IMPORTANT: We use sh -c to execute the python string
+                # This handles spaces in arguments correctly interpreted by the shell
+                wrapped_cmd = f"sh -c '{cmd_inner_str}'"
+                args_term.append(wrapped_cmd)
             else:
                 # Fallback
                 args_term.append(flag)
