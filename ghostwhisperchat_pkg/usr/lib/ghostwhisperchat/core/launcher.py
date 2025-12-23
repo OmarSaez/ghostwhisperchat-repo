@@ -19,6 +19,10 @@ TERMINALES = [
     ("mate-terminal", "--"),
     ("xfce4-terminal", "--execute"), 
     ("konsole", "-e"),
+    ("qterminal", "-e"),
+    ("lxterminal", "-e"),
+    ("kitty", "-e"), # Modern / GPU
+    ("alacritty", "-e"), # Modern / Rust
     ("tilix", "-e"),
     ("terminator", "-x"),
     ("xterm", "-e"),
