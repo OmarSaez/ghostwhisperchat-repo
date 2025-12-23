@@ -85,8 +85,9 @@ def abrir_chat_ui(id_destino, nombre_legible=None, es_grupo=False, env_vars=None
                 args_term.append(flag)
                 
                 # IMPORTANT: We use sh -c to execute the python string
-                # This handles spaces in arguments correctly interpreted by the shell
-                wrapped_cmd = f"sh -c '{cmd_inner_str}'"
+                # INJECT TITLE: printf "\033]0;TITLE\007" sets window title in xterm-compatible terms
+                safe_title = full_title.replace("'", "").replace('"', '') # Sanitation
+                wrapped_cmd = f"sh -c 'printf \"\\033]0;{safe_title}\\007\"; {cmd_inner_str}'"
                 args_term.append(wrapped_cmd)
             else:
                 # Fallback

@@ -974,8 +974,7 @@ class Motor:
              # Red Console Error
              print(f"{Colores.RED}[X] Error al unirse a '{gname}': {reason}{Colores.RESET}", file=sys.stderr)
              
-             # Notificacion visual
-             from ghostwhisperchat.core.utilidades import enviar_notificacion
+                     # Notificacion visual
              enviar_notificacion(f"Error: {gname}", f"No se pudo unir: {reason}")
              
         elif tipo == "SYNC_REQ":
@@ -1017,7 +1016,7 @@ class Motor:
                          s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                          s.settimeout(2.0)
                          s.connect((target_ip, PORT_GROUP))
-                         s.setblocking(False)
+                         # s.setblocking(False) # Blocking for announce is safer
                          
                          self.red.enviar_tcp(s, ann_pkg)
                          self.red.registrar_socket_tcp(s, f"GRP_PEER_{gid}_{uid}")
@@ -1042,7 +1041,6 @@ class Motor:
                          self.ui_sessions[gid].sendall(f"\n[SISTEMA] [+] {new_user['nick']} se unió al grupo.\n".encode('utf-8'))
                      
                      # Notificacion de Escritorio
-                     from ghostwhisperchat.core.utilidades import enviar_notificacion
                      enviar_notificacion(f"Grupo {g['nombre']}", f"{new_user['nick']} se unió al grupo.")
 
         elif tipo == "LEAVE":
@@ -1099,7 +1097,6 @@ class Motor:
                      print(f"[FILE] Completado: {final_path}", file=sys.stderr)
                      
                      # Notify User
-                     from ghostwhisperchat.core.utilidades import enviar_notificacion
                      enviar_notificacion("Archivo Recibido", f"De {origen['nick']}: {os.path.basename(final_path)}")
                      
                      # Console Notification
