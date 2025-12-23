@@ -193,11 +193,13 @@ class Motor:
         elif cmd == "JOIN":
              if not args: return "[X] Uso: --unirse <Nombre>"
              nombre = args[0]
+             password = args[1] if len(args) > 1 else None
              gid = grupos.generar_id_grupo(nombre)
              
              # Set trigger for auto-join in FOUND handler (Normalize for reliable check)
              from ghostwhisperchat.core.utilidades import normalize_text
              self.pending_join_name = normalize_text(nombre)
+             self.pending_join_pwd = password
              
              if gid in self.memoria.grupos_activos:
                  abrir_chat_ui(gid, nombre_legible=nombre, es_grupo=True)
@@ -703,10 +705,18 @@ class Motor:
                 
                 if self.pending_join_name and self.pending_join_name == norm_target:
                     print(f"[MESH] Auto-Joining found group: {name}...", file=sys.stderr)
+                    
+                    # Prepare Password
+                    pwd_to_send = None
+                    if hasattr(self, 'pending_join_pwd') and self.pending_join_pwd:
+                        from ghostwhisperchat.logica import grupos
+                        pwd_to_send = grupos.hash_password(self.pending_join_pwd)
+                    
                     self.pending_join_name = None # Clear trigger
+                    self.pending_join_pwd = None
                     
                     if gid not in self.memoria.grupos_activos:
-                        req_pkg = empaquetar("JOIN_REQ", {"gid": gid, "password_hash": None}, self.memoria.get_origen())
+                        req_pkg = empaquetar("JOIN_REQ", {"gid": gid, "password_hash": pwd_to_send}, self.memoria.get_origen())
                         try:
                             from ghostwhisperchat.core.transporte import PORT_GROUP
                             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -740,6 +750,20 @@ class Motor:
             gid = payload.get("gid")
             if gid in self.memoria.grupos_activos:
                 g = self.memoria.grupos_activos[gid]
+                
+                # --- PORTERO SEGURIDAD (Clausula de Guardia) ---
+                # Si el grupo NO es publico, verificamos password
+                if not g['es_publico']:
+                    pwd_incoming = payload.get("password_hash")
+                    pwd_actual = g.get('clave_hash')
+                    
+                    if pwd_incoming != pwd_actual:
+                        print(f"[SECURITY] Rechazando acceso a {origen.get('nick')} (Clave invalida)", file=sys.stderr)
+                        # Enviar Rechazo Explicit
+                        rej = empaquetar("JOIN_REJ", {"gid": gid, "reason": "Password Incorrecto", "name": g['nombre']}, self.memoria.get_origen())
+                        self.red.enviar_tcp(sock, rej)
+                        return # ALTO: No procesar ingreso
+                # -----------------------------------------------
 
                 # 1. Add to our own list (Ambassador)
                 if 'miembros' not in g: g['miembros'] = {}
@@ -784,6 +808,18 @@ class Motor:
              except Exception as e:
                  print(f"[X] Error lanzando UI: {e}", file=sys.stderr)
 
+        elif tipo == "JOIN_REJ":
+             reason = payload.get("reason", "Acceso Denegado")
+             gname = payload.get("name", "Desconocido")
+             
+             from ghostwhisperchat.datos.recursos import Colores
+             # Red Console Error
+             print(f"{Colores.RED}[X] Error al unirse a '{gname}': {reason}{Colores.RESET}", file=sys.stderr)
+             
+             # Notificacion visual
+             from ghostwhisperchat.core.utilidades import enviar_notificacion
+             enviar_notificacion(f"Error: {gname}", f"No se pudo unir: {reason}")
+             
         elif tipo == "SYNC_REQ":
              gid = payload.get("gid")
              if gid in self.memoria.grupos_activos:
