@@ -71,10 +71,21 @@ def abrir_chat_ui(id_destino, nombre_legible=None, es_grupo=False):
                  args_term.extend(["--title", full_title])
             
             # Flag de ejecución ("--" o "-e" o "-x")
-            args_term.append(flag)
             
-            # Añadimos los argumentos del comando interno
-            args_term.extend(inner_args)
+            if flag == "--":
+                # Gnome/Mate/XFCE support separate arguments after --
+                args_term.append(flag)
+                args_term.extend(inner_args)
+            elif flag == "-e" or flag == "-x":
+                # Konsole, QTerminal, Xterm, Kitty often prefer single string for -e
+                # Also wrapping in sh to ensure path resolution
+                args_term.append(flag)
+                # Pass whole command as one string
+                args_term.append(cmd_inner_str)
+            else:
+                # Fallback
+                args_term.append(flag)
+                args_term.extend(inner_args)
             
             log_launcher(f"[LAUNCHER] Intentando terminal: {term}")
             log_launcher(f"[LAUNCHER] Exec args: {args_term}")
