@@ -22,12 +22,59 @@ def check_dependencies():
             all_ok = False
     return all_ok
 
+def fetch_daemon_status():
+    """Contacta al daemon para pedir sus puertos reales."""
+    ipc_path = os.path.expanduser("~/.ghostwhisperchat/gwc.sock")
+    if not os.path.exists(ipc_path): return None
+    
+    try:
+        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        s.connect(ipc_path)
+        s.sendall(b"--estatus") # GLOBAL_STATUS
+        s.settimeout(2.0)
+        data = s.recv(4096).decode('utf-8')
+        s.close()
+        return data
+    except:
+        return None
+
+def parse_ports(status_text):
+    """Extrae puertos TCP UDP del texto de estatus."""
+    priv = 44494 # Default
+    group = 44496 # Default
+    pid = "UNK"
+    
+    if not status_text: return priv, group, pid
+    
+    for line in status_text.splitlines():
+        if "Ports:" in line:
+            # Ports: PRIV=XXXX GROUP=XXXX
+            parts = line.split()
+            for p in parts:
+                if "PRIV=" in p: priv = int(p.split("=")[1])
+                elif "GROUP=" in p: group = int(p.split("=")[1])
+        elif "PID:" in line:
+            pid = line.split(":")[1].strip()
+            
+    return priv, group, pid
+
 def check_ports():
     print(f"\n{C.BOLD}:: Estado de Puertos (Daemon Health) ::{C.RESET}")
+    
+    # Intento de obtener puertos reales
+    status = fetch_daemon_status()
+    port_priv, port_group, pid = parse_ports(status)
+    
+    if status:
+        print(f" -> Info del Demonio (PID {pid}): Detectado vivo via IPC.")
+    else:
+        print(f" -> {C.YELLOW}Demonio no responde via IPC. Verificando puertos default (Fallback)...{C.RESET}")
+
+    # Verificar conectividad real
     ports = [
-        (44494, "TCP Privado"),
-        (44495, "UDP Discovery"),
-        (44496, "TCP Mesh (Grupos)")
+        (port_priv, "TCP Privado (Mensajes/Archivos)"),
+        (44495, "UDP Discovery (Fijo)"),
+        (port_group, "TCP Mesh (Grupos)")
     ]
     for p, desc in ports:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -38,7 +85,7 @@ def check_ports():
                 print(f" - Puerto {p} ({desc}): {C.GREEN}EN ESCUCHA (Activo){C.RESET}")
             else:
                 # Si falla, puerto cerrado o filtrado
-                print(f" - Puerto {p} ({desc}): {C.YELLOW}LIBRE / INACTIVO{C.RESET}")
+                print(f" - Puerto {p} ({desc}): {C.YELLOW}LIBRE / INACTIVO (Fallo){C.RESET}")
 
 def check_ipc():
     print(f"\n{C.BOLD}:: Subsistema IPC (Socket Demonio) ::{C.RESET}")

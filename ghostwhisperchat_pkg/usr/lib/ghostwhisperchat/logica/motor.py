@@ -355,6 +355,12 @@ class Motor:
              res += f"IP: {m.mi_ip}\n"
              res += f"Version: {m.version}\n"
              res += f"Peers: {len(m.peers)}\n"
+             
+             # Ports Info (Dynamic)
+             ident = m.get_origen()
+             res += f"Ports: PRIV={ident.get('port_priv')} GROUP={ident.get('port_group')}\n"
+             res += f"PID: {os.getpid()}\n"
+             
              return res
 
         elif cmd == "CONTACTS":
