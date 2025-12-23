@@ -23,6 +23,9 @@ class Motor:
         self.memoria = MemoriaGlobal()
         self.red = GestorRed()
         self.ipc_sock = None
+        
+        # Actividad para notificaciones inteligentes (3 min cooldown)
+        self.last_activity = {} # chat_id -> timestamp
         self.running = False
         
         # Mapeo de UI Sockets: { "ID_CHAT": socket_ipc }
@@ -454,6 +457,9 @@ class Motor:
                  return
 
              ui_sock.sendall(f"Tu: {msg_content}\n".encode('utf-8'))
+             
+             # Reset notification counter on send
+             self.last_activity[chat_id] = time.time()
              
              if chat_id in self.memoria.grupos_activos:
                  g = self.memoria.grupos_activos[chat_id]
@@ -951,6 +957,11 @@ class Motor:
              gid = payload.get("gid")
              target_id = gid if gid else origen['uid']
              
+             # Smart Notification Tracker
+             now = time.time()
+             last_act = self.last_activity.get(target_id, 0)
+             self.last_activity[target_id] = now
+             
              if target_id in self.ui_sessions:
                  # Logic for Mention Detection
                  import re
@@ -1019,7 +1030,9 @@ class Motor:
                       # Normal Message: Use Colored Nick
                       self.ui_sessions[target_id].sendall(f"\n({nick_display}): {text}\n".encode('utf-8'))
              else:
-                 enviar_notificacion(f"Mensaje de {origen['nick']}", text)
+                 # Smart Notification (3 min cooldown)
+                 if (now - last_act) > 180:
+                     enviar_notificacion(f"Mensaje de {origen['nick']}", text)
 
     def _hilo_ping(self):
         while self.running:
