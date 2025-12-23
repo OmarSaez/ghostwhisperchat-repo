@@ -27,8 +27,8 @@ class Colores:
     BG_RED = "\033[41m"
 
 # Versionado
-APP_VER_NUM = "2.63"
-APP_VER_TAG = "Menciones Alto Contraste y Mejora en Busqueda de Usuarios"
+APP_VER_NUM = "2.64"
+APP_VER_TAG = "Arreglo de invitacion chat privado"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 BANNER = r"""

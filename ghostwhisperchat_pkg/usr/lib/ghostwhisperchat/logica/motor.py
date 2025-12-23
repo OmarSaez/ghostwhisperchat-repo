@@ -318,21 +318,6 @@ class Motor:
                       res += f"  - {sub}: {', '.join(data['aliases'])}\n"
              return res
              
-        elif cmd == "DM": 
-             if not args: return "[X] Uso: --dm <Usuario>"
-             target = args[0]
-             peer = self.memoria.buscar_peer(target)
-             if not peer:
-                 return f"[X] '{target}' no encontrado (Use --enlinea)."
-             
-             print(f"[WHISPER] Solicitando chat a {peer['nick']}...", file=sys.stderr)
-             pkg = empaquetar("CHAT_REQ", {}, self.memoria.get_origen())
-             try:
-                 self.red.enviar_tcp_priv(peer['ip'], pkg)
-                 return f"[*] Solicitud enviada a {peer['nick']}."
-             except Exception as e:
-                 return f"[X] Fallo: {e}"
-
         elif cmd == "CHANGE_NICK":
             if not args: return "[X] Uso: --nick <Nuevo>"
             old = self.memoria.mi_nick
