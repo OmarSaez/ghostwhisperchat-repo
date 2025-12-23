@@ -1029,6 +1029,10 @@ class Motor:
                  else:
                       # Normal Message: Use Colored Nick
                       self.ui_sessions[target_id].sendall(f"\n({nick_display}): {text}\n".encode('utf-8'))
+                      
+                      # Smart Notification even if UI Open (AFK Check)
+                      if (now - last_act) > 180:
+                          enviar_notificacion(f"Mensaje de {origen['nick']}", text)
              else:
                  # Smart Notification (3 min cooldown)
                  if (now - last_act) > 180:

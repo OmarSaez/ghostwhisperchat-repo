@@ -58,11 +58,13 @@ def abrir_chat_ui(id_destino, nombre_legible=None, es_grupo=False):
             
             args_term = [term]
             
-             # Flags específicos de terminal
-            if term == "gnome-terminal":
-                 # Usamos nombre_legible en el título si existe, sino el ID corto
-                 display_title = nombre_legible if nombre_legible else id_destino[:8]
-                 args_term.extend(["--title", f"Chat GWC: {display_title}"])
+             # Flags específicos de terminal (Titulo Personalizado)
+            display_title = nombre_legible if nombre_legible else id_destino[:8]
+            prefix = "Chat Grupo" if es_grupo else "Chat Priv"
+            full_title = f"{prefix}: {display_title}"
+            
+            if term in ["gnome-terminal", "mate-terminal", "xfce4-terminal"]:
+                 args_term.extend(["--title", full_title])
             
             # Flag de ejecución ("--" o "-e" o "-x")
             args_term.append(flag)
