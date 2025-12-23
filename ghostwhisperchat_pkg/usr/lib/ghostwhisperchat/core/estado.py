@@ -213,7 +213,7 @@ class MemoriaGlobal:
     def obtener_peer(self, ip):
         return self.peers.get(ip)
 
-    def limpiar_peers_antiguos(self, timeout_segundos=60):
+    def limpiar_peers_antiguos(self, timeout_segundos=300):
         """Elimina peers que no han dado señales de vida"""
         ahora = time.time()
         with self._lock:

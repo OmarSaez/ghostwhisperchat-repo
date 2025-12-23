@@ -488,10 +488,18 @@ class Motor:
                          s.close()
                      except: pass 
              else:
+                 target_ip = None
                  peer = self.memoria.buscar_peer(chat_id)
                  if peer:
+                     target_ip = peer['ip']
+                 else:
+                     # Fallback: Check persistent contacts (Offline/Sleeping Peer)
+                     if chat_id in self.memoria.contactos:
+                         target_ip = self.memoria.contactos[chat_id]['ip']
+                 
+                 if target_ip:
                      pkg = empaquetar("MSG", {"text": msg_content}, self.memoria.get_origen())
-                     try: self.red.enviar_tcp_priv(peer['ip'], pkg)
+                     try: self.red.enviar_tcp_priv(target_ip, pkg)
                      except: pass
 
     def _shutdown_all_sessions(self):
