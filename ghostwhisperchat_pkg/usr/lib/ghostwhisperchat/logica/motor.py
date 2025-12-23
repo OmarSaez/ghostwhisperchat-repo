@@ -167,6 +167,7 @@ class Motor:
 
     def ejecutar_comando_transitorio(self, comando_str, context_ui=None):
         cmd, args = parsear_comando(comando_str)
+        print(f"[CMD_DEBUG] Ejecutando: '{cmd}' Args: {args}", file=sys.stderr)
         
         if cmd == "HELP":
             return obtener_ayuda_comando(args[0] if args else None)
@@ -238,7 +239,7 @@ class Motor:
                  found_in_buffer = next((x for x in self.scan_buffer if x.get('nick') == target_nick), None)
                  
                  if found_in_buffer:
-                     target_peer = self.memoria.buscar_peer_por_nick(target_nick)
+                     target_peer = self.memoria.buscar_peer(target_nick)
              
              if not target_peer:
                  # Fuzzy / Offline Search
@@ -360,7 +361,7 @@ class Motor:
                       return f"[X] Excepcion conectando: {e}"
 
              # 2. Cache Check (Exact active peer)
-             peer = self.memoria.buscar_peer_por_nick(target)
+             peer = self.memoria.buscar_peer(target)
              if peer:
                   req = empaquetar("CHAT_REQ", {}, self.memoria.get_origen())
                   try:

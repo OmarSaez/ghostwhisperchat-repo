@@ -22,7 +22,7 @@ class MemoriaGlobal:
     def _inicializar(self):
         # Datos Propios
         self.mi_uid = None       # Hash único persistente
-        self.mi_nick = "Usuario" # Nick actual
+        self.mi_nick = os.getenv("USER", "Usuario") # Nick actual (Default: System User)
         self.mi_ip = None        # IP local
         
         # Configuración Runtime
