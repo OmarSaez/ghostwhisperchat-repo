@@ -1266,37 +1266,59 @@ class Motor:
                  # normalize_text strips spaces, keeps chars.
                  # We assume my_nick "omar" -> text has "@omar" or "@Omar".
                  
-                 is_mention = False
-                 pattern = r"@\b" + re.escape(my_nick) + r"\b"
-                 if re.search(pattern, normalize_text(text), re.IGNORECASE):
-                      is_mention = True
+                 # --- MENTION LOGIC REWORK (v2.112) ---
                  
-                 # If we normalise text completely ("hello @omar here" -> "hello@omarhere"), detection is hard.
-                 # Better to search in raw text, normalizing the comparison target.
-                 if re.search(r"@\b" + re.escape(self.memoria.mi_nick) + r"\b", text, re.IGNORECASE):
-                     is_mention = True
+                 is_personal_mention = False
+                 is_global_mention = False
                  
-                 # Actually, normalize_text(self.memoria.mi_nick) gives the canonical ID.
-                 # Users might type @Omar or @omar.
-                 # Let's assume standard IRC style: Case insensitive match of canonical nick against words.
-                 
-                 if is_mention:
-                      # Cooldown Check
-                      now = time.time()
-                      last_pop = self.mention_cooldowns.get(target_id, 0)
+                 # 1. Check Global (@todos / @everyone)
+                 if re.search(r"@todos\b|@everyone\b", text, re.IGNORECASE):
+                      is_global_mention = True
                       
-                      # Send with Prefix (Plain Nick to avoid breaking BG Highlight with resets)
+                 # 2. Check Personal (@myNick)
+                 # Check raw text against current nick
+                 if re.search(r"@\b" + re.escape(self.memoria.mi_nick) + r"\b", text, re.IGNORECASE):
+                      is_personal_mention = True
+                 
+                 is_highlight = is_personal_mention or is_global_mention
+                 
+                 if is_highlight:
+                      now = time.time()
+                      should_notify = False
+                      
+                      # COOLDOWN TRACKING
+                      
+                      # A. Global Cooldown (60s) - PER CHAT
+                      if is_global_mention:
+                           if not hasattr(self, 'everyone_cooldowns'): self.everyone_cooldowns = {}
+                           last_global = self.everyone_cooldowns.get(target_id, 0)
+                           
+                           if now - last_global > 60:
+                                should_notify = True
+                                self.everyone_cooldowns[target_id] = now
+                                
+                      # B. Personal Cooldown (40s) - Independent trigger
+                      if is_personal_mention:
+                           last_pop = self.mention_cooldowns.get(target_id, 0)
+                           if now - last_pop > 40:
+                                should_notify = True
+                                self.mention_cooldowns[target_id] = now
+                      
+                      # Send with Highlight Prefix
                       prefix = "__MENTION__ "
                       self.ui_sessions[target_id].sendall(f"\n{prefix}({origen['nick']}): {text}\n".encode('utf-8'))
                       
-                      if now - last_pop > 40: # 40 seconds
-                          # POPUP
-                          g_name = "Chat Privado"
-                          if gid and gid in self.memoria.grupos_activos:
-                              g_name = self.memoria.grupos_activos[gid]['nombre']
-                              
-                          enviar_notificacion("Mensaje destacado", f"{origen['nick']} te ha mencionado en {g_name}")
-                          self.mention_cooldowns[target_id] = now
+                      if should_notify:
+                           g_name = "Chat Privado"
+                           if gid and gid in self.memoria.grupos_activos:
+                               g_name = self.memoria.grupos_activos[gid]['nombre']
+                           
+                           msg_body = f"{origen['nick']} te ha mencionado en {g_name}"
+                           if is_global_mention and not is_personal_mention:
+                                msg_body = f"{origen['nick']} notificó a todos en {g_name}"
+                                
+                           enviar_notificacion("Mención Destacada", msg_body)
+                 else:
                  else:
                       # Normal Message: Use Colored Nick
                       self.ui_sessions[target_id].sendall(f"\n({nick_display}): {text}\n".encode('utf-8'))
