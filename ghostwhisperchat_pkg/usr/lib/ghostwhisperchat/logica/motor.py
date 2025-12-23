@@ -183,9 +183,10 @@ class Motor:
             for item in self.scan_buffer:
                  # Check type of item (User or Group)
                  if item.get("type") == "GROUP":
-                      res += f"[SALA] {item['name']} (Ambassador: {item['ip']})\n"
+                      res += f"[SALA] {item['name']} (Enbajador: {item['ip']})\n"
                  else:
-                      res += f"[*] {item.get('nick')} ({item.get('ip')})\n"
+                      suffix = " [Tu]" if item.get('ip') == self.memoria.mi_ip else ""
+                      res += f"[*] {item.get('nick')} ({item.get('ip')}){suffix}\n"
                       
             self.scan_buffer = [] # Clear after reading
             return res
@@ -418,6 +419,104 @@ class Motor:
             pkg = empaquetar("DISCOVER", {"filter": "GROUPS"}, "ALL")
             self.red.enviar_udp_broadcast(pkg)
             return "[*] Buscando grupos públicos..."
+
+        elif cmd == "FILE":
+            if not context_ui: return "[X] Solo en un chat activo."
+            chat_id = context_ui[1]
+            if not args: return "[X] Uso: --archivo <Ruta>"
+            
+            ruta = args[0].strip("'\"") # Remove quotes if shell didn't
+            if not os.path.exists(ruta):
+                return f"[X] Archivo no encontrado: {ruta}"
+            
+            import base64
+            import shutil
+            
+            filename = os.path.basename(ruta)
+            file_data = None
+            
+            # Handle Directory -> Zip
+            temp_zip = None
+            if os.path.isdir(ruta):
+                import tempfile
+                fd, temp_zip = tempfile.mkstemp(suffix=".zip")
+                os.close(fd)
+                # Remove file created by mkstemp to allow make_archive to create it? 
+                # make_archive creates 'base_name.zip'.
+                # Better:
+                base = os.path.join(tempfile.gettempdir(), filename)
+                shutil.make_archive(base, 'zip', ruta)
+                temp_zip = base + ".zip"
+                filename = filename + ".zip"
+                ruta = temp_zip
+            
+            # Size Check (Max 2GB)
+            size = os.path.getsize(ruta)
+            max_size = 2 * 1024 * 1024 * 1024 # 2GB
+            if size > max_size:
+                return f"[X] Archivo muy grande ({size/1024/1024:.1f}MB). Max 2GB."
+                
+            try:
+                import math
+                chunk_size = 10 * 1024 * 1024 # 10MB
+                total_chunks = math.ceil(size / chunk_size)
+                
+                # Get UI Session for progress bars
+                ui_sess = self.ui_sessions.get(chat_id)
+                
+                with open(ruta, 'rb') as f:
+                    for i in range(total_chunks):
+                        raw = f.read(chunk_size)
+                        if not raw: break
+                        
+                        b64_data = base64.b64encode(raw).decode('ascii')
+                        
+                        # Packet
+                        pkg = empaquetar("FILE_CHUNK", {
+                            "filename": filename,
+                            "chunk_id": i + 1,
+                            "total_chunks": total_chunks,
+                            "data": b64_data,
+                            "filesize": size
+                        }, self.memoria.get_origen())
+                        
+                        # Send Logic (Same as before but inside loop)
+                        targets = []
+                        if chat_id in self.memoria.grupos_activos:
+                             g = self.memoria.grupos_activos[chat_id]
+                             for uid, m in g['miembros'].items():
+                                 if uid == self.memoria.mi_uid: continue
+                                 if m.get('ip'): targets.append(m['ip'])
+                        else:
+                             peer = self.memoria.buscar_peer(chat_id)
+                             target_ip = peer['ip'] if peer else None
+                             if not target_ip and chat_id in self.memoria.contactos:
+                                 target_ip = self.memoria.contactos[chat_id]['ip']
+                             if target_ip: targets.append(target_ip)
+                        
+                        for ip in targets:
+                            try: self.red.enviar_tcp_priv(ip, pkg)
+                            except: pass
+                        
+                        # Progress Update
+                        if ui_sess:
+                            pct = int(((i + 1) / total_chunks) * 100)
+                            # ASCII Animation Frame roughly
+                            # Just simple percentage
+                            msg_prog = f"\r[SISTEMA] [*] Enviando '{filename}': {pct}% (Parte {i+1}/{total_chunks})"
+                            ui_sess.sendall(msg_prog.encode('utf-8'))
+                            
+                        # Slight delay to allow network flush and prevent freezing
+                        time.sleep(0.2)
+                
+                if ui_sess: ui_sess.sendall(b"\n")
+                return f"[*] Archivo '{filename}' enviado exitosamente ({total_chunks} partes)."
+            except Exception as e:
+                return f"[X] Error enviando archivo: {e}"
+            finally:
+                # Cleanup temp zip
+                if temp_zip and os.path.exists(temp_zip):
+                    os.unlink(temp_zip)
 
         elif cmd == "EXIT":
             if context_ui:
@@ -907,9 +1006,63 @@ class Motor:
                          # YELLOW INDICATOR [-]
                          self.ui_sessions[gid].sendall(f"\n[SISTEMA] [-] {origen['nick']} abandonó el grupo.\n".encode('utf-8'))
                      
-                     # Notificacion de Escritorio
                      from ghostwhisperchat.core.utilidades import enviar_notificacion
                      enviar_notificacion(f"Grupo {g['nombre']}", f"{origen['nick']} abandonó el grupo.")
+        
+        elif tipo == "FILE_CHUNK":
+             filename = payload.get("filename")
+             chunk_id = payload.get("chunk_id", 1)
+             total_chunks = payload.get("total_chunks", 1)
+             b64_data = payload.get("data")
+             
+             import base64
+             try:
+                 raw_data = base64.b64decode(b64_data)
+                 
+                 # Path Logic
+                 base_dir = os.path.expanduser("~/Escritorio")
+                 if not os.path.exists(base_dir): base_dir = os.path.expanduser("~/Desktop")
+                 if not os.path.exists(base_dir): base_dir = os.path.expanduser("~")
+                 
+                 dest_dir = os.path.join(base_dir, "GhostWhisper_Recibidos")
+                 os.makedirs(dest_dir, exist_ok=True)
+                 
+                 # Temp file strategy for concurrency safe reassembly
+                 # UID + Filename ensures unique stream per sender/file
+                 temp_name = f".{filename}.part.{origen.get('uid', 'unk')}"
+                 part_path = os.path.join(dest_dir, temp_name)
+                 
+                 mode = 'wb' if chunk_id == 1 else 'ab'
+                 with open(part_path, mode) as f:
+                     f.write(raw_data)
+                     
+                 # Completion Check
+                 if chunk_id == total_chunks:
+                     final_path = os.path.join(dest_dir, filename)
+                     # Avoid overwrite
+                     if os.path.exists(final_path):
+                         base, ext = os.path.splitext(filename)
+                         final_path = os.path.join(dest_dir, f"{base}_{int(time.time())}{ext}")
+                     
+                     os.rename(part_path, final_path)
+                     print(f"[FILE] Completado: {final_path}", file=sys.stderr)
+                     
+                     # Notify User
+                     from ghostwhisperchat.core.utilidades import enviar_notificacion
+                     enviar_notificacion("Archivo Recibido", f"De {origen['nick']}: {os.path.basename(final_path)}")
+                     
+                     # Console Notification
+                     try:
+                         from ghostwhisperchat.datos.recursos import Colores
+                         msg_alert = f"\n{Colores.YELLOW}[SISTEMA] [!] {origen['nick']} te ha enviado: {os.path.basename(final_path)}{Colores.RESET}\n"
+                         for chat_id, sess in self.ui_sessions.items():
+                             sess.sendall(msg_alert.encode('utf-8'))
+                     except: pass
+                 elif chunk_id % 5 == 0:
+                     print(f"[FILE] Recibiendo {filename}: {chunk_id}/{total_chunks}", file=sys.stderr)
+
+             except Exception as e:
+                 print(f"[X] Error procesando chunk {chunk_id}: {e}", file=sys.stderr)
 
         elif tipo == "INVITE":
             gid = payload.get("gid")
