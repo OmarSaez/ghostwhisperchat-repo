@@ -39,9 +39,8 @@ class GestorInput:
         """Imprime mensaje entrante sin romper el input actual"""
         with self.lock:
             self._limpiar_linea()
-            # Asegurar retorno de carro para raw mode (\n -> \r\n) nếu necesario
-            # Pero normalmente print maneja \n. En raw mode, sys.stdout necesita \r\n
-            # msg suele venir limpio.
+            # Asegurar retorno de carro para raw mode (\n -> \r\n)
+            msg = msg.replace('\n', '\r\n')
             sys.stdout.write(f"{msg}\r\n") 
             self._pintar_linea()
             
@@ -65,7 +64,6 @@ class GestorInput:
                         self._pintar_linea() # Queda "Tu: " vacio esperando eco o siguiente msg
                         
                         # Procesar comando (sin bloquear el lock mucho tiempo)
-                        # Soltar lock para enviar? No, enviar es rapido.
                         if linea.strip():
                              self.history.append(linea)
                              self.history_index = len(self.history)
@@ -74,11 +72,8 @@ class GestorInput:
                     elif ch == '\x7f': # Backspace
                         if self.buffer:
                             self.buffer.pop()
-                            # Hack visual: borrar ultimo caracter
-                            # \b \b es backspace, espacio, backspace
                             sys.stdout.write("\b \b")
                             sys.stdout.flush()
-                        # Si buffer vacio, NO HACER NADA (Arregla bug de borrar "Tu:")
                         
                     elif ch == '\x1b': # Escape seq (Flechas)
                         # Leer siguientes 2
@@ -102,8 +97,6 @@ class GestorInput:
                                     self._pintar_linea()
                                     
                     else:
-                        # Caracter imprimible normal
-                        # Check si es imprimible simple
                         if ch.isprintable():
                             self.buffer.append(ch)
                             sys.stdout.write(ch)
@@ -124,8 +117,9 @@ class GestorInput:
              
              if is_scan:
                   self.sock.sendall(f"__MSG__ {msg}".encode('utf-8'))
-                  # Animation is tricky in raw mode. Skipping for stability or implementing simple print.
                   sys.stdout.write("\r\n[*] Escaneando...\r\n")
+                  # Anti-Coalescing Delay: Daemon needs time to read first msg
+                  time.sleep(0.3) 
                   self.sock.sendall(b"__MSG__ --scan-results")
                   return
 
