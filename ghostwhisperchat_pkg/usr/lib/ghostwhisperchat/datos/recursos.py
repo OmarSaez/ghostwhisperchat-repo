@@ -27,8 +27,8 @@ class Colores:
     BG_RED = "\033[41m"
 
 # Versionado
-APP_VER_NUM = "2.61"
-APP_VER_TAG = "Mejora en busqueda de usuarios"
+APP_VER_NUM = "2.63"
+APP_VER_TAG = "Menciones Alto Contraste y Mejora en Busqueda de Usuarios"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 BANNER = r"""
@@ -49,52 +49,63 @@ Inicializando...
 :: v2 :: LAN Distributed Chat ::
 """
 
-AYUDA = """
-=========================================================================
-DICCIONARIO DE COMANDOS - GHOSTWHISPERCHAT 2.0
-=========================================================================
+AYUDA = f"""
+{Colores.BLUE}{Colores.BOLD}========================================================================
+   DICCIONARIO DE COMANDOS - GHOSTWHISPERCHAT {APP_VER_NUM}
+========================================================================{Colores.RESET}
 
-GESTIÓN DE CHATS:
-  --dm (Nick/IP)                : Iniciar chat privado.
-                          Alias: -d, --mensaje, --susurrar
-  --crearpublico (Nombre)       : Crear un grupo público.
-                          Alias: -o, --publico, --sala
-  --crearprivado (Nombre Clave) : Crear un grupo privado (requiere clave).
-                          Alias: -p, --privado, --candado
-  --unirse (Nombre)             : Unirse a un grupo.
-                          Alias: -u, --entrar, --join
-  --agregar (Nicks)             : Invitar usuarios al grupo actual.
-                          Alias: -a, --invitar, --meter
-  --aceptar / --rechazar        : Responder a solicitudes.
-  --salir                       : Salir del chat o cerrar sesión.
-                          Alias: -x, --chau, --exit
+{Colores.MAGENTA}{Colores.BOLD}>> GESTIÓN DE CHATS{Colores.RESET}
+  {Colores.GREEN}--dm <Nick/IP>{Colores.RESET} .............. Iniciar chat privado.
+        {Colores.GREY}[Alias: -d, --mensaje, --susurrar]{Colores.RESET}
 
-RED Y CONTACTOS:
-  --enlinea                     : Escanear red (¿Quién está online?).
-                          Alias: -s, --buscar, --radar
-  --vergrupos                   : Ver grupos públicos disponibles.
-                          Alias: -g, --grupos, --salas
-  --contactos                   : Ver historial de usuarios.
-                          Alias: -c, --amigos
-  --invisible                   : Ocultarse del escáner (Switch).
-                          Alias: -v, --fantasma
+  {Colores.GREEN}--crearpublico <Nombre>{Colores.RESET} ...... Crear un grupo público (Sala).
+        {Colores.GREY}[Alias: -o, --publico, --sala]{Colores.RESET}
 
-UTILIDADES:
-  --archivo (Ruta)              : Enviar archivo (Drag & Drop soportado).
-                          Alias: -f, --enviar
-  --cambiarnombre               : Cambiar tu nick.
-                          Alias: -n, --nick
-  --estado (Texto)              : Poner un mensaje de estado.
-                          Alias: -e, --mood
-  --info                        : Ver estado del sistema e IP.
-  --limpiar                     : Limpiar pantalla.
-                          Alias: --cls, --clear
+  {Colores.GREEN}--crearprivado <Nom> <Pwd>{Colores.RESET} ... Crear un grupo privado con clave.
+        {Colores.GREY}[Alias: -p, --privado, --candado]{Colores.RESET}
 
-SISTEMA:
-  --log                         : Guardar historial (Switch).
-  --descarga                    : Descarga automática de archivos (Switch).
+  {Colores.GREEN}--unirse <Nombre>{Colores.RESET} ............ Unirse a un grupo existente.
+        {Colores.GREY}[Alias: -u, --entrar, --join]{Colores.RESET}
 
-Para ver todos los alias, escribe: --abreviaciones
+  {Colores.GREEN}--agregar <Nick>{Colores.RESET} ............. Invitar usuario al grupo actual.
+        {Colores.GREY}[Alias: -a, --invitar, --meter]{Colores.RESET}
+
+  {Colores.GREEN}--aceptar / --rechazar{Colores.RESET} ....... Responder a solicitudes pendientes.
+
+  {Colores.GREEN}--salir{Colores.RESET} ...................... Salir del chat o cerrar sesión.
+        {Colores.GREY}[Alias: -x, --chau, --exit]{Colores.RESET}
+
+{Colores.MAGENTA}{Colores.BOLD}>> RED Y CONTACTOS{Colores.RESET}
+  {Colores.GREEN}--enlinea{Colores.RESET} .................... Escanear red local (¿Quién está?).
+        {Colores.GREY}[Alias: -s, --buscar, --radar]{Colores.RESET}
+
+  {Colores.GREEN}--vergrupos{Colores.RESET} .................. Ver salas públicas disponibles.
+        {Colores.GREY}[Alias: -g, --grupos, --salas]{Colores.RESET}
+
+  {Colores.GREEN}--contactos{Colores.RESET} .................. Ver historial persistente de amigos.
+        {Colores.GREY}[Alias: -c, --amigos]{Colores.RESET}
+
+  {Colores.GREEN}--invisible{Colores.RESET} .................. {Colores.YELLOW}[Switch]{Colores.RESET} Ocultarse del radar.
+        {Colores.GREY}[Alias: -v, --fantasma]{Colores.RESET}
+
+{Colores.MAGENTA}{Colores.BOLD}>> UTILIDADES{Colores.RESET}
+  {Colores.GREEN}--archivo <Ruta>{Colores.RESET} ............. Enviar archivo (Soporta Drag & Drop).
+        {Colores.GREY}[Alias: -f, --enviar]{Colores.RESET}
+
+  {Colores.GREEN}--cambiarnombre <Nuevo>{Colores.RESET} ....... Cambiar tu Nick actual.
+        {Colores.GREY}[Alias: -n, --nick]{Colores.RESET}
+
+  {Colores.GREEN}--estado <Texto>{Colores.RESET} .............. Publicar mensaje de estado.
+        {Colores.GREY}[Alias: -e, --mood]{Colores.RESET}
+
+  {Colores.GREEN}--info{Colores.RESET} ....................... Ver estado del sistema, IP y versión.
+  {Colores.GREEN}--limpiar{Colores.RESET} .................... Limpiar pantalla.
+
+{Colores.MAGENTA}{Colores.BOLD}>> SISTEMA{Colores.RESET}
+  {Colores.GREEN}--log{Colores.RESET} ........................ {Colores.YELLOW}[Switch]{Colores.RESET} Guardar chat en archivo.
+  {Colores.GREEN}--descarga{Colores.RESET} ................... {Colores.YELLOW}[Switch]{Colores.RESET} Auto-aceptar archivos.
+
+{Colores.CYAN}Para ver la lista completa de alias, escribe:{Colores.RESET} {Colores.BOLD}--abreviaciones{Colores.RESET}
 """
 
 # Mapeo de comandos para mostrar en --abreviaciones
@@ -205,7 +216,7 @@ ABBREVIATIONS_DISPLAY = {
 }
 
 COMMAND_MAP = {
-    'DM':           ['--dm', '-d', '--mensaje', '--susurrar', '--priv'],
+    'CHAT':         ['--dm', '-d', '--mensaje', '--susurrar', '--priv'],
     'CREATE_PUB':   ['--crearpublico', '-o', '--publico', '--abrir', '--sala'],
     'CREATE_PRIV':  ['--crearprivado', '-p', '--privado', '--candado', '--cerrado'],
     'JOIN':         ['--unirse', '-u', '--entrar', '--join'],
