@@ -35,7 +35,7 @@ def detectar_terminal():
             return term, flag
     return None, None
 
-def abrir_chat_ui(id_destino, nombre_legible=None, es_grupo=False):
+def abrir_chat_ui(id_destino, nombre_legible=None, es_grupo=False, env_vars=None):
     """
     Abre una nueva ventana de terminal ejecutando el modo UI del cliente.
     Ejecuta: gwc --chat-ui <ID>
@@ -51,18 +51,21 @@ def abrir_chat_ui(id_destino, nombre_legible=None, es_grupo=False):
     inner_args = shlex.split(cmd_inner_str)
         
     log_launcher(f"[LAUNCHER] Solicitud abrir UI: ID={id_destino}, GRUPO={es_grupo}")
-    log_launcher(f"[LAUNCHER] Entorno (DISPLAY): {os.environ.get('DISPLAY', 'NO_DISPLAY')}")
-    log_launcher(f"[LAUNCHER] Entorno (XDG_RUNTIME_DIR): {os.environ.get('XDG_RUNTIME_DIR', '?')}")
-    log_launcher(f"[LAUNCHER] Comando interno raw: {cmd_inner_str}")
+    
+    # Preparar Entorno Dinamico (Display Injection)
+    final_env = os.environ.copy()
+    if env_vars:
+        log_launcher(f"[LAUNCHER] Env Injection: {env_vars}")
+        final_env.update(env_vars)
+        
+    log_launcher(f"[LAUNCHER] Entorno Efectivo (DISPLAY): {final_env.get('DISPLAY', 'UNK')}")
 
     for term, flag in TERMINALES:
         if shutil.which(term):
             # Construir comando final
-            # Ej: ['gnome-terminal', '--title', '...', '--', 'python3', '-m', ...]
-            
             args_term = [term]
             
-             # Flags específicos de terminal (Titulo Personalizado)
+            # Flags específicos de terminal (Titulo Personalizado)
             display_title = nombre_legible if nombre_legible else id_destino[:8]
             prefix = "Chat Grupo" if es_grupo else "Chat Priv"
             full_title = f"{prefix}: {display_title}"
@@ -94,7 +97,7 @@ def abrir_chat_ui(id_destino, nombre_legible=None, es_grupo=False):
             log_launcher(f"[LAUNCHER] Exec args: {args_term}")
             
             try:
-                subprocess.Popen(args_term, start_new_session=True)
+                subprocess.Popen(args_term, start_new_session=True, env=final_env)
                 log_launcher(f"[LAUNCHER] Éxito lanzando {term}")
                 return True
             except Exception as e:

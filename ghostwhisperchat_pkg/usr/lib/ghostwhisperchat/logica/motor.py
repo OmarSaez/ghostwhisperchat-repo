@@ -192,8 +192,18 @@ class Motor:
             conn.close()
 
     def ejecutar_comando_transitorio(self, comando_str, context_ui=None):
+        # 1. Extract Environment Injection (Hidden Flag)
+        # Format: "--command args __ENV_DISPLAY__=:1.0"
+        env_injection = {}
+        if "__ENV_DISPLAY__=" in comando_str:
+            parts = comando_str.split("__ENV_DISPLAY__=")
+            if len(parts) == 2:
+                comando_str = parts[0].strip()
+                display_val = parts[1].split()[0] # Take until next space if any (though usually at end)
+                env_injection['DISPLAY'] = display_val.strip()
+                
         cmd, args = parsear_comando(comando_str)
-        print(f"[CMD_DEBUG] Ejecutando: '{cmd}' Args: {args}", file=sys.stderr)
+        print(f"[CMD_DEBUG] Ejecutando: '{cmd}' Args: {args} Env: {env_injection}", file=sys.stderr)
         
         if cmd == "HELP":
             return obtener_ayuda_comando(args[0] if args else None)
@@ -226,7 +236,7 @@ class Motor:
              self.pending_join_pwd = password
              
              if gid in self.memoria.grupos_activos:
-                 abrir_chat_ui(gid, nombre_legible=nombre, es_grupo=True)
+                 abrir_chat_ui(gid, nombre_legible=nombre, es_grupo=True, env_vars=env_injection)
                  return f"[*] Ya estás en '{nombre}'. Abriendo chat."
                  
              pkg = empaquetar("SEARCH", {"group_name": nombre}, self.memoria.get_origen())
@@ -239,7 +249,7 @@ class Motor:
              nombre = args[0]
              gid = grupos.generar_id_grupo(nombre)
              self.memoria.agregar_grupo_activo(gid, nombre)
-             abrir_chat_ui(gid, nombre_legible=nombre, es_grupo=True)
+             abrir_chat_ui(gid, nombre_legible=nombre, es_grupo=True, env_vars=env_injection)
              return f"[*] Grupo público '{nombre}' creado."
 
         elif cmd == "CREATE_PRIV":
@@ -249,7 +259,7 @@ class Motor:
              gid = grupos.generar_id_grupo(nombre)
              pwd_hash = grupos.hash_password(clave)
              self.memoria.agregar_grupo_activo(gid, nombre, pwd_hash)
-             abrir_chat_ui(gid, nombre_legible=nombre, es_grupo=True)
+             abrir_chat_ui(gid, nombre_legible=nombre, es_grupo=True, env_vars=env_injection)
              return f"[*] Grupo privado '{nombre}' creado."
 
         elif cmd == "ADD":

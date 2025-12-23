@@ -124,6 +124,12 @@ class GestorInput:
                   return
 
              payload = f"__MSG__ {msg}"
+             
+             # If command, inject display
+             if msg.strip().startswith("--"):
+                 disp = os.environ.get('DISPLAY')
+                 if disp: payload = f"{payload} __ENV_DISPLAY__={disp}"
+                 
              self.sock.sendall(payload.encode('utf-8'))
         except:
              pass
@@ -311,6 +317,11 @@ def main():
             return
 
         # 3. Comando Normal
+        # Inject Display for Daemon to know where to open windows
+        disp = os.environ.get('DISPLAY')
+        if disp:
+             full_cmd = f"{full_cmd} __ENV_DISPLAY__={disp}"
+        
         enviar_comando_transitorio(full_cmd)
 
 if __name__ == "__main__":
