@@ -34,6 +34,7 @@ class MemoriaGlobal:
         
         # Cargar Persistencia
         self._cargar_configuracion()
+        self._cargar_contactos()
         
         # Si no hay UID (primer inicio), generarlo
         if not self.mi_uid:
@@ -105,6 +106,93 @@ class MemoriaGlobal:
                  json.dump(data, f)
         except Exception as e:
              print(f"[!] Error guardando config: {e}")
+
+    # --- PERSISTENCIA CONTACTOS ---
+    def _cargar_contactos(self):
+        cfile = os.path.expanduser("~/.ghostwhisperchat/contacts.json")
+        if os.path.exists(cfile):
+            try:
+                with open(cfile, 'r') as f:
+                    self.contactos = json.load(f)
+            except: self.contactos = {}
+        else:
+            self.contactos = {}
+
+    def guardar_contactos(self):
+        cfile = os.path.expanduser("~/.ghostwhisperchat/contacts.json")
+        try:
+            with open(cfile, 'w') as f:
+                json.dump(self.contactos, f)
+        except: pass
+
+    def registrar_contacto(self, uid, nick, ip):
+        """Registra un contacto persistente (historial de interaccion)"""
+        with self._lock:
+            # Timestamp update
+            self.contactos[uid] = {
+                "nick": nick,
+                "ip": ip,
+                "last_seen": time.time()
+            }
+        self.guardar_contactos()
+        
+    def buscar_contacto_fuzzy(self, query):
+        """
+        Busca en contactos y peers activos.
+        Retorna lista de sugerencias [ {nick, ip, match_ratio, source} ]
+        """
+        import difflib
+        from ghostwhisperchat.core.utilidades import normalize_text
+        
+        query_norm = normalize_text(query)
+        candidates = {}
+        
+        # 1. Merge sources (Active Peers + Persistent Contacts)
+        # Peers have priority on IP info
+        all_users = {} 
+        
+        with self._lock:
+            # Load contacts first
+            for uid, c in self.contactos.items():
+                all_users[uid] = c.copy()
+                all_users[uid]['source'] = 'CONTACTO'
+                
+            # Overwrite/Add active peers (more recent status)
+            for ip, p in self.peers.items():
+                uid = p.get('uid')
+                if uid:
+                    p_data = p.copy()
+                    p_data['ip'] = ip
+                    p_data['source'] = 'RED (Scan)'
+                    all_users[uid] = p_data
+
+        suggestions = []
+        
+        for uid, data in all_users.items():
+            nick = data.get('nick', 'UNK')
+            nick_norm = normalize_text(nick)
+            
+            # Exact Match (already checked elsewhere usually, but good to have)
+            if query_norm == nick_norm:
+                data['ratio'] = 1.0
+                suggestions.append(data)
+                continue
+                
+            # Contains
+            if query_norm in nick_norm:
+                data['ratio'] = 0.9
+                suggestions.append(data)
+                continue
+            
+            # Fuzzy
+            ratio = difflib.SequenceMatcher(None, query_norm, nick_norm).ratio()
+            if ratio >= 0.55: # User requested 55%
+                data['ratio'] = ratio
+                suggestions.append(data)
+        
+        # Sort by ratio
+        suggestions.sort(key=lambda x: x['ratio'], reverse=True)
+        return suggestions
 
     def set_identidad(self, uid, nick, ip):
         # Este metodo se suele llamar al inicio desde motor para setear IP

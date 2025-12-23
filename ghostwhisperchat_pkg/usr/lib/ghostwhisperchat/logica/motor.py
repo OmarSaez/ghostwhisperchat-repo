@@ -38,6 +38,9 @@ class Motor:
         self.pending_invite_nick = None
         self.pending_invite_gid = None 
         
+        # Trigger temporal para CHAT Privado (buscar y conectar)
+        self.pending_private_target = None
+        
         # Menciones Cooldowns: {chat_id: timestamp_ultimo_pop}
         self.mention_cooldowns = {} 
 
@@ -235,20 +238,29 @@ class Motor:
                  found_in_buffer = next((x for x in self.scan_buffer if x.get('nick') == target_nick), None)
                  
                  if found_in_buffer:
-                     target_peer = {'ip': found_in_buffer['ip'], 'nick': target_nick}
-                 else:
-                     # Fallback 2: Active Discovery (WHO_NAME)
-                     from ghostwhisperchat.core.utilidades import normalize_text
+                     target_peer = self.memoria.buscar_peer_por_nick(target_nick)
+             
+             if not target_peer:
+                 # Fuzzy / Offline Search
+                 msg_extra = ""
+                 sugs = self.memoria.buscar_contacto_fuzzy(target_nick)
+                 
+                 if sugs:
+                     msg_extra = f"\n[?] Usuario no encontrado en caché activa. ¿Buscabas a...?\n"
+                     for s in sugs[:3]:
+                          src = s.get('source', 'UNK')
+                          msg_extra += f"   > {s['nick']} ({s['ip']}) [{src}]\n"
+                     msg_extra += "\n"
                      
-                     self.pending_invite_nick = normalize_text(target_nick)
-                     self.pending_invite_gid = gid
-                     
-                     # Broadcast WHO_NAME
-                     pkg = empaquetar("WHO_NAME", {"nick": target_nick}, self.memoria.get_origen()) # Send raw nick, receivers normalize
-                     self.red.enviar_udp_broadcast(pkg)
-                     
-                     return f"[*] Buscando a '{target_nick}' en la red para invitar..."
-
+                 # Setup trigger for auto-invite upon IAM response
+                 from ghostwhisperchat.core.utilidades import normalize_text
+                 self.pending_invite_nick = normalize_text(target_nick)
+                 self.pending_invite_gid = gid
+                 
+                 pkg = empaquetar("WHO_NAME", {"nick": target_nick}, self.memoria.get_origen())
+                 self.red.enviar_udp_broadcast(pkg)
+                 
+                 return f"{msg_extra}[*] Lanzando invitación asíncrona a '{target_nick}'..."
 
                  
              # Send INVITE packet
@@ -346,6 +358,51 @@ class Motor:
              self.memoria.auto_download = not self.memoria.auto_download
              return f"[*] Auto-Descarga: {self.memoria.auto_download}"
              
+        elif cmd == "CHAT":
+             if not args: return "[X] Uso: --dm <NICK_O_IP>"
+             target = args[0]
+             
+             # 1. IP Directa
+             import re
+             # Simple regex for IP
+             if re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$", target):
+                  req = empaquetar("CHAT_REQ", {}, self.memoria.get_origen())
+                  try:
+                      msg_err = self.red.enviar_tcp_priv(target, req)
+                      if msg_err: return f"[X] Error: {msg_err}"
+                      return f"[*] Solicitud TCP enviada a {target}"
+                  except Exception as e:
+                      return f"[X] Excepcion conectando: {e}"
+
+             # 2. Cache Check (Exact active peer)
+             peer = self.memoria.buscar_peer_por_nick(target)
+             if peer:
+                  req = empaquetar("CHAT_REQ", {}, self.memoria.get_origen())
+                  try:
+                      self.red.enviar_tcp_priv(peer['ip'], req)
+                      return f"[*] Contacto '{target}' encontrado en caché. Solicitud enviada."
+                  except: 
+                      pass # Fallback if TCP fails
+             
+             # 3. Fuzzy Suggestions (Contacts + Peers)
+             sugs = self.memoria.buscar_contacto_fuzzy(target)
+             msg_extra = ""
+             if sugs:
+                 msg_extra = f"\n[?] Usuario no encontrado. Querias buscar a:\n"
+                 for s in sugs[:3]: # Top 3 best matches
+                     # Show Nick, IP and Source
+                     src = s.get('source', 'UNK')
+                     msg_extra += f"   > {s['nick']} ({s['ip']}) [{src}]\n"
+                 msg_extra += "\n"
+
+             # 4. Discovery (WHO_NAME)
+             from ghostwhisperchat.core.utilidades import normalize_text
+             self.pending_private_target = normalize_text(target)
+             
+             pkg = empaquetar("WHO_NAME", {"nick": target}, self.memoria.get_origen())
+             self.red.enviar_udp_broadcast(pkg)
+             return f"{msg_extra}[*] Lanzando búsqueda en red para '{target}'..."
+
         elif cmd == "LS":
              if not context_ui: return "[X] Solo en chat."
              chat_id = context_ui[1]
@@ -606,6 +663,22 @@ class Motor:
                   # Reset triggers regardless of outcome
                   self.pending_invite_nick = None
                   self.pending_invite_gid = None
+
+             # Check if we are waiting for a private chat with this person
+             if self.pending_private_target and self.pending_private_target == normalize_text(responder_nick):
+                 print(f"[MESH] Encontrado {responder_nick} para chat privado. Conectando...", file=sys.stderr)
+                 self.pending_private_target = None
+                 
+                 req = empaquetar("CHAT_REQ", {}, self.memoria.get_origen())
+                 try:
+                     self.red.enviar_tcp_priv(responder_ip, req)
+                     # Notify global UI? Usually user is in transient console, 
+                     # but we can't easily print to it unless it polled.
+                     # However, CHAT_REQ usually triggers UI on *Receiver* side.
+                     # For Sender, sending CHAT_REQ is just the first step.
+                     # If receiver accepts, they send CHAT_ACK.
+                 except Exception as e:
+                     print(f"[X] Error iniciando chat privado: {e}", file=sys.stderr)
         
         elif tipo == "FOUND":
             ftype = payload.get("type")
