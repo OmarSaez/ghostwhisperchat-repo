@@ -1238,15 +1238,16 @@ class Motor:
                  import re
                  from ghostwhisperchat.core.utilidades import normalize_text, enviar_notificacion
                  from ghostwhisperchat.datos.recursos import Colores
-                                  # Nick Color Calculation (Deterministic - Improved v2.113)
-                  sender_nick = origen['nick']
-                  n_len = len(sender_nick)
-                  
-                  first_char = ord(sender_nick[0]) if n_len > 0 else 0
-                  last_char = ord(sender_nick[-1]) if n_len > 0 else 0
-                  hash_val = n_len + first_char + last_char
-                  
-                  color_idx = hash_val % len(Colores.NICK_COLORS)
+                 
+                 # Nick Color Calculation (Deterministic - Improved v2.113)
+                 sender_nick = origen['nick']
+                 n_len = len(sender_nick)
+                 
+                 first_char = ord(sender_nick[0]) if n_len > 0 else 0
+                 last_char = ord(sender_nick[-1]) if n_len > 0 else 0
+                 hash_val = n_len + first_char + last_char
+                 
+                 color_idx = hash_val % len(Colores.NICK_COLORS)
                  nick_color = Colores.NICK_COLORS[color_idx]
                  
                  # Formatted Nick with Color
@@ -1322,7 +1323,6 @@ class Motor:
                                 msg_body = f"{origen['nick']} notificó a todos en {g_name}"
                                 
                            enviar_notificacion("Mención Destacada", msg_body)
-                 else:
                  else:
                       # Normal Message: Use Colored Nick
                       self.ui_sessions[target_id].sendall(f"\n({nick_display}): {text}\n".encode('utf-8'))

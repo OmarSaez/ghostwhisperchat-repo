@@ -20,6 +20,16 @@ class Colores:
     C_GREEN_LIME  = "\033[38;5;118m"
     C_OLIVE       = "\033[38;5;100m"
     
+    # SYSTEM ALIASES (Backward Compatibility)
+    GREEN   = C_GREEN_NEON
+    RED     = "\033[38;5;196m" # C_RED_FIRE
+    BLUE    = "\033[38;5;33m"  # C_BLUE_ROYAL
+    YELLOW  = "\033[38;5;220m" # C_GOLD
+    MAGENTA = "\033[38;5;201m" # C_MAGENTA
+    CYAN    = "\033[38;5;51m"  # C_CYAN_ELEC
+    
+    # 2. Azules/Cyans
+    
     # 2. Azules/Cyans
     C_BLUE_ROYAL  = "\033[38;5;33m" # Ajustado a 33 para legibilidad
     C_BLUE_ICE    = "\033[38;5;81m"
@@ -65,7 +75,7 @@ class Colores:
     BLACK_TXT = "\033[38;5;0m"
 
 # Versionado
-APP_VER_NUM = "2.112"
+APP_VER_NUM = "2.113"
 APP_VER_TAG = "Llego el @todos y mas colores de nombres!!"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
