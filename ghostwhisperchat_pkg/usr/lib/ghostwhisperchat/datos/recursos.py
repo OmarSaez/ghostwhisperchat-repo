@@ -27,7 +27,7 @@ class Colores:
     BG_RED = "\033[41m"
 
 # Versionado
-APP_VER_NUM = "2.90"
+APP_VER_NUM = "2.91"
 APP_VER_TAG = "Soporte Cuentas Multiples (Puertos Dinamicos)"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
