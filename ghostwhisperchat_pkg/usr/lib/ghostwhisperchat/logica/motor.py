@@ -962,6 +962,14 @@ class Motor:
              last_act = self.last_activity.get(target_id, 0)
              self.last_activity[target_id] = now
              
+             # Format Notification (Minimal)
+             trunc_text = text if len(text) <= 16 else text[:16] + "..."
+             if gid and gid in self.memoria.grupos_activos:
+                 g_name = self.memoria.grupos_activos[gid]['nombre']
+                 noti_title = f"GRUP-{g_name} mensaje {origen['nick']}"
+             else:
+                 noti_title = f"PRIV mensaje {origen['nick']}"
+             
              if target_id in self.ui_sessions:
                  # Logic for Mention Detection
                  import re
@@ -1032,11 +1040,11 @@ class Motor:
                       
                       # Smart Notification even if UI Open (AFK Check)
                       if (now - last_act) > 180:
-                          enviar_notificacion(f"Mensaje de {origen['nick']}", text)
+                          enviar_notificacion(noti_title, trunc_text)
              else:
                  # Smart Notification (3 min cooldown)
                  if (now - last_act) > 180:
-                     enviar_notificacion(f"Mensaje de {origen['nick']}", text)
+                     enviar_notificacion(noti_title, trunc_text)
 
     def _hilo_ping(self):
         while self.running:
