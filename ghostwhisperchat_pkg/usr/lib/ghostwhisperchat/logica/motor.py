@@ -192,23 +192,35 @@ class Motor:
             conn.close()
 
     def ejecutar_comando_transitorio(self, comando_str, context_ui=None):
-        # 1. Extract Environment Injection (Hidden Flag)
-        # Format: "--command args __ENV_DISPLAY__=:1.0"
+        # 1. Parse Environment Injection (Universal)
+        # We look for the marker " __ENV_" which indicates start of injected vars
         env_injection = {}
-        if "__ENV_DISPLAY__=" in comando_str:
-            parts = comando_str.split("__ENV_DISPLAY__=")
-            if len(parts) == 2:
-                comando_str = parts[0].strip()
-                display_val = parts[1].split()[0] # Take until next space if any (though usually at end)
-                env_injection['DISPLAY'] = display_val.strip()
-                
-                # GLOBAL FIX: Update Daemon's environment so Zenity and future Popen calls work
-                # This persists the "last known good display" for async events (Invites, etc.)
-                if display_val.strip():
-                    os.environ['DISPLAY'] = display_val.strip()
-                    # Also try XAUTHORITY? Usually display is enough if cookie is standard.
-                    print(f"[*] Entorno Grafico Actualizado: DISPLAY={os.environ['DISPLAY']}", file=sys.stderr)
-                
+        
+        if " __ENV_" in comando_str:
+            # Split ensures we separate command args from env vars
+            # Arg 0 is real command. Arg 1..N are env vars (e.g. DISPLAY__=:0)
+            parts = comando_str.split(" __ENV_")
+            comando_str = parts[0].strip() # The clean command
+            
+            for p in parts[1:]:
+                # p is like "DISPLAY__=:1.0" or "DBUS__=unix:path..."
+                # There might be subsequent args if logic was different, but here injection is at end.
+                if "=" in p:
+                    key_suffix, val = p.split("=", 1)
+                    # Clean value (take until space if any, though usually last args)
+                    val = val.strip().split(" ")[0]
+                    
+                    target_var = None
+                    if key_suffix == "DISPLAY__": target_var = "DISPLAY"
+                    elif key_suffix == "WAYLAND__": target_var = "WAYLAND_DISPLAY"
+                    elif key_suffix == "DBUS__": target_var = "DBUS_SESSION_BUS_ADDRESS"
+                    
+                    if target_var and val:
+                        env_injection[target_var] = val
+                        os.environ[target_var] = val
+                        # Debug Log (only once/debug)
+                        # print(f"[*] ENV Update: {target_var}={val}", file=sys.stderr)
+
         cmd, args = parsear_comando(comando_str)
         print(f"[CMD_DEBUG] Ejecutando: '{cmd}' Args: {args} Env: {env_injection}", file=sys.stderr)
         

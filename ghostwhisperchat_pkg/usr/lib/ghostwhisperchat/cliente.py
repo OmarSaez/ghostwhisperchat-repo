@@ -317,10 +317,19 @@ def main():
             return
 
         # 3. Comando Normal
-        # Inject Display for Daemon to know where to open windows
+        # Inject Universal Environment Context
+        injection = ""
+        
         disp = os.environ.get('DISPLAY')
-        if disp:
-             full_cmd = f"{full_cmd} __ENV_DISPLAY__={disp}"
+        if disp: injection += f" __ENV_DISPLAY__={disp}"
+        
+        way = os.environ.get('WAYLAND_DISPLAY')
+        if way: injection += f" __ENV_WAYLAND__={way}"
+        
+        dbus = os.environ.get('DBUS_SESSION_BUS_ADDRESS')
+        if dbus: injection += f" __ENV_DBUS__={dbus}"
+        
+        full_cmd += injection
         
         enviar_comando_transitorio(full_cmd)
 

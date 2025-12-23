@@ -73,12 +73,30 @@ def check_filesystem():
 
 def check_display():
     print(f"\n{C.BOLD}:: Entorno Gráfico & Terminales ::{C.RESET}")
-    display = os.environ.get("DISPLAY")
-    if display:
-        print(f" - DISPLAY: {display} ({C.GREEN}Detectado{C.RESET})")
-    else:
-        print(f" - DISPLAY: {C.RED}NO DETECTADO (Headless mode?){C.RESET}")
-        print(f"   {C.YELLOW}↳ Las ventanas de chat NO se abrirán sin DISPLAY.{C.RESET}")
+    print(f"\n{C.BOLD}:: Entorno Gráfico & Terminales ::{C.RESET}")
+    
+    # 1. Variables de Entorno Críticas
+    env_vars = ["DISPLAY", "WAYLAND_DISPLAY", "DBUS_SESSION_BUS_ADDRESS"] # XDG_RUNTIME_DIR usually implicit
+    print(f"Variables de Entorno (Contexto Shell):")
+    
+    display_ok = False
+    
+    for var in env_vars:
+        val = os.environ.get(var)
+        if val:
+            print(f" - {var}: {C.GREEN}{val}{C.RESET}")
+            if var == "DISPLAY": display_ok = True
+        else:
+            # Logic for criticality
+            if var == "DISPLAY":
+                print(f" - {var}: {C.RED}NO DETECTADO (Crítico para X11){C.RESET}")
+            elif var == "DBUS_SESSION_BUS_ADDRESS":
+                print(f" - {var}: {C.YELLOW}NO DETECTADO (Notificaciones pueden fallar){C.RESET}")
+            else:
+                print(f" - {var}: {C.GREY}No detectado (Opcional/Wayland){C.RESET}")
+
+    if not display_ok:
+        print(f"   {C.RED}↳ Las ventanas de chat NO se abrirán sin DISPLAY válido.{C.RESET}")
 
     # Verificar Terminales
     # Verificar Terminales
