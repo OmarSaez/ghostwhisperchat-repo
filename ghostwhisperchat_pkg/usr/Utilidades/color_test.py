@@ -22,6 +22,8 @@ C_PURPLE      = "\033[38;5;93m"
 C_LAVENDER    = "\033[38;5;147m"
 C_SILVER      = "\033[38;5;250m"
 RESET         = "\033[0m"
+BOLD          = "\033[1m"
+GREY          = "\033[90m"
 
 COLORES = {
     "GREEN_NEON": C_GREEN_NEON, "GREEN_LIME": C_GREEN_LIME, "OLIVE": C_OLIVE,
@@ -50,29 +52,45 @@ def demo_mencion(nombre_estilo, bg_code, fg_code, bold=False):
     print(f"\nEstilo {nombre_estilo}:")
     print(f"{bg_code}{fg_code}{b} __MENTION__ (Admin): @todos Reunión urgente en 5 min! {reset}")
 
-print("\n=== GALERÍA DE ESTILOS DE MENCIÓN ===")
-
-# V0: Original (Legacy - 16 colors) -> Lo que tenías antes
-demo_mencion("0. ORIGINAL (Legacy 4-bit)", "\033[43m", "\033[30m", bold=False)
-
-# V1: Resaltador Texto (Amarillo Neón 226)
-# Fondo: 226 (Amarillo puro), Texto: 0 (Negro), Bold
-demo_mencion("1. HIGH-VIS (Resaltador)", "\033[48;5;226m", "\033[38;5;0m", bold=True)
-
-# V2: Alerta Roja (Rojo 196)
-# Fondo: 196 (Rojo Fuego), Texto: 231 (Blanco Puro), Bold
-demo_mencion("2. RED ALERT (Emergencia)", "\033[48;5;196m", "\033[38;5;231m", bold=True)
-
-# V3: Cyberpunk (Cyan 51)
-# Fondo: 51 (Cyan Eléctrico), Texto: 0 (Negro), Bold
-demo_mencion("3. CYBER (Futurista)", "\033[48;5;51m", "\033[38;5;0m", bold=True)
-
-# V4: Elegancia (Blanco 255)
-# Fondo: 255 (Blanco Nieve), Texto: 0 (Negro), Bold
-demo_mencion("4. ELEGANT (Alto Contraste)", "\033[48;5;255m", "\033[38;5;0m", bold=True)
-
-# V5: Gold Standard (Oro 220)
-# Fondo: 220 (Oro), Texto: 0 (Negro), Bold
+print("\n=== GALERÍA DE MENCIÓNES ===")
+# Resumido
 demo_mencion("5. GOLD (Premium)", "\033[48;5;220m", "\033[38;5;0m", bold=True)
 
-print("-" * 45)
+
+print("\n" + "="*60)
+print(f"{C_BLUE_ROYAL}{BOLD}   PROPUESTAS DE VISUALIZACIÓN DE IDENTIDAD (CMD --ls){RESET}")
+print("="*60 + "\n")
+
+# Datos Mock
+nick_a = "Jualitungo"
+real_a = "jose"
+ip_a   = "192.168.1.234"
+
+nick_b = "SuperParrot"
+real_b = "omar"
+ip_b   = "192.168.1.10"
+
+def print_row(op_name, content):
+    print(f"{C_GOLD}>> {op_name}:{RESET}")
+    print(content)
+    print("")
+
+# --- OPCION 1 ---
+line_1 = f" - {C_GREEN_NEON}{nick_a}{RESET} ({GREY}@{real_a}{RESET}) - {GREY}{ip_a}{RESET} [ONLINE]"
+print_row("OPCIÓN 1: Estilo 'Social Handle' (@usuario)", line_1)
+
+# --- OPCION 2 ---
+line_2 = f" - {C_GREEN_NEON}{nick_a}{RESET} <{GREY}sys: {real_a}{RESET}> ({GREY}{ip_a}{RESET}) [ONLINE]"
+print_row("OPCIÓN 2: Estilo 'System Source' (Hacker)", line_2)
+
+# --- OPCION 3 ---
+line_3 = f" - {C_GREEN_NEON}{nick_a}{RESET} [{GREY}{real_a}@{ip_a}{RESET}] [ONLINE]"
+print_row("OPCIÓN 3: Estilo 'Identidad Combinada' (Compacto)", line_3)
+
+# --- OPCION 4 ---
+line_4 = f" - {C_GREEN_NEON}{nick_a}{RESET} ➜ {GREY}{real_a}{RESET} ({GREY}{ip_a}{RESET}) [ONLINE]"
+print_row("OPCIÓN 4: Estilo 'Flecha de Verdad'", line_4)
+
+# --- OPCION 5 ---
+line_5 = f" - {C_GREEN_NEON}{nick_a:<12}{RESET} | {GREY}{real_a:<8}{RESET} | {GREY}{ip_a}{RESET} [ONLINE]"
+print_row("OPCIÓN 5: Estilo 'Tubería' (Columnas)", line_5)

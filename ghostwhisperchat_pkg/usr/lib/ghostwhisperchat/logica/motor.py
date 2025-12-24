@@ -562,15 +562,19 @@ class Motor:
                  # ms is dict {uid: {nick, ip, status...}}
                  res = f"Miembros en '{g['nombre']}': {len(ms)}\n"
                  
+                 from ghostwhisperchat.datos.recursos import C_GREEN_NEON, RESET, GREY
+                 
                  for uid, mdata in ms.items():
                      # Default to snapshot
                      nick = mdata.get('nick', 'UNK')
                      ip = mdata.get('ip', 'UNK')
                      status = mdata.get('status', 'UNK')
+                     sys_user = mdata.get('sys_user', '?') # Default unknown
                      
                      # 1. Self Check
                      if uid == self.memoria.mi_uid:
                          nick = self.memoria.mi_nick
+                         sys_user = self.memoria.sys_user # Real Local
                          tag = " [Tu]"
                      else:
                          tag = ""
@@ -581,12 +585,18 @@ class Motor:
                              nick = peer.get('nick', nick)
                              status = peer.get('status', status)
                              if peer.get('ip'): ip = peer.get('ip')
+                             if peer.get('sys_user'): sys_user = peer.get('sys_user')
                          
                          # Update local group cache (Lazy Sync)
                          mdata['nick'] = nick
                          mdata['status'] = status
+                         mdata['sys_user'] = sys_user
                      
-                     res += f" - {nick} ({ip}) [{status}]{tag}\n"
+                     # FORMATO ELEGIDO: Option 3 (Extended Identity)
+                     # Nick [sys@ip] [STATUS]
+                     # e.g. Jualitungo [jose@192.168.1.10] [ONLINE]
+                     
+                     res += f" - {C_GREEN_NEON}{nick}{RESET} [{GREY}{sys_user}@{ip}{RESET}] [{status}]{tag}\n"
                  return res
              return "Chat Privado."
 
@@ -1040,7 +1050,12 @@ class Motor:
         # print(f"[TCP_DEBUG] Recibido {tipo} de {origen.get('nick', 'UNK')}", file=sys.stderr)
         
         if origen:
-             self.memoria.actualizar_peer(origen['ip'], origen['uid'], origen['nick'])
+             self.memoria.actualizar_peer(
+                 origen['ip'], 
+                 origen['uid'], 
+                 origen['nick'],
+                 sys_user=origen.get('sys_user')
+             )
 
         if tipo == "JOIN_REQ":
             gid = payload.get("gid")
@@ -1067,8 +1082,15 @@ class Motor:
                 if origen:
                     # FIX: Ensure 'status' is separated/included if available or default to ONLINE
                     status = origen.get('status', 'ONLINE')
-                    g['miembros'][origen['uid']] = {'nick': origen['nick'], 'ip': origen['ip'], 'uid': origen['uid'], 'status': status}
-                    print(f"[GROUP] Agregado nuevo miembro: {origen['nick']} ({origen['ip']})", file=sys.stderr)
+                    s_user = origen.get('sys_user', '?')
+                    g['miembros'][origen['uid']] = {
+                        'nick': origen['nick'], 
+                        'ip': origen['ip'], 
+                        'uid': origen['uid'], 
+                        'status': status,
+                        'sys_user': s_user
+                    }
+                    print(f"[GROUP] Agregado nuevo miembro: {origen['nick']} <{s_user}> ({origen['ip']})", file=sys.stderr)
                 
                 # 2. Send WELCOME
                 welcome = empaquetar("WELCOME", {"gid": gid, "name": g['nombre']}, self.memoria.get_origen())

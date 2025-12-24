@@ -4,6 +4,7 @@ import os
 import sys
 import json
 import hashlib
+import getpass
 from ghostwhisperchat.datos.recursos import APP_VERSION
 
 CONFIG_FILE = os.path.expanduser("~/.ghostwhisperchat/config.json")
@@ -23,6 +24,7 @@ class MemoriaGlobal:
         # Datos Propios
         self.mi_uid = None       # Hash único persistente
         self.mi_nick = os.getenv("USER", "Usuario") # Nick actual (Default: System User)
+        self.sys_user = getpass.getuser() # Real System Username (Immutable)
         self.mi_ip = None        # IP local
         
         # Configuración Runtime
@@ -203,19 +205,22 @@ class MemoriaGlobal:
         if port_priv: self.mi_port_priv = port_priv
         if port_group: self.mi_port_group = port_group
 
-    def actualizar_peer(self, ip, uid, nick, status="ONLINE", port_priv=None, port_group=None):
+    def actualizar_peer(self, ip, uid, nick, status="ONLINE", port_priv=None, port_group=None, sys_user=None):
         with self._lock:
             # Key is UID to allow multiple users per IP (Different Ports)
             if uid not in self.peers:
                 self.peers[uid] = {}
             
-            self.peers[uid].update({
+            update_data = {
                 "uid": uid,
                 "nick": nick,
                 "ip": ip,
                 "status": status,
                 "last_seen": time.time()
-            })
+            }
+            if sys_user: update_data['sys_user'] = sys_user
+            
+            self.peers[uid].update(update_data)
             if port_priv: self.peers[uid]['port_priv'] = port_priv
             if port_group: self.peers[uid]['port_group'] = port_group
 
@@ -244,6 +249,7 @@ class MemoriaGlobal:
                             "uid": self.mi_uid,
                             "nick": self.mi_nick,
                             "ip": self.mi_ip,
+                            "sys_user": self.sys_user,
                             "status": "ONLINE",
                             "port_priv": getattr(self, 'mi_port_priv', 44494)
                         }
@@ -273,6 +279,7 @@ class MemoriaGlobal:
         return {
             "nick": self.mi_nick,
             "uid": self.mi_uid,
+            "sys_user": self.sys_user,
             "ip": self.mi_ip,
             "port_priv": getattr(self, 'mi_port_priv', 44494),
             "port_group": getattr(self, 'mi_port_group', 44496)
