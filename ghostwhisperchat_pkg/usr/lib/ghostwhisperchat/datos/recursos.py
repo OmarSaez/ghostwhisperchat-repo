@@ -74,9 +74,9 @@ class Colores:
     # Texto High Contrast para fondos claros
     BLACK_TXT = "\033[38;5;0m"
 
-# Versionado - "Dashboard Pro, Status, Mas colores de nombres & @todos"
-APP_VER_NUM = "2.119.5"
-APP_VER_TAG = "Stable Dashboard Release"
+# Versionado
+APP_VER_NUM = "2.120"
+APP_VER_TAG = "Dashboard Pro, Status, Mas colores de nombres & @todos"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 BANNER = r"""
