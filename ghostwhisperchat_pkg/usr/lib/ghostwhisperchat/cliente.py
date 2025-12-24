@@ -3,6 +3,7 @@
 # Modo Transitorio (Comandos) + Modo UI (Ventana Dedicada)
 
 import socket
+import select
 import os
 import sys
 import threading
@@ -58,16 +59,36 @@ class GestorInput:
                         break
                         
                     elif ch == '\r' or ch == '\n': # Enter
-                        linea = "".join(self.buffer)
-                        self.buffer = [] # Limpiar buffer visualmente
-                        self._limpiar_linea()
-                        self._pintar_linea() # Queda "Tu: " vacio esperando eco o siguiente msg
+                        # --- DETECCION INTELIGENTE DE PASTE (Bloques ASCII) ---
+                        # Si hay más datos esperando inmediatamente en el stdin, es muy probable
+                        # que sea un paste de texto multilínea. Agregamos \n en vez de enviar.
                         
-                        # Procesar comando (sin bloquear el lock mucho tiempo)
-                        if linea.strip():
-                             self.history.append(linea)
-                             self.history_index = len(self.history)
-                             self._enviar_mensaje(linea)
+                        is_paste = False
+                        try:
+                            # Peek no bloqueante (timeout muy bajo 5ms)
+                            rfds, _, _ = select.select([sys.stdin], [], [], 0.005)
+                            if rfds:
+                                is_paste = True
+                        except:
+                            pass
+                            
+                        if is_paste:
+                            self.buffer.append('\n')
+                            # Feedback visual mínimo: Salto de linea real + retorno carro
+                            sys.stdout.write('\r\n')
+                            sys.stdout.flush()
+                        else:
+                            # Enter manual -> Enviar mensaje acumulado
+                            linea = "".join(self.buffer)
+                            self.buffer = [] # Limpiar buffer visualmente
+                            self._limpiar_linea()
+                            self._pintar_linea() # Queda "Tu: " vacio esperando eco o siguiente msg
+                            
+                            # Procesar comando (sin bloquear el lock mucho tiempo)
+                            if linea.strip():
+                                 self.history.append(linea)
+                                 self.history_index = len(self.history)
+                                 self._enviar_mensaje(linea)
                              
                     elif ch == '\x7f' or ch == '\x08': # Backspace
                         if self.buffer:
@@ -191,7 +212,7 @@ def modo_ui_chat(target_id, es_grupo):
         
     # Header Limpio (Sin IDs)
     print(f"{C.BOLD}[*] IP LOCAL: {mi_ip}{C.RESET}")
-    print(f"{C.GREY}(Escribe y presiona Enter. Ctrl+C para cerrar){C.RESET}\n")
+    print(f"{C.GREY}(Escribe --ayuda para ver comandos disponibles. Ctrl+C para cerrar){C.RESET}\n")
     
     # Init Input Helper
     helper = GestorInput(s)

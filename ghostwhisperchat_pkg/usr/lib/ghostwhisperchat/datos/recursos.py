@@ -75,8 +75,8 @@ class Colores:
     BLACK_TXT = "\033[38;5;0m"
 
 # Versionado
-APP_VER_NUM = "2.121"
-APP_VER_TAG = "Startup Fix & Stable"
+APP_VER_NUM = "2.122"
+APP_VER_TAG = "Mejoras visuales"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 BANNER = r"""
@@ -91,8 +91,7 @@ Inicializando...
   ░   ░   ▒ ░ ░    ░  ▒   
 ░ ░   ░   ░   ░  ░        
       ░     ░    ░ ░      
-                 ░        
-:: v2 :: LAN Distributed Chat ::
+                 ░     2.0   
 """
 
 AYUDA = f"""
