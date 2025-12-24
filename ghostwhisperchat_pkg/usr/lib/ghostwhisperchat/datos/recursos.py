@@ -75,8 +75,8 @@ class Colores:
     BLACK_TXT = "\033[38;5;0m"
 
 # Versionado
-APP_VER_NUM = "2.122"
-APP_VER_TAG = "Mejoras visuales"
+APP_VER_NUM = "2.123"
+APP_VER_TAG = "Actualizacion de nombre en tiempo real"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 BANNER = r"""

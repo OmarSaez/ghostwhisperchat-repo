@@ -65,8 +65,8 @@ class GestorInput:
                         
                         is_paste = False
                         try:
-                            # Peek no bloqueante (timeout muy bajo 5ms)
-                            rfds, _, _ = select.select([sys.stdin], [], [], 0.005)
+                            # Peek no bloqueante (timeout aumentado a 30ms para terminales lentas)
+                            rfds, _, _ = select.select([sys.stdin], [], [], 0.03)
                             if rfds:
                                 is_paste = True
                         except:

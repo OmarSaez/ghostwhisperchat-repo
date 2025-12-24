@@ -457,7 +457,38 @@ class Motor:
             old = self.memoria.mi_nick
             self.memoria.mi_nick = args[0]
             self.memoria.guardar_configuracion()
-            return f"[*] Nick cambiado: {old} -> {self.memoria.mi_nick}"
+            
+            # --- BROADCAST NICK CHANGE (v2.119 Dynamic Update) ---
+            # Send 'PEER_UPDATE' (empty or dummy packet) to all active groups/peers
+            # This ensures everyone refreshes their peer/member lists via TCP handler
+            pkg = empaquetar("PEER_UPDATE", {}, self.memoria.get_origen())
+            from ghostwhisperchat.core.transporte import PORT_GROUP
+            
+            processed = 0
+            # Broadcast to all members of all active groups
+            for gid, g in self.memoria.grupos_activos.items():
+                members = g.get('miembros', {})
+                # Normalize members to list
+                m_list = list(members.values()) if isinstance(members, dict) else members
+                for m in m_list:
+                    uid_member = m.get('uid')
+                    if uid_member == self.memoria.mi_uid: continue
+                    
+                    ip = m.get('ip')
+                    if not ip: continue
+                    
+                    # Connect and send update
+                    try:
+                        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                        s.settimeout(0.5) # Fast timeout for broadcast
+                        port_g = m.get('port_group', PORT_GROUP)
+                        s.connect((ip, port_g))
+                        s.sendall(pkg + b'\n') # Newline delimiter
+                        s.close()
+                        processed += 1
+                    except: pass
+                    
+            return f"[*] Nick cambiado: {old} -> {self.memoria.mi_nick} (Propagado a {processed} nodos)"
 
         elif cmd == "MUTE_TOGGLE":
             self.memoria.no_molestar = not self.memoria.no_molestar
@@ -530,11 +561,31 @@ class Motor:
                  ms = g.get('miembros', {})
                  # ms is dict {uid: {nick, ip, status...}}
                  res = f"Miembros en '{g['nombre']}': {len(ms)}\n"
+                 
                  for uid, mdata in ms.items():
-                     nick = mdata.get('nick')
-                     ip = mdata.get('ip')
+                     # Default to snapshot
+                     nick = mdata.get('nick', 'UNK')
+                     ip = mdata.get('ip', 'UNK')
                      status = mdata.get('status', 'UNK')
-                     tag = " [Tu]" if uid == self.memoria.mi_uid else ""
+                     
+                     # 1. Self Check
+                     if uid == self.memoria.mi_uid:
+                         nick = self.memoria.mi_nick
+                         tag = " [Tu]"
+                     else:
+                         tag = ""
+                         # 2. Dynamic Lookup (Source of Truth: Global Peers)
+                         peer = self.memoria.peers.get(uid)
+                         if peer:
+                             # Use freshest data
+                             nick = peer.get('nick', nick)
+                             status = peer.get('status', status)
+                             if peer.get('ip'): ip = peer.get('ip')
+                         
+                         # Update local group cache (Lazy Sync)
+                         mdata['nick'] = nick
+                         mdata['status'] = status
+                     
                      res += f" - {nick} ({ip}) [{status}]{tag}\n"
                  return res
              return "Chat Privado."
