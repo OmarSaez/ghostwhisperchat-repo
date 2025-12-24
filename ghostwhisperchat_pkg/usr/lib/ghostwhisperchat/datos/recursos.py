@@ -75,8 +75,8 @@ class Colores:
     BLACK_TXT = "\033[38;5;0m"
 
 # Versionado
-APP_VER_NUM = "2.113"
-APP_VER_TAG = "Llego el @todos y mas colores de nombres!!"
+APP_VER_NUM = "2.114"
+APP_VER_TAG = "Dashboard Pro, Status, Mas colores de nombres & @todos"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 BANNER = r"""
