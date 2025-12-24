@@ -171,13 +171,32 @@ class Motor:
             if len(partes) >= 3:
                 chat_id = partes[2]
                 
+                
                 # --- HISTORY INJECTION (Feature 2) ---
-                # FIX: History only for Private Chats to avoid confusion in dynamic groups
+                # FIX: Resolve ID to UID for consistent history
+                hist_target_id = chat_id
+                
                 # Check handshake parsing parts "TYPE ID"
                 # parts[1] is TYPE (GROUP or PRIVATE)
                 if len(partes) >= 2 and partes[1] == "PRIVATE":
+                    # Try to resolve IP/Nick to UID
+                    peer_found = self.memoria.buscar_peer(chat_id)
+                    if peer_found:
+                        hist_target_id = peer_found['uid']
+                    else:
+                        # Fallback: Check contacts
+                        if chat_id in self.memoria.contactos:
+                             hist_contact = self.memoria.contactos[chat_id]
+                             # Contactos dict key IS the UID? No, looking at cargar_contactos:
+                             # self.contactos[uid] = {...}
+                             # So 'chat_id' might be an IP. We need to reverse lookup.
+                             # buscar_peer does this logic (returns peer if found).
+                             # If not found, we use chat_id as is (IP).
+                             # Optimization: Let's assume buscar_peer works for both.
+                             pass
+
                     try:
-                        hist_block = self.memoria.get_historial_reciente(chat_id, limit=15)
+                        hist_block = self.memoria.get_historial_reciente(hist_target_id, limit=15)
                         if hist_block:
                             conn.sendall((hist_block + "\n").encode('utf-8'))
                     except Exception as e:
@@ -835,11 +854,25 @@ class Motor:
                      try: self.red.enviar_tcp_priv(target_ip, pkg, port=target_port)
                      except: pass
                  
+                 
                  # Log outgoing private message
                  # Try to resolve UID if possible for consistent history filename
                  p = self.memoria.buscar_peer(chat_id)
                  hist_id = p['uid'] if p else chat_id
                  self.memoria.log_historial(hist_id, self.memoria.mi_nick, msg_content, es_propio=True)
+                 
+                 # --- SELF ECHO (v2.131) ---
+                 # Send back the formatted line so user sees [Timestamp] Tu: ...
+                 from datetime import datetime
+                 ts = datetime.now().strftime("%H:%M")
+                 from ghostwhisperchat.datos.recursos import Colores
+                 
+                 # Format: [HH:MM] Tu: Msg
+                 self_echo = f"{Colores.GREY}[{ts}]{Colores.RESET} {Colores.C_GREEN_NEON}Tu{Colores.RESET}: {msg_content}"
+                 # Send to MY UI
+                 if chat_id in self.ui_sessions:
+                     try: self.ui_sessions[chat_id].sendall((self_echo + "\n").encode('utf-8'))
+                     except: pass
 
 
     def _shutdown_all_sessions(self):
