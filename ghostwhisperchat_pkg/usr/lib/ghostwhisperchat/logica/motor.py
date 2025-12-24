@@ -180,25 +180,36 @@ class Motor:
                 # parts[1] is TYPE (GROUP or PRIVATE)
                 if len(partes) >= 2 and partes[1] == "PRIVATE":
                     # Try to resolve IP/Nick to UID
+                    # Improve Resolution logic:
+                    # 1. Active Peer Search
                     peer_found = self.memoria.buscar_peer(chat_id)
                     if peer_found:
                         hist_target_id = peer_found['uid']
                     else:
-                        # Fallback: Check contacts
-                        if chat_id in self.memoria.contactos:
-                             hist_contact = self.memoria.contactos[chat_id]
-                             # Contactos dict key IS the UID? No, looking at cargar_contactos:
-                             # self.contactos[uid] = {...}
-                             # So 'chat_id' might be an IP. We need to reverse lookup.
-                             # buscar_peer does this logic (returns peer if found).
-                             # If not found, we use chat_id as is (IP).
-                             # Optimization: Let's assume buscar_peer works for both.
-                             pass
+                        # 2. Reverse Lookup in Active Peers (by IP) manually
+                        # buscar_peer usually does nick or uid.
+                        uid_by_ip = None
+                        for uid, p in self.memoria.peers.items():
+                             if p.get('ip') == chat_id:
+                                  uid_by_ip = uid
+                                  break
+                        
+                        if uid_by_ip:
+                             hist_target_id = uid_by_ip
+                        else:
+                             # 3. Fallback: Contacts (Reverse Lookup IP)
+                             # self.memoria.contactos = {uid: {ip, nick...}}
+                             for uid, c in self.memoria.contactos.items():
+                                  if c.get('ip') == chat_id or c.get('nick') == chat_id:
+                                       hist_target_id = uid
+                                       break
 
                     try:
                         hist_block = self.memoria.get_historial_reciente(hist_target_id, limit=20)
                         if hist_block:
-                            conn.sendall((hist_block + "\n").encode('utf-8'))
+                            data_bytes = (hist_block + "\n").encode('utf-8')
+                            conn.sendall(data_bytes)
+                            print(f"[HISTORIAL] Enviados {len(data_bytes)} bytes a UI {chat_id} (Target UID: {hist_target_id})", file=sys.stderr)
                     except Exception as e:
                         print(f"[X] History Error: {e}", file=sys.stderr)
                 
@@ -837,6 +848,17 @@ class Motor:
                  
                  # Log outgoing group message
                  self.memoria.log_historial(chat_id, self.memoria.mi_nick, msg_content, es_propio=True)
+                 
+                 # --- SELF ECHO GROUP (v2.133) ---
+                 from datetime import datetime
+                 ts = datetime.now().strftime("%H:%M")
+                 from ghostwhisperchat.datos.recursos import Colores
+                 
+                 # Format: [HH:MM] Tu: Msg
+                 self_echo = f"{Colores.GREY}[{ts}]{Colores.RESET} {Colores.C_GREEN_NEON}Tu{Colores.RESET}: {msg_content}"
+                 if chat_id in self.ui_sessions:
+                     try: self.ui_sessions[chat_id].sendall((self_echo + "\n").encode('utf-8'))
+                     except: pass
 
              else:
                  target_ip = None
