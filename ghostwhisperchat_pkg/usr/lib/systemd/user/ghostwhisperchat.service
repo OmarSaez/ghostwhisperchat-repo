@@ -1,12 +1,16 @@
 [Unit]
 Description=GhostWhisperChat Daemon
-After=network.target
+After=graphical-session.target
 
 [Service]
 Type=simple
+# Esperar 5s para asegurar que el entorno grafico este listo (Fix race condition al boot)
+ExecStartPre=/bin/sleep 10
 ExecStart=/usr/bin/gwc --start
 Restart=always
 RestartSec=10
+# Quitamos hardcode DISPLAY=:0 para permitir que herede el real si es posible, o que se inyecte despues.
+# Pero por compatibilidad basica lo dejamos si systemd user sessions no lo propagan bien.
 Environment=DISPLAY=:0
 
 [Install]

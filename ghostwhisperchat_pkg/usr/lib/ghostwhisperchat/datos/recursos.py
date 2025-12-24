@@ -75,8 +75,8 @@ class Colores:
     BLACK_TXT = "\033[38;5;0m"
 
 # Versionado
-APP_VER_NUM = "2.120"
-APP_VER_TAG = "Dashboard Pro, Status, Mas colores de nombres & @todos"
+APP_VER_NUM = "2.121"
+APP_VER_TAG = "Startup Fix & Stable"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 BANNER = r"""
