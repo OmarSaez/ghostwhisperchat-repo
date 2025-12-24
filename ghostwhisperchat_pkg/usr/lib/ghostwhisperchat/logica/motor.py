@@ -348,7 +348,86 @@ class Motor:
              return "[*] Búsqueda lanzada."
 
         elif cmd == "GLOBAL_STATUS":
-             return "HOLA MUNDO - DEBUG TEST (Si ves esto, el canal funciona)"
+             try:
+                 m = self.memoria
+                 ident = m.get_origen() or {} # Defensa contra None
+                 
+                 # Calculate Own Nick Color
+                 nick = m.mi_nick
+                 n_len = len(nick)
+                 f_char = ord(nick[0]) if n_len > 0 else 0
+                 l_char = ord(nick[-1]) if n_len > 0 else 0
+                 h_val = n_len + f_char + l_char
+                 c_idx = h_val % len(Colores.NICK_COLORS)
+                 my_color = Colores.NICK_COLORS[c_idx]
+                 
+                 # --- Build Dashboard v2.115 ---
+                 
+                 # Header
+                 res =  f"\n{Colores.BLUE}{Colores.BOLD}╔══════════════════════════════════════════════════════╗{Colores.RESET}\n"
+                 res += f"{Colores.BLUE}{Colores.BOLD}║           GHOSTWHISPERCHAT NETWORK DASHBOARD         ║{Colores.RESET}\n"
+                 res += f"{Colores.BLUE}{Colores.BOLD}╚══════════════════════════════════════════════════════╝{Colores.RESET}\n\n"
+                 
+                 # 1. Identity & Status
+                 status_flags = []
+                 # Verificamos atributos con getattr por seguridad
+                 if getattr(m, 'invisible', False): 
+                     status_flags.append(f"{Colores.C_SILVER}👻 INVISIBLE{Colores.RESET}")
+                 else: 
+                     status_flags.append(f"{Colores.C_GREEN_NEON}🟢 VISIBLE{Colores.RESET}")
+                 
+                 if getattr(m, 'no_molestar', False): 
+                     status_flags.append(f"{Colores.C_RED_FIRE}⛔ DND{Colores.RESET}")
+                 
+                 # Force string conversion just in case
+                 uid_display = str(m.mi_uid)[:12] if m.mi_uid else "UNK"
+                 
+                 res += f"{Colores.BOLD}👤 MI NODO:{Colores.RESET}\n"
+                 res += f"   • Nick:     {my_color}{nick}{Colores.RESET}\n"
+                 res += f"   • Status:   {' '.join(status_flags)}\n"
+                 res += f"   • IP:       {Colores.GREEN}{m.mi_ip}{Colores.RESET}\n"
+                 res += f"   • UID:      {Colores.CYAN}{uid_display}...{Colores.RESET}\n"
+                 res += f"   • Puertos:  TCP={ident.get('port_priv', '?')} / MESH={ident.get('port_group', '?')}\n\n"
+                 
+                 # 2. Network Peers (Contactos)
+                 peers_list = list(m.peers.values())
+                 p_count = len(peers_list)
+                 
+                 res += f"{Colores.BOLD}👥 CONTACTOS DETECTADOS ({p_count}):{Colores.RESET}\n"
+                 if p_count == 0:
+                     res += f"   {Colores.C_SILVER}(No hay peers. Ejecuta 'gwc scan' para buscar){Colores.RESET}\n"
+                 else:
+                     limit = 15
+                     for i, p in enumerate(peers_list):
+                         if i >= limit:
+                             res += f"   {Colores.C_SILVER}... y {p_count - limit} más.{Colores.RESET}\n"
+                             break
+                         
+                         p_nick = p.get('nick', 'Unknown')
+                         pn_len = len(p_nick)
+                         ph_val = pn_len + (ord(p_nick[0]) if pn_len else 0) + (ord(p_nick[-1]) if pn_len else 0)
+                         pc_idx = ph_val % len(Colores.NICK_COLORS)
+                         p_color = Colores.NICK_COLORS[pc_idx]
+                         
+                         res += f"   • {p_color}{p_nick:<15}{Colores.RESET} [{p.get('ip', '?')}]\n"
+                 res += "\n"
+
+                 # 3. Active Groups
+                 groups = m.grupos_activos
+                 g_count = len(groups)
+                 res += f"{Colores.BOLD}🛡️  MIS GRUPOS ACTIVO ({g_count}):{Colores.RESET}\n"
+                 if g_count == 0:
+                     res += f"   {Colores.C_SILVER}(No estás unido a ningún grupo){Colores.RESET}\n"
+                 else:
+                     for gid, gdata in groups.items():
+                         gname = gdata.get('nombre', '???')
+                         res += f"   • {Colores.C_GOLD}#{gname:<15}{Colores.RESET} (ID: {str(gid)[:8]})\n"
+
+                 return res
+                 
+             except Exception as e:
+                 import traceback
+                 return f"{Colores.RED}[CRASH] Error generando Dashboard:\n{traceback.format_exc()}{Colores.RESET}"
 
         elif cmd == "CONTACTS":
              # Usamos peers para historial reciente por ahora
