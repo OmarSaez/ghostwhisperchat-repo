@@ -458,37 +458,37 @@ class Motor:
             self.memoria.mi_nick = args[0]
             self.memoria.guardar_configuracion()
             
-            # --- BROADCAST NICK CHANGE (v2.119 Dynamic Update) ---
-            # Send 'PEER_UPDATE' (empty or dummy packet) to all active groups/peers
-            # This ensures everyone refreshes their peer/member lists via TCP handler
-            pkg = empaquetar("PEER_UPDATE", {}, self.memoria.get_origen())
-            from ghostwhisperchat.core.transporte import PORT_GROUP
-            
-            processed = 0
-            # Broadcast to all members of all active groups
-            for gid, g in self.memoria.grupos_activos.items():
-                members = g.get('miembros', {})
-                # Normalize members to list
-                m_list = list(members.values()) if isinstance(members, dict) else members
-                for m in m_list:
-                    uid_member = m.get('uid')
-                    if uid_member == self.memoria.mi_uid: continue
-                    
-                    ip = m.get('ip')
-                    if not ip: continue
-                    
-                    # Connect and send update
-                    try:
-                        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                        s.settimeout(0.5) # Fast timeout for broadcast
-                        port_g = m.get('port_group', PORT_GROUP)
-                        s.connect((ip, port_g))
-                        s.sendall(pkg + b'\n') # Newline delimiter
-                        s.close()
-                        processed += 1
-                    except: pass
-                    
-            return f"[*] Nick cambiado: {old} -> {self.memoria.mi_nick} (Propagado a {processed} nodos)"
+            # Use shared helper
+            nodos = self._propagar_actualizacion_perfil()
+            return f"[*] Nick cambiado: {old} -> {self.memoria.mi_nick} (Propagado a {nodos} nodos)"
+
+        elif cmd == "STATUS":
+             # 1. Parse Args
+             if not args:
+                 curr = self.memoria.mi_estado_msg or "(Sin estado)"
+                 return f"[*] Tu estado actual: {curr}\nUso: --estado <Nuevo Mensaje>"
+             
+             # 2. Join and Validate
+             nuevo_estado = " ".join(args).strip()
+             MAX_LEN = 34
+             if len(nuevo_estado) > MAX_LEN:
+                 return f"[X] Estado muy largo ({len(nuevo_estado)} chars). Max {MAX_LEN}."
+             
+             if not nuevo_estado:
+                 # Clear status if empty string passed somehow? Or just ignore
+                 self.memoria.mi_estado_msg = None
+                 msg = "borrado"
+             else:
+                 self.memoria.mi_estado_msg = nuevo_estado
+                 msg = f"establecido: '{nuevo_estado}'"
+             
+             # 3. Save
+             self.memoria.guardar_configuracion()
+             
+             # 4. Propagate
+             nodos = self._propagar_actualizacion_perfil()
+             
+             return f"[*] Estado {msg} (Propagado a {nodos} nodos)"
 
         elif cmd == "MUTE_TOGGLE":
             self.memoria.no_molestar = not self.memoria.no_molestar
@@ -594,10 +594,17 @@ class Motor:
                          mdata['sys_user'] = sys_user
                      
                      # FORMATO ELEGIDO: Option 3 (Extended Identity)
-                     # Nick [sys@ip] [STATUS]
-                     # Usamos Colores.VAR en lugar de VAR directo
+                     # Nick [sys@ip] [STATUS: "Msg"]
                      
-                     res += f" - {Colores.C_GREEN_NEON}{nick}{Colores.RESET} [{Colores.GREY}{sys_user}@{ip}{Colores.RESET}] [{status}]{tag}\n"
+                     st_display = f"[{status}]"
+                     status_msg = mdata.get('status_msg')
+                     # Fallback to peer cache if missing in group snapshot
+                     if not status_msg and peer: status_msg = peer.get('status_msg')
+                     
+                     if status_msg:
+                         st_display = f"[{status}: {Colores.C_GOLD}\"{status_msg}\"{Colores.RESET}]"
+                     
+                     res += f" - {Colores.C_GREEN_NEON}{nick}{Colores.RESET} [{Colores.GREY}{sys_user}@{ip}{Colores.RESET}] {st_display}{tag}\n"
                  return res
              return "Chat Privado."
 
@@ -1055,7 +1062,8 @@ class Motor:
                  origen['ip'], 
                  origen['uid'], 
                  origen['nick'],
-                 sys_user=origen.get('sys_user')
+                 sys_user=origen.get('sys_user'),
+                 status_msg=origen.get('status_msg')
              )
 
         if tipo == "JOIN_REQ":
@@ -1488,3 +1496,58 @@ class Motor:
 
     def tareas_mantenimiento(self):
         self.memoria.limpiar_peers_inactivos()
+
+    def _propagar_actualizacion_perfil(self):
+        """Helper to broadcast PEER_UPDATE packet to everyone (Group + Peers)"""
+        pkg = empaquetar("PEER_UPDATE", {}, self.memoria.get_origen())
+        from ghostwhisperchat.core.transporte import PORT_GROUP
+        
+        processed = 0
+        sent_uids = set()
+        
+        # 1. Groups
+        for gid, g in self.memoria.grupos_activos.items():
+            members = g.get('miembros', {})
+            m_list = list(members.values()) if isinstance(members, dict) else members
+            for m in m_list:
+                uid_member = m.get('uid')
+                if uid_member == self.memoria.mi_uid: continue
+                if uid_member in sent_uids: continue
+                
+                ip = m.get('ip')
+                if not ip: continue
+                
+                try:
+                    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    s.settimeout(0.5) 
+                    port_g = m.get('port_group', PORT_GROUP)
+                    s.connect((ip, port_g))
+                    s.sendall(pkg + b'\n') 
+                    s.close()
+                    processed += 1
+                    sent_uids.add(uid_member)
+                except: pass
+        
+        # 2. Direct Peers (Private)
+        all_peers = list(self.memoria.peers.values())
+        for p in all_peers:
+            uid_p = p.get('uid')
+            if uid_p == self.memoria.mi_uid: continue
+            if uid_p in sent_uids: continue 
+            
+            if p.get('status') == 'ONLINE' or uid_p in self.ui_sessions:
+                 ip = p.get('ip')
+                 if not ip: continue
+                 
+                 try:
+                    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    s.settimeout(0.5) 
+                    port_p = p.get('port_priv', 44494) 
+                    s.connect((ip, port_p))
+                    s.sendall(pkg + b'\n') 
+                    s.close()
+                    processed += 1
+                    sent_uids.add(uid_p)
+                 except: pass
+                 
+        return processed

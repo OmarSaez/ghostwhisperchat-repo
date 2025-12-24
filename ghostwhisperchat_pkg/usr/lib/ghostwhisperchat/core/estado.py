@@ -26,6 +26,7 @@ class MemoriaGlobal:
         self.mi_nick = os.getenv("USER", "Usuario") # Nick actual (Default: System User)
         self.sys_user = getpass.getuser() # Real System Username (Immutable)
         self.mi_ip = None        # IP local
+        self.mi_estado_msg = None # Mensaje de estado personalizado (max 34 chars)
         
         # Configuración Runtime
         self.no_molestar = False
@@ -88,6 +89,7 @@ class MemoriaGlobal:
                      # Opcional: Cargar settings
                      self.no_molestar = data.get("no_molestar", False)
                      self.invisible = data.get("invisible", False)
+                     self.mi_estado_msg = data.get("estado_msg")
                  print(f"[ESTADO] Config cargada. Nick: {self.mi_nick}", file=sys.stderr)
              except Exception as e:
                  print(f"[!] Error cargando config: {e}", file=sys.stderr)
@@ -99,8 +101,10 @@ class MemoriaGlobal:
         data = {
             "uid": self.mi_uid,
             "nick": self.mi_nick,
+            "nick": self.mi_nick,
             "no_molestar": self.no_molestar,
-            "invisible": self.invisible
+            "invisible": self.invisible,
+            "estado_msg": self.mi_estado_msg
         }
         try:
              os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
@@ -205,7 +209,7 @@ class MemoriaGlobal:
         if port_priv: self.mi_port_priv = port_priv
         if port_group: self.mi_port_group = port_group
 
-    def actualizar_peer(self, ip, uid, nick, status="ONLINE", port_priv=None, port_group=None, sys_user=None):
+    def actualizar_peer(self, ip, uid, nick, status="ONLINE", port_priv=None, port_group=None, sys_user=None, status_msg=None):
         with self._lock:
             # Key is UID to allow multiple users per IP (Different Ports)
             if uid not in self.peers:
@@ -219,6 +223,7 @@ class MemoriaGlobal:
                 "last_seen": time.time()
             }
             if sys_user: update_data['sys_user'] = sys_user
+            if status_msg is not None: update_data['status_msg'] = status_msg
             
             self.peers[uid].update(update_data)
             if port_priv: self.peers[uid]['port_priv'] = port_priv
@@ -280,6 +285,7 @@ class MemoriaGlobal:
             "nick": self.mi_nick,
             "uid": self.mi_uid,
             "sys_user": self.sys_user,
+            "status_msg": self.mi_estado_msg,
             "ip": self.mi_ip,
             "port_priv": getattr(self, 'mi_port_priv', 44494),
             "port_group": getattr(self, 'mi_port_group', 44496)
