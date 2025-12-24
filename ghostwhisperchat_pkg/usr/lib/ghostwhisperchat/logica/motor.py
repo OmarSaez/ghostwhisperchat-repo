@@ -387,6 +387,10 @@ class Motor:
                  res += f"{Colores.BOLD}👤 MI NODO:{Colores.RESET}\n"
                  res += f"   • Nick:     {my_c}{nick}{Colores.RESET}\n"
                  res += f"   • Status:   {status_str}\n"
+                 
+                 custom_st = getattr(m, 'mi_estado_msg', None) or "(Sin estado)"
+                 res += f"   • Info:     {Colores.C_GOLD}\"{custom_st}\"{Colores.RESET}\n"
+                 
                  res += f"   • IP:       {Colores.GREEN}{m.mi_ip}{Colores.RESET}\n"
                  res += f"   • UID:      {Colores.CYAN}{str(m.mi_uid)[:12]}...{Colores.RESET}\n"
                  res += f"   • Puertos:  TCP={ident.get('port_priv')} / MESH={ident.get('port_group')}\n\n"
