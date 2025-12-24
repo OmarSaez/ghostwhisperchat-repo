@@ -350,84 +350,93 @@ class Motor:
         elif cmd == "GLOBAL_STATUS":
              try:
                  m = self.memoria
-                 ident = m.get_origen() or {} # Defensa contra None
+                 ident = m.get_origen() or {} 
                  
-                 # Calculate Own Nick Color
-                 nick = m.mi_nick
+                 # --- SAFE DASHBOARD (ASCII ONLY) ---
+                 
+                 # 1. Calc Color
+                 nick = str(m.mi_nick)
                  n_len = len(nick)
-                 f_char = ord(nick[0]) if n_len > 0 else 0
-                 l_char = ord(nick[-1]) if n_len > 0 else 0
-                 h_val = n_len + f_char + l_char
-                 c_idx = h_val % len(Colores.NICK_COLORS)
-                 my_color = Colores.NICK_COLORS[c_idx]
+                 f = ord(nick[0]) if n_len else 0
+                 l = ord(nick[-1]) if n_len else 0
+                 idx = (n_len + f + l) % len(Colores.NICK_COLORS)
+                 my_c = Colores.NICK_COLORS[idx]
                  
-                 # --- Build Dashboard v2.115 ---
-                 
-                 # Header
-                 res =  f"\n{Colores.BLUE}{Colores.BOLD}╔══════════════════════════════════════════════════════╗{Colores.RESET}\n"
-                 res += f"{Colores.BLUE}{Colores.BOLD}║           GHOSTWHISPERCHAT NETWORK DASHBOARD         ║{Colores.RESET}\n"
-                 res += f"{Colores.BLUE}{Colores.BOLD}╚══════════════════════════════════════════════════════╝{Colores.RESET}\n\n"
-                 
-                 # 1. Identity & Status
-                 status_flags = []
-                 # Verificamos atributos con getattr por seguridad
+                 # 2. Status Strings
+                 st_flags = []
                  if getattr(m, 'invisible', False): 
-                     status_flags.append(f"{Colores.C_SILVER}👻 INVISIBLE{Colores.RESET}")
+                     st_flags.append(f"{Colores.C_SILVER}[INVISIBLE]{Colores.RESET}")
                  else: 
-                     status_flags.append(f"{Colores.C_GREEN_NEON}🟢 VISIBLE{Colores.RESET}")
+                     st_flags.append(f"{Colores.GREEN}[VISIBLE]{Colores.RESET}")
+                     
+                 if getattr(m, 'no_molestar', False):
+                     st_flags.append(f"{Colores.C_RED_FIRE}[DND]{Colores.RESET}")
                  
-                 if getattr(m, 'no_molestar', False): 
-                     status_flags.append(f"{Colores.C_RED_FIRE}⛔ DND{Colores.RESET}")
+                 status_str = " ".join(st_flags) if st_flags else "[OK]"
                  
-                 # Force string conversion just in case
-                 uid_display = str(m.mi_uid)[:12] if m.mi_uid else "UNK"
+                 # 3. Build Response (ASCII SAFE)
+                 # Usamos caracteres simples para evitar Unicode Errors en transporte
                  
-                 res += f"{Colores.BOLD}👤 MI NODO:{Colores.RESET}\n"
-                 res += f"   • Nick:     {my_color}{nick}{Colores.RESET}\n"
-                 res += f"   • Status:   {' '.join(status_flags)}\n"
-                 res += f"   • IP:       {Colores.GREEN}{m.mi_ip}{Colores.RESET}\n"
-                 res += f"   • UID:      {Colores.CYAN}{uid_display}...{Colores.RESET}\n"
-                 res += f"   • Puertos:  TCP={ident.get('port_priv', '?')} / MESH={ident.get('port_group', '?')}\n\n"
+                 linea = f"{Colores.BLUE}======================================================{Colores.RESET}"
                  
-                 # 2. Network Peers (Contactos)
-                 peers_list = list(m.peers.values())
-                 p_count = len(peers_list)
+                 res =  f"\n{linea}\n"
+                 res += f"{Colores.BLUE}|        GHOSTWHISPERCHAT SYSTEM STATUS (v2.117)     |{Colores.RESET}\n"
+                 res += f"{linea}\n\n"
                  
-                 res += f"{Colores.BOLD}👥 CONTACTOS DETECTADOS ({p_count}):{Colores.RESET}\n"
-                 if p_count == 0:
-                     res += f"   {Colores.C_SILVER}(No hay peers. Ejecuta 'gwc scan' para buscar){Colores.RESET}\n"
+                 res += f"{Colores.BOLD}:: IDENTIDAD LOCAL ::{Colores.RESET}\n"
+                 res += f" - Nick:    {my_c}{nick}{Colores.RESET}\n"
+                 res += f" - Estado:  {status_str}\n"
+                 res += f" - IP Addr: {Colores.GREEN}{m.mi_ip}{Colores.RESET}\n"
+                 res += f" - UID:     {Colores.CYAN}{str(m.mi_uid)[:16]}{Colores.RESET}\n"
+                 res += f" - Puertos: TCP={ident.get('port_priv')} | MESH={ident.get('port_group')}\n\n"
+
+                 # Peers
+                 all_peers = list(m.peers.values())
+                 n_peers = len(all_peers)
+                 res += f"{Colores.BOLD}:: NODOS EN RED ({n_peers}) ::{Colores.RESET}\n"
+                 if n_peers == 0:
+                     res += f"   (Sin nodos visibles. Usa 'gwc scan')\n"
                  else:
-                     limit = 15
-                     for i, p in enumerate(peers_list):
+                     limit = 12
+                     for i, p in enumerate(all_peers):
                          if i >= limit:
-                             res += f"   {Colores.C_SILVER}... y {p_count - limit} más.{Colores.RESET}\n"
+                             res += f"   ... y {n_peers - limit} mas.\n"
                              break
                          
-                         p_nick = p.get('nick', 'Unknown')
-                         pn_len = len(p_nick)
-                         ph_val = pn_len + (ord(p_nick[0]) if pn_len else 0) + (ord(p_nick[-1]) if pn_len else 0)
-                         pc_idx = ph_val % len(Colores.NICK_COLORS)
-                         p_color = Colores.NICK_COLORS[pc_idx]
+                         # Hash Color for Peer
+                         pn = str(p.get('nick', '???'))
+                         pl = len(pn)
+                         ph = pl + (ord(pn[0]) if pl else 0) + (ord(pn[-1]) if pl else 0)
+                         pci = ph % len(Colores.NICK_COLORS)
+                         pcol = Colores.NICK_COLORS[pci]
                          
-                         res += f"   • {p_color}{p_nick:<15}{Colores.RESET} [{p.get('ip', '?')}]\n"
+                         pip = str(p.get('ip', '0.0.0.0'))
+                         res += f" + {pcol}{pn:<12}{Colores.RESET} -> {pip}\n"
                  res += "\n"
 
-                 # 3. Active Groups
-                 groups = m.grupos_activos
-                 g_count = len(groups)
-                 res += f"{Colores.BOLD}🛡️  MIS GRUPOS ACTIVO ({g_count}):{Colores.RESET}\n"
-                 if g_count == 0:
-                     res += f"   {Colores.C_SILVER}(No estás unido a ningún grupo){Colores.RESET}\n"
+                 # Groups
+                 all_groups = m.grupos_activos
+                 n_groups = len(all_groups)
+                 res += f"{Colores.BOLD}:: GRUPOS UNIDOS ({n_groups}) ::{Colores.RESET}\n"
+                 if n_groups == 0:
+                     res += f"   (Ninguno)\n"
                  else:
-                     for gid, gdata in groups.items():
-                         gname = gdata.get('nombre', '???')
-                         res += f"   • {Colores.C_GOLD}#{gname:<15}{Colores.RESET} (ID: {str(gid)[:8]})\n"
-
-                 return res
+                     for gid, gdata in all_groups.items():
+                         gn = str(gdata.get('nombre', 'UNK'))
+                         res += f" # {Colores.C_GOLD}{gn:<12}{Colores.RESET} [ID:{str(gid)[:6]}]\n"
                  
+                 res += f"\n{linea}\n"
+                 
+                 # DEBUG LOG para confirmar generacion
+                 print(f"[DEBUG_STATUS] Dashboard generado exitosamente. Len: {len(res)} bytes")
+                 
+                 return res
+
              except Exception as e:
                  import traceback
-                 return f"{Colores.RED}[CRASH] Error generando Dashboard:\n{traceback.format_exc()}{Colores.RESET}"
+                 err = traceback.format_exc()
+                 print(f"[ERROR_STATUS] {err}")
+                 return f"ERROR GENERANDO INFO: {e}"
 
         elif cmd == "CONTACTS":
              # Usamos peers para historial reciente por ahora
