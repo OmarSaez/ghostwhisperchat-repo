@@ -562,7 +562,8 @@ class Motor:
                  # ms is dict {uid: {nick, ip, status...}}
                  res = f"Miembros en '{g['nombre']}': {len(ms)}\n"
                  
-                 from ghostwhisperchat.datos.recursos import C_GREEN_NEON, RESET, GREY
+                 # FIX CRITICO: Importar Colores correctamente (Clase, no modulo)
+                 from ghostwhisperchat.datos.recursos import Colores
                  
                  for uid, mdata in ms.items():
                      # Default to snapshot
@@ -594,9 +595,9 @@ class Motor:
                      
                      # FORMATO ELEGIDO: Option 3 (Extended Identity)
                      # Nick [sys@ip] [STATUS]
-                     # e.g. Jualitungo [jose@192.168.1.10] [ONLINE]
+                     # Usamos Colores.VAR en lugar de VAR directo
                      
-                     res += f" - {C_GREEN_NEON}{nick}{RESET} [{GREY}{sys_user}@{ip}{RESET}] [{status}]{tag}\n"
+                     res += f" - {Colores.C_GREEN_NEON}{nick}{Colores.RESET} [{Colores.GREY}{sys_user}@{ip}{Colores.RESET}] [{status}]{tag}\n"
                  return res
              return "Chat Privado."
 
