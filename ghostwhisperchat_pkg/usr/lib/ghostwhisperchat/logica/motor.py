@@ -391,7 +391,11 @@ class Motor:
                  custom_st = getattr(m, 'mi_estado_msg', None) or "(Sin estado)"
                  res += f"   • Info:     {Colores.C_GOLD}\"{custom_st}\"{Colores.RESET}\n"
                  
+                 # Import version dynamically or ensure imported at top, but local is safer for hot-loading
+                 from ghostwhisperchat.datos.recursos import APP_VERSION
+                 
                  res += f"   • IP:       {Colores.GREEN}{m.mi_ip}{Colores.RESET}\n"
+                 res += f"   • Versión:  {Colores.C_PINK_PASTEL}{APP_VERSION}{Colores.RESET}\n"
                  res += f"   • UID:      {Colores.CYAN}{str(m.mi_uid)[:12]}...{Colores.RESET}\n"
                  res += f"   • Puertos:  TCP={ident.get('port_priv')} / MESH={ident.get('port_group')}\n\n"
 
