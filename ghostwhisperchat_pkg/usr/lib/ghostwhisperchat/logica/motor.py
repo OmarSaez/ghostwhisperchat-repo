@@ -12,7 +12,7 @@ from ghostwhisperchat.core.transporte import GestorRed
 from ghostwhisperchat.core.protocolo import empaquetar, desempaquetar
 from ghostwhisperchat.core.launcher import abrir_chat_ui
 from ghostwhisperchat.logica.comandos import parsear_comando, obtener_ayuda_comando
-from ghostwhisperchat.datos.recursos import AYUDA, ABBREVIATIONS_DISPLAY
+from ghostwhisperchat.datos.recursos import AYUDA, ABBREVIATIONS_DISPLAY, Colores
 from ghostwhisperchat.logica import grupos
 from ghostwhisperchat.core.utilidades import enviar_notificacion, preguntar_invitacion_chat
 
@@ -349,10 +349,13 @@ class Motor:
 
         elif cmd == "GLOBAL_STATUS":
              try:
+                 # FIX CRITICO: Importar Colores localmente para asegurar disponibilidad
+                 from ghostwhisperchat.datos.recursos import Colores
+                 
                  m = self.memoria
                  ident = m.get_origen() or {} 
                  
-                 # --- SAFE DASHBOARD (ASCII ONLY) ---
+                 # --- DASHBOARD PRO v2.119 (Visual Rich + Safe) ---
                  
                  # 1. Calc Color
                  nick = str(m.mi_nick)
@@ -365,42 +368,40 @@ class Motor:
                  # 2. Status Strings
                  st_flags = []
                  if getattr(m, 'invisible', False): 
-                     st_flags.append(f"{Colores.C_SILVER}[INVISIBLE]{Colores.RESET}")
+                     st_flags.append(f"{Colores.C_SILVER}👻 INVISIBLE{Colores.RESET}")
                  else: 
-                     st_flags.append(f"{Colores.GREEN}[VISIBLE]{Colores.RESET}")
+                     st_flags.append(f"{Colores.C_GREEN_NEON}🟢 VISIBLE{Colores.RESET}")
                      
                  if getattr(m, 'no_molestar', False):
-                     st_flags.append(f"{Colores.C_RED_FIRE}[DND]{Colores.RESET}")
+                     st_flags.append(f"{Colores.C_RED_FIRE}⛔ DND{Colores.RESET}")
                  
-                 status_str = " ".join(st_flags) if st_flags else "[OK]"
+                 status_str = " ".join(st_flags)
                  
-                 # 3. Build Response (ASCII SAFE)
-                 # Usamos caracteres simples para evitar Unicode Errors en transporte
+                 # --- Build Response (Clean Minimal v2.119) ---
                  
-                 linea = f"{Colores.BLUE}======================================================{Colores.RESET}"
+                 # Header Simple y Elegante
+                 res =  f"\n{Colores.BLUE}======================================================{Colores.RESET}\n"
+                 res += f"{Colores.BLUE}{Colores.BOLD}       GHOSTWHISPERCHAT NETWORK DASHBOARD       {Colores.RESET}\n"
+                 res += f"{Colores.BLUE}======================================================{Colores.RESET}\n\n"
                  
-                 res =  f"\n{linea}\n"
-                 res += f"{Colores.BLUE}|        GHOSTWHISPERCHAT SYSTEM STATUS (v2.117)     |{Colores.RESET}\n"
-                 res += f"{linea}\n\n"
-                 
-                 res += f"{Colores.BOLD}:: IDENTIDAD LOCAL ::{Colores.RESET}\n"
-                 res += f" - Nick:    {my_c}{nick}{Colores.RESET}\n"
-                 res += f" - Estado:  {status_str}\n"
-                 res += f" - IP Addr: {Colores.GREEN}{m.mi_ip}{Colores.RESET}\n"
-                 res += f" - UID:     {Colores.CYAN}{str(m.mi_uid)[:16]}{Colores.RESET}\n"
-                 res += f" - Puertos: TCP={ident.get('port_priv')} | MESH={ident.get('port_group')}\n\n"
+                 res += f"{Colores.BOLD}👤 MI NODO:{Colores.RESET}\n"
+                 res += f"   • Nick:     {my_c}{nick}{Colores.RESET}\n"
+                 res += f"   • Status:   {status_str}\n"
+                 res += f"   • IP:       {Colores.GREEN}{m.mi_ip}{Colores.RESET}\n"
+                 res += f"   • UID:      {Colores.CYAN}{str(m.mi_uid)[:12]}...{Colores.RESET}\n"
+                 res += f"   • Puertos:  TCP={ident.get('port_priv')} / MESH={ident.get('port_group')}\n\n"
 
                  # Peers
                  all_peers = list(m.peers.values())
                  n_peers = len(all_peers)
-                 res += f"{Colores.BOLD}:: NODOS EN RED ({n_peers}) ::{Colores.RESET}\n"
+                 res += f"{Colores.BOLD}👥 CONTACTOS DETECTADOS ({n_peers}):{Colores.RESET}\n"
                  if n_peers == 0:
-                     res += f"   (Sin nodos visibles. Usa 'gwc scan')\n"
+                     res += f"   {Colores.C_SILVER}(No hay peers. Ejecuta 'gwc scan' para buscar){Colores.RESET}\n"
                  else:
-                     limit = 12
+                     limit = 15
                      for i, p in enumerate(all_peers):
                          if i >= limit:
-                             res += f"   ... y {n_peers - limit} mas.\n"
+                             res += f"   {Colores.C_SILVER}... y {n_peers - limit} más.{Colores.RESET}\n"
                              break
                          
                          # Hash Color for Peer
@@ -411,32 +412,25 @@ class Motor:
                          pcol = Colores.NICK_COLORS[pci]
                          
                          pip = str(p.get('ip', '0.0.0.0'))
-                         res += f" + {pcol}{pn:<12}{Colores.RESET} -> {pip}\n"
+                         res += f"   • {pcol}{pn:<15}{Colores.RESET} [{pip}]\n"
                  res += "\n"
 
                  # Groups
                  all_groups = m.grupos_activos
                  n_groups = len(all_groups)
-                 res += f"{Colores.BOLD}:: GRUPOS UNIDOS ({n_groups}) ::{Colores.RESET}\n"
+                 res += f"{Colores.BOLD}🛡️  MIS GRUPOS ACTIVO ({n_groups}):{Colores.RESET}\n"
                  if n_groups == 0:
-                     res += f"   (Ninguno)\n"
+                     res += f"   {Colores.C_SILVER}(No estás unido a ningún grupo){Colores.RESET}\n"
                  else:
                      for gid, gdata in all_groups.items():
                          gn = str(gdata.get('nombre', 'UNK'))
-                         res += f" # {Colores.C_GOLD}{gn:<12}{Colores.RESET} [ID:{str(gid)[:6]}]\n"
-                 
-                 res += f"\n{linea}\n"
-                 
-                 # DEBUG LOG para confirmar generacion
-                 print(f"[DEBUG_STATUS] Dashboard generado exitosamente. Len: {len(res)} bytes")
+                         res += f"   • {Colores.C_GOLD}#{gn:<15}{Colores.RESET} (ID: {str(gid)[:8]})\n"
                  
                  return res
 
              except Exception as e:
                  import traceback
-                 err = traceback.format_exc()
-                 print(f"[ERROR_STATUS] {err}")
-                 return f"ERROR GENERANDO INFO: {e}"
+                 return f"{Colores.RED}[CRASH] Error generando Dashboard:\n{traceback.format_exc()}{Colores.RESET}"
 
         elif cmd == "CONTACTS":
              # Usamos peers para historial reciente por ahora
