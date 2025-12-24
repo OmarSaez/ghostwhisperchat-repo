@@ -1517,9 +1517,20 @@ class Motor:
                            if now - last_pop > 40:
                                 should_notify = True
                                 self.mention_cooldowns[target_id] = now
-                      
-                      # HIGHLIGHT MENTION
-                      formatted = f"__MENTION__ {ts_display} {sender_nick}: {text}"
+                       if is_highlight:
+                           # HIGHLIGHT MENTION
+                           formatted = f"__MENTION__ {ts_display} {sender_nick}: {text}"
+                           
+                           # Notification Logic (Only if highlight)
+                           if should_notify:
+                                g_name = "Chat Privado"
+                                if gid and gid in self.memoria.grupos_activos:
+                                    g_name = self.memoria.grupos_activos[gid]['nombre']
+                                msg_body = f"{origen['nick']} te ha mencionado en {g_name}"
+                                if is_global_mention and not is_personal_mention:
+                                     msg_body = f"{origen['nick']} notificó a todos en {g_name}"
+                                     
+                                enviar_notificacion("Mención Destacada", msg_body)
                  else:
                       # STANDARD
                       formatted = f"{ts_display} {nick_display}: {text}"
@@ -1529,22 +1540,9 @@ class Motor:
                      self.ui_sessions[target_id].sendall((formatted + "\n").encode('utf-8'))
                  except: pass
                       
-                      if should_notify:
-                           g_name = "Chat Privado"
-                           if gid and gid in self.memoria.grupos_activos:
-                               g_name = self.memoria.grupos_activos[gid]['nombre']
-                           msg_body = f"{origen['nick']} te ha mencionado en {g_name}"
-                           if is_global_mention and not is_personal_mention:
-                                msg_body = f"{origen['nick']} notificó a todos en {g_name}"
-                                
-                           enviar_notificacion("Mención Destacada", msg_body)
-                 else:
-                      # Normal Message: Use Colored Nick
-                      self.ui_sessions[target_id].sendall(f"\n({nick_display}): {text}\n".encode('utf-8'))
-                      
-                      # Smart Notification even if UI Open (AFK Check)
-                      if (now - last_act) > 180:
-                          enviar_notificacion(noti_title, trunc_text)
+                 # Smart Notification even if UI Open (AFK Check)
+                 if (now - last_act) > 180:
+                     enviar_notificacion(noti_title, trunc_text)
              else:
                  # Smart Notification (3 min cooldown)
                  if (now - last_act) > 180:
