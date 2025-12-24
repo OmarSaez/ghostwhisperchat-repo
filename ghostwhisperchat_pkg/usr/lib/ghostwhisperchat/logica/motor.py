@@ -196,7 +196,7 @@ class Motor:
                              pass
 
                     try:
-                        hist_block = self.memoria.get_historial_reciente(hist_target_id, limit=15)
+                        hist_block = self.memoria.get_historial_reciente(hist_target_id, limit=20)
                         if hist_block:
                             conn.sendall((hist_block + "\n").encode('utf-8'))
                     except Exception as e:
@@ -800,7 +800,10 @@ class Motor:
                  ui_sock.sendall(f"\n[SISTEMA] {res}\n".encode('utf-8'))
                  return
 
-             ui_sock.sendall(f"Tu: {msg_content}\n".encode('utf-8'))
+             # ui_sock.sendall(f"Tu: {msg_content}\n".encode('utf-8'))
+             # v2.132: Disabled instant echo to avoid duplication.
+             # We wait for the timestamped echo from below.
+             pass
              
              # Reset notification counter on send
              self.last_activity[chat_id] = time.time()
@@ -857,8 +860,41 @@ class Motor:
                  
                  # Log outgoing private message
                  # Try to resolve UID if possible for consistent history filename
-                 p = self.memoria.buscar_peer(chat_id)
-                 hist_id = p['uid'] if p else chat_id
+                 # FIX v2.132: Logic was: p = buscar_peer(chat_id). 
+                 # If chat_id is IP, buscar_peer looks it up? buscar_peer expects Nick or UID.
+                 # It does NOT scan by IP values. We have to iterate or use cache.
+                 
+                 # Improved UID Resolution:
+                 hist_id = chat_id # Default
+                 
+                 # 1. Is chat_id a UID? (len 16 hex?)
+                 if len(chat_id) == 16:
+                      pass # good
+                 else:
+                      # It's likely an IP or Nick.
+                      # Try to find peer with this IP
+                      real_uid = None
+                      # Check Active Peers
+                      for uid, pdata in self.memoria.peers.items():
+                           if pdata.get('ip') == chat_id or pdata.get('nick') == chat_id:
+                               real_uid = uid
+                               break
+                      
+                      if real_uid:
+                           hist_id = real_uid
+                      # Check Contacts
+                      elif chat_id in self.memoria.contactos:
+                            # Warning: contactos dict keys ARE UIDs usually
+                            # contactos = {UID: {nick, ip...}}
+                            if chat_id in self.memoria.contactos:
+                                 hist_id = chat_id # It was a UID after all?
+                            else:
+                                 # Reverse search in contacts
+                                 for c_uid, c_data in self.memoria.contactos.items():
+                                      if c_data.get('ip') == chat_id or c_data.get('nick') == chat_id:
+                                           hist_id = c_uid
+                                           break
+                 
                  self.memoria.log_historial(hist_id, self.memoria.mi_nick, msg_content, es_propio=True)
                  
                  # --- SELF ECHO (v2.131) ---

@@ -75,8 +75,8 @@ class Colores:
     BLACK_TXT = "\033[38;5;0m"
 
 # Versionado - Estable version con apodos, nombres reales, dashboard pro color, estados y @todos
-APP_VER_NUM = "2.132"
-APP_VER_TAG = "Probando historiales y marcas de tiempo"
+APP_VER_NUM = "2.133"
+APP_VER_TAG = "Historiales 1 a 1y marcas de tiempo"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 BANNER = r"""
