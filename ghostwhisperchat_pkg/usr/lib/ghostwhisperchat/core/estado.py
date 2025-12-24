@@ -8,6 +8,7 @@ import getpass
 from ghostwhisperchat.datos.recursos import APP_VERSION
 
 CONFIG_FILE = os.path.expanduser("~/.ghostwhisperchat/config.json")
+HISTORY_DIR = os.path.expanduser("~/.ghostwhisperchat/history")
 
 class MemoriaGlobal:
     _instance = None
@@ -293,3 +294,95 @@ class MemoriaGlobal:
 
     # Alias para compatibilidad
     limpiar_peers_inactivos = limpiar_peers_antiguos
+
+    # --- HISTORIAL ROBUSTO (Feature 2 - Persistence) ---
+    def log_historial(self, chat_id, nick_sender, mensaje, es_propio=False):
+        """
+        Guarda un mensaje en el log del chat específico.
+        Formato: [HH:MM] Nick: Mensaje
+        """
+        try:
+            os.makedirs(HISTORY_DIR, exist_ok=True)
+            log_path = os.path.join(HISTORY_DIR, f"{chat_id}.log")
+            
+            from datetime import datetime
+            now = datetime.now()
+            ts_str = now.strftime("%Y-%m-%d %H:%M")
+            time_str = now.strftime("%H:%M")
+            
+            nick_display = "Tú" if es_propio else nick_sender
+            
+            # Simple line format for parsing later if needed, or just display
+            # We prefix with TS| for internal parsing or just raw text?
+            # User wants visual history. Let's store raw display text + hidden meta if needed.
+            # But to insert "HOY", we need the date. So let's store:
+            # YYYY-MM-DD HH:MM|Nick|Msg
+            
+            line = f"{ts_str}|{nick_display}|{mensaje}\n"
+            
+            with open(log_path, 'a', encoding='utf-8') as f:
+                f.write(line)
+                
+        except Exception as e:
+            print(f"[X] Error guardando historial: {e}", file=sys.stderr)
+
+    def get_historial_reciente(self, chat_id, limit=15):
+        """
+        Recupera las últimas líneas formateadas con separadores de fecha.
+        Retorna una cadena lista para imprimir.
+        """
+        log_path = os.path.join(HISTORY_DIR, f"{chat_id}.log")
+        if not os.path.exists(log_path):
+            return ""
+            
+        lines = []
+        try:
+            # Read all (lightweight enough for text logs usually) or tail
+            with open(log_path, 'r', encoding='utf-8') as f:
+                raw_lines = f.readlines()
+                
+            # Take last N
+            chunk = raw_lines[-limit:] if len(raw_lines) > limit else raw_lines
+            
+            from datetime import datetime
+            from ghostwhisperchat.datos.recursos import Colores
+            
+            res = ""
+            last_date = None
+            today = datetime.now().strftime("%Y-%m-%d")
+            
+            # Header
+            if raw_lines:
+                res += f"{Colores.GREY}--- Cargar historial previo ({len(chunk)}/{len(raw_lines)}) ---{Colores.RESET}\n"
+
+            for line in chunk:
+                parts = line.strip().split('|', 2)
+                if len(parts) < 3: continue
+                
+                dt_str, nick, msg = parts
+                date_part, time_part = dt_str.split(' ')
+                
+                # Date Separator
+                if date_part != last_date:
+                    if date_part == today:
+                        label = "HOY"
+                    else:
+                        label = date_part
+                        
+                    res += f"\n{Colores.BG_YELLOW}{Colores.BLACK_TXT} {label} {Colores.RESET}\n"
+                    last_date = date_part
+                
+                # Format: [HH:MM] Nick: Msg
+                # Colorize Nick
+                if nick == "Tú":
+                    c_nick = Colores.C_GREEN_NEON
+                else:
+                    c_nick = Colores.C_BLUE_ROYAL
+                    
+                res += f"{Colores.GREY}[{time_part}]{Colores.RESET} {c_nick}{nick}{Colores.RESET}: {msg}\n"
+            
+            res += f"{Colores.GREY}--- Fin del historial ---{Colores.RESET}\n"
+            return res
+            
+        except Exception as e:
+            return f"[Error leyendo historial: {e}]"

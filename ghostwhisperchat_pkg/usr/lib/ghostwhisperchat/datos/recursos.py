@@ -74,9 +74,9 @@ class Colores:
     # Texto High Contrast para fondos claros
     BLACK_TXT = "\033[38;5;0m"
 
-# Versionado
-APP_VER_NUM = "2.128"
-APP_VER_TAG = "Estable version con apodos, nombres reales, dashboard pro color, estados y @todos"
+# Versionado - Estable version con apodos, nombres reales, dashboard pro color, estados y @todos
+APP_VER_NUM = "2.129"
+APP_VER_TAG = "Probando historiales y marcas de tiempo"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 BANNER = r"""

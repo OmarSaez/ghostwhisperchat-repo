@@ -170,6 +170,21 @@ class Motor:
             partes = mensaje.split(" ", 2)
             if len(partes) >= 3:
                 chat_id = partes[2]
+                
+                # --- HISTORY INJECTION (Feature 2) ---
+                # FIX: History only for Private Chats to avoid confusion in dynamic groups
+                # Check handshake parsing parts "TYPE ID"
+                # parts[1] is TYPE (GROUP or PRIVATE)
+                if len(partes) >= 2 and partes[1] == "PRIVATE":
+                    try:
+                        hist_block = self.memoria.get_historial_reciente(chat_id, limit=15)
+                        if hist_block:
+                            conn.sendall((hist_block + "\n").encode('utf-8'))
+                    except Exception as e:
+                        print(f"[X] History Error: {e}", file=sys.stderr)
+                
+                # Keep connection open for streaming logs
+                # We store it in ui_sessions
                 self.ui_sessions[chat_id] = conn
                 print(f"[UI] Registrada ventana para {chat_id}", file=sys.stderr)
                 conn.sendall(f"[*] Conectado al Daemon. ID: {chat_id}\n".encode('utf-8'))
@@ -797,6 +812,10 @@ class Motor:
                          s.sendall(pkg + b'\n')
                          s.close()
                      except: pass 
+                 
+                 # Log outgoing group message
+                 self.memoria.log_historial(chat_id, self.memoria.mi_nick, msg_content, es_propio=True)
+
              else:
                  target_ip = None
                  target_port = 44494
@@ -815,6 +834,13 @@ class Motor:
                      pkg = empaquetar("MSG", {"text": msg_content}, self.memoria.get_origen())
                      try: self.red.enviar_tcp_priv(target_ip, pkg, port=target_port)
                      except: pass
+                 
+                 # Log outgoing private message
+                 # Try to resolve UID if possible for consistent history filename
+                 p = self.memoria.buscar_peer(chat_id)
+                 hist_id = p['uid'] if p else chat_id
+                 self.memoria.log_historial(hist_id, self.memoria.mi_nick, msg_content, es_propio=True)
+
 
     def _shutdown_all_sessions(self):
         print("[SHUTDOWN] Cerrando todas las sesiones...", file=sys.stderr)
@@ -1306,7 +1332,8 @@ class Motor:
                 acepta = preguntar_invitacion_chat(origen_data['nick'], origen_data['uid'], grupo_nombre=g_name)
                 
                 if acepta:
-                    # 1. Send ACK (Best effort, sender might have closed)
+                    # 1. Send via Network
+                    # (Best effort, sender might have closed)
                     # We can't use 'sock' here efficiently as it might be dead. 
                     # But the real action is the JOIN.
                     
@@ -1413,6 +1440,11 @@ class Motor:
                  # We use this for normal messages.
                  nick_display = f"{nick_color}{sender_nick}{Colores.RESET}"
                  
+                 # v2.130: Timestamp for visual display
+                 from datetime import datetime
+                 ts = datetime.now().strftime("%H:%M")
+                 ts_display = f"{Colores.GREY}[{ts}]{Colores.RESET}"
+                 
                  # Regex: @ + MyNick (normalized check)
                  
                  # Regex: @ + MyNick (normalized check)
@@ -1446,6 +1478,24 @@ class Motor:
                  
                  is_highlight = is_personal_mention or is_global_mention
                  
+                 # Log message locally if private or relevant
+                 # Chat ID: If Private -> Sender UID/IP? Sender IP (peer key). If Group -> GID.
+                 
+                 # Logic: We need a Stable Chat ID for history.
+                 # Private: Use Sender UID (Unique).
+                 # Group: Use GID (Unique).
+                 
+                 hist_id = None
+                 if gid: 
+                     hist_id = gid
+                 else:
+                     # Private Message
+                     # Use Sender UID
+                     hist_id = origen.get('uid')
+                 
+                 if hist_id:
+                     self.memoria.log_historial(hist_id, sender_nick, text)
+
                  if is_highlight:
                       now = time.time()
                       should_notify = False
@@ -1468,15 +1518,21 @@ class Motor:
                                 should_notify = True
                                 self.mention_cooldowns[target_id] = now
                       
-                      # Send with Highlight Prefix
-                      prefix = "__MENTION__ "
-                      self.ui_sessions[target_id].sendall(f"\n{prefix}({origen['nick']}): {text}\n".encode('utf-8'))
+                      # HIGHLIGHT MENTION
+                      formatted = f"__MENTION__ {ts_display} {sender_nick}: {text}"
+                 else:
+                      # STANDARD
+                      formatted = f"{ts_display} {nick_display}: {text}"
+                 
+                 # 3. Send to UI
+                 try:
+                     self.ui_sessions[target_id].sendall((formatted + "\n").encode('utf-8'))
+                 except: pass
                       
                       if should_notify:
                            g_name = "Chat Privado"
                            if gid and gid in self.memoria.grupos_activos:
                                g_name = self.memoria.grupos_activos[gid]['nombre']
-                           
                            msg_body = f"{origen['nick']} te ha mencionado en {g_name}"
                            if is_global_mention and not is_personal_mention:
                                 msg_body = f"{origen['nick']} notificó a todos en {g_name}"
