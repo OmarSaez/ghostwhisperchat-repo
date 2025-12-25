@@ -1299,7 +1299,22 @@ class Motor:
                          if 'status_msg' in p: m_copy['status_msg'] = p['status_msg']
                          if 'status' in p: m_copy['status'] = p['status']
                      
+                     if p:
+                         if 'status_msg' in p: m_copy['status_msg'] = p['status_msg']
+                         if 'status' in p: m_copy['status'] = p['status']
+                     
                      sync_list.append(m_copy)
+                 
+                 # FEATURE FIX: Ensure HOST (Me) is in the list with FULL details (including status_msg)
+                 # Sometime 'miembros' dict already has me.
+                 # If so, does it have my 'status_msg'? 
+                 # 'miembros' usually stores static snapshot. My status changes dynamically.
+                 # We must refresh MY entry in the sync_list.
+                 for m in sync_list:
+                     if m['uid'] == self.memoria.mi_uid:
+                         m['status_msg'] = self.memoria.mi_estado_msg
+                         m['status'] = 'ONLINE' # Force online
+                         break
 
                  sync_pkg = empaquetar("SYNC", {"gid": gid, "members": sync_list}, self.memoria.get_origen())
                  print(f"[MESH] Respondiendo SYNC_REQ con {len(sync_list)} miembros.", file=sys.stderr)
@@ -1443,6 +1458,7 @@ class Motor:
                           
                      noti_body = f"{origen['nick']} te envio un archivo"
                      
+                     from ghostwhisperchat.core.utilidades import enviar_notificacion
                      enviar_notificacion(noti_title, noti_body)
                       
                      # Console Notification - User format
