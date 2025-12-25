@@ -626,12 +626,18 @@ class Motor:
                      sys_user = mdata.get('sys_user', '?') # Default unknown
                      
                      # 1. Self Check
+                     peer = None # Scope safety
+                     
                      if uid == self.memoria.mi_uid:
                          nick = self.memoria.mi_nick
                          sys_user = self.memoria.sys_user # Real Local
+                         # Self Status Msg
+                         status_msg = getattr(self.memoria, 'mi_estado_msg', None)
                          tag = " [Tu]"
                      else:
                          tag = ""
+                         status_msg = mdata.get('status_msg')
+                         
                          # 2. Dynamic Lookup (Source of Truth: Global Peers)
                          peer = self.memoria.peers.get(uid)
                          if peer:
@@ -640,19 +646,18 @@ class Motor:
                              status = peer.get('status', status)
                              if peer.get('ip'): ip = peer.get('ip')
                              if peer.get('sys_user'): sys_user = peer.get('sys_user')
+                             if peer.get('status_msg'): status_msg = peer.get('status_msg')
                          
                          # Update local group cache (Lazy Sync)
                          mdata['nick'] = nick
                          mdata['status'] = status
                          mdata['sys_user'] = sys_user
+                         # mdata['status_msg'] = status_msg # Optional sync
                      
                      # FORMATO ELEGIDO: Option 3 (Extended Identity)
                      # Nick [sys@ip] [STATUS: "Msg"]
                      
                      st_display = f"[{status}]"
-                     status_msg = mdata.get('status_msg')
-                     # Fallback to peer cache if missing in group snapshot
-                     if not status_msg and peer: status_msg = peer.get('status_msg')
                      
                      if status_msg:
                          st_display = f"[{status}: {Colores.C_GOLD}\"{status_msg}\"{Colores.RESET}]"
@@ -726,7 +731,8 @@ class Motor:
                             "chunk_id": i + 1,
                             "total_chunks": total_chunks,
                             "data": b64_data,
-                            "filesize": size
+                            "filesize": size,
+                            "gid": chat_id if chat_id in self.memoria.grupos_activos else None # Inject Context
                         }, self.memoria.get_origen())
                         
                         # Send Logic (Same as before but inside loop)
@@ -763,7 +769,12 @@ class Motor:
                         # Slight delay to allow network flush and prevent freezing
                         time.sleep(0.2)
                 
-                if ui_sess: ui_sess.sendall(b"\n")
+                if ui_sess: 
+                    ui_sess.sendall(b"\n")
+                    from ghostwhisperchat.datos.recursos import Colores
+                    msg_done = f"\n{Colores.BG_GREEN}{Colores.BLACK_TXT} [SISTEMA] Archivo enviado correctamente: {filename} {Colores.RESET}\n"
+                    ui_sess.sendall(msg_done.encode('utf-8'))
+                
                 return f"[*] Archivo '{filename}' enviado exitosamente ({total_chunks} partes)."
             except Exception as e:
                 return f"[X] Error enviando archivo: {e}"
@@ -1381,7 +1392,7 @@ class Motor:
                      
                  # Completion Check
                  if chunk_id == total_chunks:
-                     final_path = os.path.join(dest_dir, filename)
+                 final_path = os.path.join(dest_dir, filename)
                      # Avoid overwrite
                      if os.path.exists(final_path):
                          base, ext = os.path.splitext(filename)
@@ -1389,17 +1400,30 @@ class Motor:
                      
                      os.rename(part_path, final_path)
                      print(f"[FILE] Completado: {final_path}", file=sys.stderr)
-                     
-                     # Notify User
-                     enviar_notificacion("Archivo Recibido", f"De {origen['nick']}: {os.path.basename(final_path)}")
-                     
-                     # Console Notification
-                     try:
-                         from ghostwhisperchat.datos.recursos import Colores
-                         msg_alert = f"\n{Colores.YELLOW}[SISTEMA] [!] {origen['nick']} te ha enviado: {os.path.basename(final_path)}{Colores.RESET}\n"
-                         for chat_id, sess in self.ui_sessions.items():
-                             sess.sendall(msg_alert.encode('utf-8'))
-                     except: pass
+                                          # Notify User (Desktop)
+                      # v2.133: Logic restored. We now check payload 'gid'.
+                      f_gid = payload.get("gid")
+                      
+                      noti_title = "PRIV recepcion archivo"
+                      if f_gid and f_gid in self.memoria.grupos_activos:
+                           g_name = self.memoria.grupos_activos[f_gid]['nombre']
+                           noti_title = f"GRUP {g_name} recepcion archivo"
+                           
+                      noti_body = f"{origen['nick']} te envio un archivo"
+                      
+                      enviar_notificacion(noti_title, noti_body)
+                      
+                      # Console Notification - User format
+                      try:
+                          from ghostwhisperchat.datos.recursos import Colores
+                          
+                          # Simple format as requested: [SISTEMA] [!] (nick) te a enviado (nombre archivo)
+                          msg_alert = f"\n{Colores.YELLOW}[SISTEMA] [!] {origen['nick']} te ha enviado: {os.path.basename(final_path)}{Colores.RESET}\n"
+                          
+                          for chat_id_sess, sess in self.ui_sessions.items():
+                              sess.sendall(msg_alert.encode('utf-8'))
+                      except Exception as e:
+                           print(f"[X] Error notificando archivo: {e}", file=sys.stderr)
                  elif chunk_id % 5 == 0:
                      print(f"[FILE] Recibiendo {filename}: {chunk_id}/{total_chunks}", file=sys.stderr)
 
