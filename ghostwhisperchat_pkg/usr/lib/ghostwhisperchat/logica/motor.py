@@ -1559,8 +1559,13 @@ class Motor:
                     # Launch UI
                     abrir_chat_ui(origen['uid'], nombre_legible=origen['nick'], es_grupo=False)
                 else:
+
+                    # Generic Rejection (could be timeout or explicit No)
+                    # We can't distinguish easy unless 'preguntar_invitacion_chat' returns None for timeout.
+                    # Assuming False = Rejected for now to ensure feedback exists.
                     rej = empaquetar("CHAT_NO", {"reason": "Rejected"}, self.memoria.get_origen())
-                    self.red.enviar_tcp_priv(origen['ip'], rej)
+                    try: self.red.enviar_tcp_priv(origen['ip'], rej)
+                    except: pass
 
             threading.Thread(target=_prompt_private, daemon=True).start()
 
@@ -1570,7 +1575,18 @@ class Motor:
 
         elif tipo == "CHAT_NO":
             razon = payload.get("reason", "Sin razón")
-            enviar_notificacion("GhostWhisperChat", f"{origen['nick']} rechazó la conexión.")
+            noti_title = "Solicitud rechazada"
+            noti_body = f"{origen['nick']} ha rechazado tu invitación."
+            
+            if razon == "Busy" or razon == "Busy/DND":
+                 noti_title = "Usuario Ocupado"
+                 noti_body = f"{origen['nick']} está en modo 'No Molestar'."
+            
+            # TODO: If reason == "Timeout", say "Ausente"?
+            # Currently protocol sends 'Rejected'.
+            
+            from ghostwhisperchat.core.utilidades import enviar_notificacion
+            enviar_notificacion(noti_title, noti_body)
             
         elif tipo == "CHAT_BYE":
              # Notify termination
