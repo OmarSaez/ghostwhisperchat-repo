@@ -200,9 +200,13 @@ class Motor:
                              # 3. Fallback: Contacts (Reverse Lookup IP)
                              # self.memoria.contactos = {uid: {ip, nick...}}
                              for uid, c in self.memoria.contactos.items():
-                                  if c.get('ip') == chat_id or c.get('nick') == chat_id:
-                                       hist_target_id = uid
-                                       break
+                                   if c.get('ip') == chat_id or c.get('nick') == chat_id:
+                                        hist_target_id = uid
+                                        break
+                        
+                        # 4. Fallback: If chat_id itself looks like a valid UID, use it.
+                        if len(chat_id) == 16:
+                             hist_target_id = chat_id
 
                     try:
                         hist_block = self.memoria.get_historial_reciente(hist_target_id, limit=20)
@@ -927,21 +931,7 @@ class Motor:
                                  for c_uid, c_data in self.memoria.contactos.items():
                                       if c_data.get('ip') == chat_id or c_data.get('nick') == chat_id:
                                            hist_id = c_uid
-                                      if c.get('ip') == chat_id or c.get('nick') == chat_id:
-                                        hist_target_id = uid
-                                        break
-                        
-                        # 4. Fallback: If chat_id itself looks like a valid UID (hex, len 16/32/64), use it directly.
-                        # This happens when we accept an invitation (CHAT_REQ) which spawns UI with UID.
-                        # Sometimes 'buscar_peer' fails if we haven't cached them yet (race condition).
-                        if len(chat_id) == 16: # Our new hashes are 16 chars
-                            hist_target_id = chat_id
-                        
-                        # 4. Fallback: If chat_id itself looks like a valid UID (hex, len 16/32/64), use it directly.
-                        # This happens when we accept an invitation (CHAT_REQ) which spawns UI with UID.
-                        # Sometimes 'buscar_peer' fails if we haven't cached them yet (race condition).
-                        if len(chat_id) == 16: # Our new hashes are 16 chars
-                            hist_target_id = chat_id
+                                           break
                  
                  self.memoria.log_historial(hist_id, self.memoria.mi_nick, msg_content, es_propio=True)
                  
