@@ -169,7 +169,9 @@ class Motor:
         if mensaje.startswith("__REGISTER_UI__"):
             partes = mensaje.split(" ", 2)
             if len(partes) >= 3:
-                chat_id = partes[2]
+                chat_id = partes[2].strip()
+                
+                print(f"[DEBUG_REG] Raw ID: {repr(chat_id)} Len: {len(chat_id)}", file=sys.stderr)
                 
                 
                 # --- HISTORY INJECTION (Feature 2) ---
@@ -184,7 +186,10 @@ class Motor:
                     import string
                     is_hex = all(c in string.hexdigits for c in chat_id)
                     
+                    print(f"[DEBUG_REG] Is Hex: {is_hex} (Len 16 check: {len(chat_id) == 16})", file=sys.stderr)
+                    
                     if len(chat_id) == 16 and is_hex:
+                        print(f"[DEBUG_REG] Optimization: Valid UID detected. Loading history directly.", file=sys.stderr)
                         hist_target_id = chat_id
                     else:
                         # Only try to resolve if it's NOT a UID (e.g. Nick or IP)
