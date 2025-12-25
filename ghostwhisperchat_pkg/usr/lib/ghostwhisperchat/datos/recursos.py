@@ -75,7 +75,7 @@ class Colores:
     BLACK_TXT = "\033[38;5;0m"
 
 # Versionado - Estable version con apodos, nombres reales, dashboard pro color, estados y @todos
-APP_VER_NUM = "2.135"
+APP_VER_NUM = "2.136"
 APP_VER_TAG = "Historiales 1 a 1, marcas de tiempo y notificaciones de archivos"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 

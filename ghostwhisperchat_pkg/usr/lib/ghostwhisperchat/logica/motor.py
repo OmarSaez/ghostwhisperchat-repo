@@ -1391,8 +1391,9 @@ class Motor:
                      f.write(raw_data)
                      
                  # Completion Check
+                 # Completion Check
                  if chunk_id == total_chunks:
-                 final_path = os.path.join(dest_dir, filename)
+                     final_path = os.path.join(dest_dir, filename)
                      # Avoid overwrite
                      if os.path.exists(final_path):
                          base, ext = os.path.splitext(filename)
@@ -1400,18 +1401,19 @@ class Motor:
                      
                      os.rename(part_path, final_path)
                      print(f"[FILE] Completado: {final_path}", file=sys.stderr)
-                                          # Notify User (Desktop)
-                      # v2.133: Logic restored. We now check payload 'gid'.
-                      f_gid = payload.get("gid")
-                      
-                      noti_title = "PRIV recepcion archivo"
-                      if f_gid and f_gid in self.memoria.grupos_activos:
-                           g_name = self.memoria.grupos_activos[f_gid]['nombre']
-                           noti_title = f"GRUP {g_name} recepcion archivo"
-                           
-                      noti_body = f"{origen['nick']} te envio un archivo"
-                      
-                      enviar_notificacion(noti_title, noti_body)
+                     
+                     # Notify User (Desktop)
+                     # v2.133: Logic restored. We now check payload 'gid'.
+                     f_gid = payload.get("gid")
+                     
+                     noti_title = "PRIV recepcion archivo"
+                     if f_gid and f_gid in self.memoria.grupos_activos:
+                          g_name = self.memoria.grupos_activos[f_gid]['nombre']
+                          noti_title = f"GRUP {g_name} recepcion archivo"
+                          
+                     noti_body = f"{origen['nick']} te envio un archivo"
+                     
+                     enviar_notificacion(noti_title, noti_body)
                       
                       # Console Notification - User format
                       try:
