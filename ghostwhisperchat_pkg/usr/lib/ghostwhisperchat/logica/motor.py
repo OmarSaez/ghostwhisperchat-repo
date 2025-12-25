@@ -1415,17 +1415,17 @@ class Motor:
                      
                      enviar_notificacion(noti_title, noti_body)
                       
-                      # Console Notification - User format
-                      try:
-                          from ghostwhisperchat.datos.recursos import Colores
-                          
-                          # Simple format as requested: [SISTEMA] [!] (nick) te a enviado (nombre archivo)
-                          msg_alert = f"\n{Colores.YELLOW}[SISTEMA] [!] {origen['nick']} te ha enviado: {os.path.basename(final_path)}{Colores.RESET}\n"
-                          
-                          for chat_id_sess, sess in self.ui_sessions.items():
-                              sess.sendall(msg_alert.encode('utf-8'))
-                      except Exception as e:
-                           print(f"[X] Error notificando archivo: {e}", file=sys.stderr)
+                     # Console Notification - User format
+                     try:
+                         from ghostwhisperchat.datos.recursos import Colores
+                         
+                         # Simple format as requested: [SISTEMA] [!] (nick) te a enviado (nombre archivo)
+                         msg_alert = f"\n{Colores.YELLOW}[SISTEMA] [!] {origen['nick']} te ha enviado: {os.path.basename(final_path)}{Colores.RESET}\n"
+                         
+                         for chat_id_sess, sess in self.ui_sessions.items():
+                             sess.sendall(msg_alert.encode('utf-8'))
+                     except Exception as e:
+                          print(f"[X] Error notificando archivo: {e}", file=sys.stderr)
                  elif chunk_id % 5 == 0:
                      print(f"[FILE] Recibiendo {filename}: {chunk_id}/{total_chunks}", file=sys.stderr)
 
