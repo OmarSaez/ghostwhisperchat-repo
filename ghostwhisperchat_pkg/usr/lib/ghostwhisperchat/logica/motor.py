@@ -1559,11 +1559,9 @@ class Motor:
                     # Launch UI
                     abrir_chat_ui(origen['uid'], nombre_legible=origen['nick'], es_grupo=False)
                 else:
-
-                    # Generic Rejection (could be timeout or explicit No)
-                    # We can't distinguish easy unless 'preguntar_invitacion_chat' returns None for timeout.
-                    # Assuming False = Rejected for now to ensure feedback exists.
-                    rej = empaquetar("CHAT_NO", {"reason": "Rejected"}, self.memoria.get_origen())
+                    # 'acepta' can be False (No) or None (Timeout)
+                    reason_code = "Rejected" if acepta is False else "Timeout"
+                    rej = empaquetar("CHAT_NO", {"reason": reason_code}, self.memoria.get_origen())
                     try: self.red.enviar_tcp_priv(origen['ip'], rej)
                     except: pass
 
@@ -1582,8 +1580,9 @@ class Motor:
                  noti_title = "Usuario Ocupado"
                  noti_body = f"{origen['nick']} está en modo 'No Molestar'."
             
-            # TODO: If reason == "Timeout", say "Ausente"?
-            # Currently protocol sends 'Rejected'.
+            elif razon == "Timeout":
+                 noti_title = "Ausente"
+                 noti_body = f"{origen['nick']} no ha respondido la solicitud."
             
             from ghostwhisperchat.core.utilidades import enviar_notificacion
             enviar_notificacion(noti_title, noti_body)

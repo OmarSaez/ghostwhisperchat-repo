@@ -117,8 +117,14 @@ def preguntar_invitacion_chat(remitente_nick, remitente_id, grupo_nombre=None):
     
     try:
         # Zenity return codes: 0=OK, 1=Cancel, 5=Timeout
+        # Zenity return codes: 0=OK, 1=Cancel, 5=Timeout
         ret = subprocess.call(cmd)
-        return (ret == 0)
+        
+        if ret == 0: return True
+        if ret == 1: return False # Rechazo
+        if ret == 5: return None  # Timeout/Ausente
+        
+        return False # Default reject for other cases
     except FileNotFoundError:
         # Fallback si no hay zenity
         return False
