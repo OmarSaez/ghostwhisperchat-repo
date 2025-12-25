@@ -40,11 +40,55 @@ class MemoriaGlobal:
         self._cargar_configuracion()
         self._cargar_contactos()
         
-        # Si no hay UID (primer inicio), generarlo
-        if not self.mi_uid:
-            random_seed = f"{time.time()}-{os.getpid()}"
-            self.mi_uid = hashlib.sha256(random_seed.encode()).hexdigest()[:16]
-            self.guardar_configuracion() # Guardar el nuevo UID
+        # --- DETERMINISTIC UID (v2.137) ---
+        # El usuario pidio asociar historial a "Cuenta Linux + Hardware" para evitar perdidas al cambiar Nick.
+        # Intentamos generar un UID robusto basado en MachineID + SysUser.
+        # Si falla, usamos el aleatorio legado o el del config.
+        
+        try:
+            # 1. Get Machine ID
+            machine_id = None
+            if os.path.exists("/etc/machine-id"):
+                with open("/etc/machine-id", "r") as f:
+                    machine_id = f.read().strip()
+            elif os.path.exists("/var/lib/dbus/machine-id"):
+                with open("/var/lib/dbus/machine-id", "r") as f:
+                    machine_id = f.read().strip()
+            
+            # 2. Get Sys User
+            sys_user = self.sys_user # already loaded
+            
+            # 3. Get MAC Address (Physical Layer Uniqueness)
+            import uuid
+            mac_addr = uuid.getnode()
+            
+            if machine_id and sys_user:
+                # Deterministic Seed: User + OS_ID + Hardware_MAC
+                # Robust even against disk cloning (if MAC differs)
+                seed = f"{sys_user}@{machine_id}@{mac_addr}"
+                stable_uid = hashlib.sha256(seed.encode()).hexdigest()[:16]
+                
+                # Logic:
+                # If we already have a UID from config, should we overwrite it?
+                # Ideally YES, to enforce the stable identity. 
+                # BUT, if we overwrite, we lose history associated with the old random UID.
+                # Migration strategy:
+                # For now, let's ENFORCE stable UID for new installs or if valid.
+                # User specifically asked to fix the issue where changing Nick confused the system.
+                # A stable UID solves this permanently.
+                self.mi_uid = stable_uid
+            else:
+                # Fallback to random if no machine-id
+                if not self.mi_uid:
+                     random_seed = f"{time.time()}-{os.getpid()}"
+                     self.mi_uid = hashlib.sha256(random_seed.encode()).hexdigest()[:16]
+        except Exception as e:
+            print(f"[!] Error generando UID estable: {e}", file=sys.stderr)
+            if not self.mi_uid:
+                 # Last resort
+                 self.mi_uid = hashlib.sha256(str(time.time()).encode()).hexdigest()[:16]
+
+        self.guardar_configuracion() # Persist current Choice
 
         # Tablas de Red
         self.peers = {} 

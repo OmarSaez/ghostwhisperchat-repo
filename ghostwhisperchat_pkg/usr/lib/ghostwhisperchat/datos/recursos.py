@@ -70,13 +70,14 @@ class Colores:
     # Style: GOLD PREMIUM (v2.113)
     BG_YELLOW = "\033[48;5;220m" # Gold
     BG_RED    = "\033[41m"       # Error standard
+    BG_GREEN  = "\033[42m"       # Green for success
     
     # Texto High Contrast para fondos claros
     BLACK_TXT = "\033[38;5;0m"
 
 # Versionado - Estable version con apodos, nombres reales, dashboard pro color, estados y @todos
-APP_VER_NUM = "2.137"
-APP_VER_TAG = "Historiales 1 a 1, marcas de tiempo y notificaciones de archivos"
+APP_VER_NUM = "2.138"
+APP_VER_TAG = "Nueva generacion de UID"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 BANNER = r"""

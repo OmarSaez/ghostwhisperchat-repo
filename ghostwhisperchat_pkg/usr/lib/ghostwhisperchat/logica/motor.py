@@ -1286,9 +1286,21 @@ class Motor:
              gid = payload.get("gid")
              if gid in self.memoria.grupos_activos:
                  g = self.memoria.grupos_activos[gid]
-                 members = g.get('miembros', [])
-                 sync_list = list(members.values()) if isinstance(members, dict) else members
+                 members = g.get('miembros', {})
                  
+                 # ENRICHMENT: Ensure 'status_msg' is up to date from global peers cache before sending
+                 sync_list = []
+                 for uid, mdata in members.items():
+                     # Copy to not mutate original
+                     m_copy = mdata.copy()
+                     # Try to fetch fresh Status Msg from Global Peer Cache if missing or stale
+                     p = self.memoria.peers.get(uid)
+                     if p:
+                         if 'status_msg' in p: m_copy['status_msg'] = p['status_msg']
+                         if 'status' in p: m_copy['status'] = p['status']
+                     
+                     sync_list.append(m_copy)
+
                  sync_pkg = empaquetar("SYNC", {"gid": gid, "members": sync_list}, self.memoria.get_origen())
                  print(f"[MESH] Respondiendo SYNC_REQ con {len(sync_list)} miembros.", file=sys.stderr)
                  self.red.enviar_tcp(sock, sync_pkg)
@@ -1338,12 +1350,30 @@ class Motor:
                  g = self.memoria.grupos_activos[gid]
                  if 'miembros' not in g: g['miembros'] = {}
                  if new_user:
+                     # Add/Update Member
                      g['miembros'][new_user['uid']] = new_user
                      
-                     # Notificar en el chat
+                     # Also update Global Peer Cache
+                     # This ensures that future --ls or calls have the data
+                     self.memoria.actualizar_peer(
+                         new_user['ip'],
+                         new_user['uid'],
+                         new_user['nick'],
+                         sys_user=new_user.get('sys_user'),
+                         status_msg=new_user.get('status_msg')
+                     )
+                     
+                     print(f"[MESH] Usuario ANNOUNCED en {g['nombre']}: {new_user['nick']} (Msg: {new_user.get('status_msg')})", file=sys.stderr)
+                     
+                     # Register Incoming Socket for them if not exists?
+                     # No, ANNOUNCE is usually one-way or they will connect.
+                     # But we should have the socket from the 'sock' arg in handle_tcp if it's persistent.
+                     self.red.registrar_socket_tcp(sock, f"GRP_IN_{gid}_{new_user['uid']}")
+                     
+                     # YELLOW INDICATOR [+]
                      if gid in self.ui_sessions:
-                         # GREEN INDICATOR [+]
-                         self.ui_sessions[gid].sendall(f"\n[SISTEMA] [+] {new_user['nick']} se unió al grupo.\n".encode('utf-8'))
+                         # Formated Join Msg
+                         self.ui_sessions[gid].sendall(f"\n[SISTEMA] [+] {new_user['nick']} se ha unido al grupo.\n".encode('utf-8'))
                      
                      # Notificacion de Escritorio
                      enviar_notificacion(f"Grupo {g['nombre']}", f"{new_user['nick']} se unió al grupo.")
