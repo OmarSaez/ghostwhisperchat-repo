@@ -526,7 +526,7 @@ class Motor:
             
             # Use shared helper
             nodos = self._propagar_actualizacion_perfil()
-            return f"[*] Nick cambiado: {old} -> {self.memoria.mi_nick} (Propagado a {nodos} nodos)"
+            return f"[*] Nick cambiado: {old} -> {self.memoria.mi_nick}"
 
         elif cmd == "STATUS":
              # 1. Parse Args
@@ -554,7 +554,7 @@ class Motor:
              # 4. Propagate
              nodos = self._propagar_actualizacion_perfil()
              
-             return f"[*] Estado {msg} (Propagado a {nodos} nodos)"
+             return f"[*] Estado {msg}"
 
         elif cmd == "MUTE_TOGGLE":
             self.memoria.no_molestar = not self.memoria.no_molestar
