@@ -222,7 +222,7 @@ class Motor:
                         if hist_block:
                             data_bytes = (hist_block + "\n").encode('utf-8')
                             conn.sendall(data_bytes)
-                            print(f"[HISTORIAL] Enviados {len(data_bytes)} bytes a UI {chat_id} (Target UID: {hist_target_id})", file=sys.stderr)
+                            print(f"[DEBUG_HIST] Se cargo el historial ({len(data_bytes)} bytes) para Target UID: {hist_target_id}", file=sys.stderr)
                     except Exception as e:
                         print(f"[X] History Error: {e}", file=sys.stderr)
                 

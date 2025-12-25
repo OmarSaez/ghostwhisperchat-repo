@@ -227,38 +227,48 @@ def modo_ui_chat(target_id, es_grupo):
                     # Raw mode makes printing hard here, relying on main loop break
                     break
                 
-                msg_in = data.decode('utf-8')
+                msg_in_block = data.decode('utf-8')
                 
-                # Check for special Close Trigger
-                if "__CLOSE_UI__" in msg_in:
-                    helper.running = False
-                    break
-
-                # FIX SPACING: Strip trailing newlines from message itself
-                msg_in = msg_in.strip()
-                if not msg_in: continue
+                # Split by lines to handle multiple messages in one packet (Buffer coalescing)
+                lines = msg_in_block.split('\n')
                 
-                # --- SISTEMA COLORING (UX/UI Standard) ---
-                if msg_in.startswith("[SISTEMA]"):
-                    if "[X]" in msg_in or "Error" in msg_in:
-                         msg_in = f"{C.RED}{msg_in}{C.RESET}"
-                    elif "[-]" in msg_in or "[!]" in msg_in:
-                         msg_in = f"{C.YELLOW}{msg_in}{C.RESET}"
-                    else:
-                         msg_in = f"{C.GREEN}{msg_in}{C.RESET}"
-                
-                # FILTER: Hide ID confirmation message
-                if "Conectado al Daemon. ID:" in msg_in:
-                    continue
-
-                # HIGHLIGHT: MENTION
-                if "__MENTION__" in msg_in:
-                    msg_in = msg_in.replace("__MENTION__ ", "")
-                    # Yellow Background, Black Text for high contrast
-                    msg_in = f"{C.BG_YELLOW}{C.BLACK_TXT}{msg_in}{C.RESET}"
+                for line in lines:
+                    line = line.strip()
+                    if not line: continue
                     
-                # Use Helper to print safely
-                helper.print_incoming(msg_in)
+                    # Check for special Close Trigger
+                    if "__CLOSE_UI__" in line:
+                         helper.running = False
+                         break
+
+                    # FILTER: Hide ID confirmation message
+                    if "Conectado al Daemon. ID:" in line:
+                        continue
+
+                    # --- SISTEMA COLORING (UX/UI Standard) ---
+                    if line.startswith("[SISTEMA]"):
+                        if "[X]" in line or "Error" in line:
+                             line = f"{C.RED}{line}{C.RESET}"
+                        elif "[-]" in line or "[!]" in line:
+                             line = f"{C.YELLOW}{line}{C.RESET}"
+                        else:
+                             line = f"{C.GREEN}{line}{C.RESET}"
+                    
+                    # HIGHLIGHT: MENTION
+                    if "__MENTION__" in line:
+                        line = line.replace("__MENTION__ ", "")
+                        line = f"{C.BG_YELLOW}{C.BLACK_TXT}{line}{C.RESET}"
+                        
+                    # Use Helper to print safely
+                    helper.print_incoming(line)
+                    
+                    # DEBUG: Trace painting (Append to file for validation)
+                    try:
+                        with open("/tmp/gwc_client_debug.txt", "a") as f:
+                            # Strip ansi colors for readability in log
+                            raw_line = line.replace('\x1b', '').replace('[', '').replace(']', '') 
+                            f.write(f"[DEBUG_PAINT] Se pinto linea: {raw_line[:30]}...\n")
+                    except: pass
                 
             except:
                 break
