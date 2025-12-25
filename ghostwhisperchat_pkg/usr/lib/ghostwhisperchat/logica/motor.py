@@ -772,7 +772,8 @@ class Motor:
                 if ui_sess: 
                     ui_sess.sendall(b"\n")
                     from ghostwhisperchat.datos.recursos import Colores
-                    msg_done = f"\n{Colores.BG_GREEN}{Colores.BLACK_TXT} [SISTEMA] Archivo enviado correctamente: {filename} {Colores.RESET}\n"
+                    # Estilo ligero: Verde Texto (sin background), como pidio usuario.
+                    msg_done = f"\n{Colores.C_GREEN_NEON} [SISTEMA] Archivo enviado correctamente: {filename} {Colores.RESET}\n"
                     ui_sess.sendall(msg_done.encode('utf-8'))
                 
                 return f"[*] Archivo '{filename}' enviado exitosamente ({total_chunks} partes)."
@@ -926,7 +927,21 @@ class Motor:
                                  for c_uid, c_data in self.memoria.contactos.items():
                                       if c_data.get('ip') == chat_id or c_data.get('nick') == chat_id:
                                            hist_id = c_uid
-                                           break
+                                      if c.get('ip') == chat_id or c.get('nick') == chat_id:
+                                        hist_target_id = uid
+                                        break
+                        
+                        # 4. Fallback: If chat_id itself looks like a valid UID (hex, len 16/32/64), use it directly.
+                        # This happens when we accept an invitation (CHAT_REQ) which spawns UI with UID.
+                        # Sometimes 'buscar_peer' fails if we haven't cached them yet (race condition).
+                        if len(chat_id) == 16: # Our new hashes are 16 chars
+                            hist_target_id = chat_id
+                        
+                        # 4. Fallback: If chat_id itself looks like a valid UID (hex, len 16/32/64), use it directly.
+                        # This happens when we accept an invitation (CHAT_REQ) which spawns UI with UID.
+                        # Sometimes 'buscar_peer' fails if we haven't cached them yet (race condition).
+                        if len(chat_id) == 16: # Our new hashes are 16 chars
+                            hist_target_id = chat_id
                  
                  self.memoria.log_historial(hist_id, self.memoria.mi_nick, msg_content, es_propio=True)
                  
@@ -1116,6 +1131,14 @@ class Motor:
                  req = empaquetar("CHAT_REQ", {}, self.memoria.get_origen())
                  try:
                      self.red.enviar_tcp_priv(responder_ip, req)
+                     # Add to peers immediately to ensure History mapping works if we open UI
+                     self.memoria.actualizar_peer(
+                         responder_ip, 
+                         origen['uid'], 
+                         responder_nick, 
+                         sys_user=origen.get('sys_user'),
+                         status_msg=origen.get('status_msg')
+                     )
                      # Notify global UI? Usually user is in transient console, 
                      # but we can't easily print to it unless it polled.
                      # However, CHAT_REQ usually triggers UI on *Receiver* side.
@@ -1468,8 +1491,15 @@ class Motor:
                          # Simple format as requested: [SISTEMA] [!] (nick) te a enviado (nombre archivo)
                          msg_alert = f"\n{Colores.YELLOW}[SISTEMA] [!] {origen['nick']} te ha enviado: {os.path.basename(final_path)}{Colores.RESET}\n"
                          
-                         for chat_id_sess, sess in self.ui_sessions.items():
-                             sess.sendall(msg_alert.encode('utf-8'))
+                         # Broadcast carefully
+                         active_sessions = list(self.ui_sessions.values())
+                         if not active_sessions:
+                             print("[DEBUG] No UI sessions active to notify file receipt.", file=sys.stderr)
+                         
+                         for sess in active_sessions:
+                             try: sess.sendall(msg_alert.encode('utf-8'))
+                             except: pass
+                             
                      except Exception as e:
                           print(f"[X] Error notificando archivo: {e}", file=sys.stderr)
                  elif chunk_id % 5 == 0:
