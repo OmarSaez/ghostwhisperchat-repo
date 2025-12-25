@@ -76,8 +76,8 @@ class Colores:
     BLACK_TXT = "\033[38;5;0m"
 
 # Versionado - Estable version con apodos, nombres reales, dashboard pro color, estados y @todos
-APP_VER_NUM = "2.139.9"
-APP_VER_TAG = "FIXCambio de estados en tiempo real"
+APP_VER_NUM = "2.139.10"
+APP_VER_TAG = "FIX2 - Cambio de estados en tiempo real"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 BANNER = r"""

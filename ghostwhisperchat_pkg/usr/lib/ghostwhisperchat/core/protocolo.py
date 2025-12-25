@@ -24,11 +24,7 @@ def empaquetar(tipo, payload, destino, token=""):
         "ver": 2,
         "tipo": tipo,
         "token": token,
-        "origen": {
-            "uid": memoria.mi_uid,
-            "nick": memoria.mi_nick,
-            "ip": memoria.mi_ip
-        },
+        "origen": memoria.get_origen(),
         "destino": destino,
         "payload": payload,
         "meta": {
