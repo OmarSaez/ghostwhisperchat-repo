@@ -179,34 +179,38 @@ class Motor:
                 # Check handshake parsing parts "TYPE ID"
                 # parts[1] is TYPE (GROUP or PRIVATE)
                 if len(partes) >= 2 and partes[1] == "PRIVATE":
-                    # Try to resolve IP/Nick to UID
-                    # Improve Resolution logic:
-                    # 1. Active Peer Search
-                    peer_found = self.memoria.buscar_peer(chat_id)
-                    if peer_found:
-                        hist_target_id = peer_found['uid']
+                    # Priority 0: Is it already a UID? (Hex hash, len 16)
+                    # We check length AND content to avoid confusing a 16-char Nickname with a UID.
+                    import string
+                    is_hex = all(c in string.hexdigits for c in chat_id)
+                    
+                    if len(chat_id) == 16 and is_hex:
+                        hist_target_id = chat_id
                     else:
-                        # 2. Reverse Lookup in Active Peers (by IP) manually
-                        # buscar_peer usually does nick or uid.
-                        uid_by_ip = None
-                        for uid, p in self.memoria.peers.items():
-                             if p.get('ip') == chat_id:
-                                  uid_by_ip = uid
-                                  break
+                        # Only try to resolve if it's NOT a UID (e.g. Nick or IP)
                         
-                        if uid_by_ip:
-                             hist_target_id = uid_by_ip
+                        # 1. Active Peer Search
+                        peer_found = self.memoria.buscar_peer(chat_id)
+                        if peer_found:
+                            hist_target_id = peer_found['uid']
                         else:
-                             # 3. Fallback: Contacts (Reverse Lookup IP)
-                             # self.memoria.contactos = {uid: {ip, nick...}}
-                             for uid, c in self.memoria.contactos.items():
-                                   if c.get('ip') == chat_id or c.get('nick') == chat_id:
-                                        hist_target_id = uid
-                                        break
-                        
-                        # 4. Fallback: If chat_id itself looks like a valid UID, use it.
-                        if len(chat_id) == 16:
-                             hist_target_id = chat_id
+                            # 2. Reverse Lookup in Active Peers (by IP) manually
+                            # buscar_peer usually does nick or uid.
+                            uid_by_ip = None
+                            for uid, p in self.memoria.peers.items():
+                                 if p.get('ip') == chat_id:
+                                      uid_by_ip = uid
+                                      break
+                            
+                            if uid_by_ip:
+                                 hist_target_id = uid_by_ip
+                            else:
+                                 # 3. Fallback: Contacts (Reverse Lookup IP)
+                                 # self.memoria.contactos = {uid: {ip, nick...}}
+                                 for uid, c in self.memoria.contactos.items():
+                                       if c.get('ip') == chat_id or c.get('nick') == chat_id:
+                                            hist_target_id = uid
+                                            break
 
                     try:
                         hist_block = self.memoria.get_historial_reciente(hist_target_id, limit=20)
