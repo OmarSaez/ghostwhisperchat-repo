@@ -657,15 +657,17 @@ class Motor:
                              # Use freshest data
                              nick = peer.get('nick', nick)
                              status = peer.get('status', status)
-                             if peer.get('ip'): ip = peer.get('ip')
-                             if peer.get('sys_user'): sys_user = peer.get('sys_user')
-                             if peer.get('status_msg'): status_msg = peer.get('status_msg')
-                         
-                         # Update local group cache (Lazy Sync)
-                         mdata['nick'] = nick
-                         mdata['status'] = status
-                         mdata['sys_user'] = sys_user
-                         # mdata['status_msg'] = status_msg # Optional sync
+                            if peer.get('ip'): ip = peer.get('ip')
+                            if peer.get('sys_user'): sys_user = peer.get('sys_user')
+                            # FIX STATUS: Always take fresh status_msg if available
+                            if 'status_msg' in peer: 
+                                status_msg = peer.get('status_msg')
+                        
+                        # Update local group cache (Lazy Sync)
+                        mdata['nick'] = nick
+                        mdata['status'] = status
+                        mdata['sys_user'] = sys_user
+                        if status_msg: mdata['status_msg'] = status_msg
                      
                      # FORMATO ELEGIDO: Option 3 (Extended Identity)
                      # Nick [sys@ip] [STATUS: "Msg"]
