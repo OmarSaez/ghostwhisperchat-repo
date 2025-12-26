@@ -37,7 +37,15 @@ def render_ascii(image_path, width=60):
     new_height = int(width * aspect_ratio) 
     if new_height % 2 != 0: new_height += 1
     
-    img = img.resize((width, new_height), Image.Resampling.LANCZOS)
+    # Compatibilidad Pillow < 9
+    if hasattr(Image, 'Resampling'):
+        resample_filter = Image.Resampling.LANCZOS
+    elif hasattr(Image, 'LANCZOS'):
+        resample_filter = Image.LANCZOS
+    else:
+        resample_filter = Image.ANTIALIAS
+    
+    img = img.resize((width, new_height), resample_filter)
     img = img.convert('RGB')
     pixels = img.load()
     

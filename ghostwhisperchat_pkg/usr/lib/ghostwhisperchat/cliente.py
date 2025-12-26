@@ -148,14 +148,18 @@ class GestorInput:
                      self.print_incoming(f"{C.RED_TXT}[X] Uso: --imagen <ruta> [ancho]{C.RESET}")
                      return
                  
-                 im_path = parts[1]
+                 im_path = parts[1].strip("'").strip('"')
                  im_width = 60
                  if len(parts) > 2 and parts[2].isdigit():
                      im_width = int(parts[2])
                  
                  # Renderizar (Puede tardar unos ms)
                  self.print_incoming(f"{C.YELLOW_TXT}[*] Procesando imagen...{C.RESET}")
-                 res = imagen_ascii.render_ascii(im_path, im_width)
+                 try:
+                     res = imagen_ascii.render_ascii(im_path, im_width)
+                 except Exception as e:
+                     self.print_incoming(f"{C.RED_TXT}[X] Crash Rendering: {e}{C.RESET}")
+                     return
                  
                  if res.startswith("ERROR:"):
                      self.print_incoming(f"{C.RED_TXT}[X] {res}{C.RESET}")
@@ -187,8 +191,8 @@ class GestorInput:
                  if disp: payload = f"{payload} __ENV_DISPLAY__={disp}"
                  
              self.sock.sendall(payload.encode('utf-8'))
-        except:
-             pass
+        except Exception as e:
+             self.print_incoming(f"[ERROR CLI] {e}")
 
 def enviar_comando_transitorio(cmd_str):
     """Envía un comando, espera respuesta inmediata y sale."""
