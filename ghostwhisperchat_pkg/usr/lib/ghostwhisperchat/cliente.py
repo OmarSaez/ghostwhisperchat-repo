@@ -13,6 +13,7 @@ import tty     # Raw mode utility
 import shutil
 import argparse
 from ghostwhisperchat.datos.recursos import Colores as C, BANNER
+from ghostwhisperchat.core import imagen_ascii # Modulo ASCII Art
 
 IPC_SOCK_PATH = os.path.expanduser("~/.ghostwhisperchat/gwc.sock")
 
@@ -40,6 +41,9 @@ class GestorInput:
         """Imprime mensaje entrante sin romper el input actual"""
         with self.lock:
             self._limpiar_linea()
+            # Decodificar newlines de ASCII Art (Safety token)
+            msg = msg.replace("<<ASCII_NL>>", "\n")
+            
             # Asegurar retorno de carro para raw mode (\n -> \r\n)
             msg = msg.replace('\n', '\r\n')
             sys.stdout.write(f"{msg}\r\n") 
@@ -134,6 +138,37 @@ class GestorInput:
              from ghostwhisperchat.datos.recursos import COMMAND_MAP
              cmd_raw = msg.split()[0]
              if not cmd_raw.startswith("-"): cmd_raw = "--" + cmd_raw 
+             
+             # --- INTERCEPCION IMAGEN ASCII ---
+             # Alias: --imagen, --foto, --picture, -P, -i
+             IMG_ALIASES = ["--imagen", "--foto", "--picture", "-P", "-i"]
+             if cmd_raw in IMG_ALIASES:
+                 parts = msg.strip().split()
+                 if len(parts) < 2:
+                     self.print_incoming(f"{C.RED_TXT}[X] Uso: --imagen <ruta> [ancho]{C.RESET}")
+                     return
+                 
+                 im_path = parts[1]
+                 im_width = 60
+                 if len(parts) > 2 and parts[2].isdigit():
+                     im_width = int(parts[2])
+                 
+                 # Renderizar (Puede tardar unos ms)
+                 self.print_incoming(f"{C.YELLOW_TXT}[*] Procesando imagen...{C.RESET}")
+                 res = imagen_ascii.render_ascii(im_path, im_width)
+                 
+                 if res.startswith("ERROR:"):
+                     self.print_incoming(f"{C.RED_TXT}[X] {res}{C.RESET}")
+                     return
+                 
+                 # Empaquetar para envio seguro (sin newlines reales)
+                 # Agregamos header visible y un salto de linea inicial para alineacion perfecta
+                 res = f"\n{C.CYAN_TXT}[IMAGEN ASCII] {os.path.basename(im_path)}{C.RESET}\n" + res
+                 msg = res.replace("\n", "<<ASCII_NL>>")
+                 
+                 # Actualizar cmd_raw para que pase la logica de abajo como si fuera texto normal
+                 cmd_raw = "MSG_TEXT" 
+
              is_scan = cmd_raw in COMMAND_MAP['SCAN'] or cmd_raw in COMMAND_MAP['LIST_GROUPS']
              
              if is_scan:
@@ -147,7 +182,7 @@ class GestorInput:
              payload = f"__MSG__ {msg}"
              
              # If command, inject display
-             if msg.strip().startswith("--"):
+             if msg.strip().startswith("--") and cmd_raw != "MSG_TEXT":
                  disp = os.environ.get('DISPLAY')
                  if disp: payload = f"{payload} __ENV_DISPLAY__={disp}"
                  

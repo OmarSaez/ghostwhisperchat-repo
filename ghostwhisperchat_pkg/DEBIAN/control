@@ -1,8 +1,8 @@
 Package: ghostwhisperchat
-Version: 2.140
+Version: 2.145
 Section: net
 Priority: optional
 Architecture: all
 Maintainer: Omar Saez <omar.saez@usach.cl>
 Description: GhostWhisperChat - Chat LAN silencioso para comunicación 1 a 1 y grupos.
-Depends: python3 (>= 3.6), zenity, libnotify-bin, psmisc, zip, unzip
+Depends: python3 (>= 3.6), zenity, libnotify-bin, psmisc, zip, unzip, python3-pil
