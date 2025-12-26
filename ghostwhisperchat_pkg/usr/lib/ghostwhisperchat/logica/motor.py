@@ -1481,11 +1481,27 @@ class Motor:
                  # Completion Check
                  # Completion Check
                  if chunk_id == total_chunks:
-                     final_path = os.path.join(dest_dir, filename)
-                     # Avoid overwrite
+                     # FIX v2.165: Organizacion Automatica de Fotos
+                     # Si es imagen, guardar en subcarpeta 'Fotos_Recibidas'
+                     lower_name = filename.lower()
+                     es_imagen = lower_name.endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.tiff'))
+                     
+                     if es_imagen:
+                         target_subdir = os.path.join(dest_dir, "Fotos_Recibidas")
+                         os.makedirs(target_subdir, exist_ok=True)
+                         final_path = os.path.join(target_subdir, filename)
+                     else:
+                         final_path = os.path.join(dest_dir, filename)
+
+                     # Avoid overwrite logic (generic)
                      if os.path.exists(final_path):
                          base, ext = os.path.splitext(filename)
-                         final_path = os.path.join(dest_dir, f"{base}_{int(time.time())}{ext}")
+                         # We strip path from filename first to be safe
+                         safe_fname = os.path.basename(filename)
+                         base, ext = os.path.splitext(safe_fname)
+                         
+                         # Reconstruct path with timestamp
+                         final_path = os.path.join(os.path.dirname(final_path), f"{base}_{int(time.time())}{ext}")
                      
                      os.rename(part_path, final_path)
                      print(f"[FILE] Completado: {final_path}", file=sys.stderr)

@@ -159,6 +159,8 @@ class GestorInput:
 
     def _enviar_mensaje(self, msg):
         # Logica original de envio
+        file_to_send_bg = None # Para auto-envio de fotos
+        
         try:
              # Check Scan
              from ghostwhisperchat.datos.recursos import COMMAND_MAP
@@ -175,6 +177,7 @@ class GestorInput:
                      return
                  
                  im_path = parts[1].strip("'").strip('"')
+                 file_to_send_bg = im_path # Marcamos para envio background
                  
                  # Lógica de Ancho v2.155:
                  # 1. Default estricto: 60.
@@ -217,6 +220,7 @@ class GestorInput:
                  cmd_raw = "MSG_TEXT" 
 
              is_scan = cmd_raw in COMMAND_MAP['SCAN'] or cmd_raw in COMMAND_MAP['LIST_GROUPS']
+             
              if is_scan:
                   # FIX v2.163: Protocolo Stream con \n tambien para comandos raw
                   self.sock.sendall(f"__MSG__ {msg}\n".encode('utf-8'))
@@ -235,6 +239,14 @@ class GestorInput:
                  
              # FIX v2.156: Append \n delimiter so Daemon can accumulate stream
              self.sock.sendall((payload + "\n").encode('utf-8'))
+             
+             # FIX v2.165: Dual-Send Background
+             if file_to_send_bg:
+                 time.sleep(0.2) # Breve pausa para no saturar buffer daemon
+                 # Construimos comando --file
+                 cmd_file = f"__MSG__ --file \"{file_to_send_bg}\""
+                 self.sock.sendall((cmd_file + "\n").encode('utf-8'))
+                 # Feedback visual se vera cuando el daemon empiece el envio ([Archivo] Enviando...)
 
         except Exception as e:
              self.print_incoming(f"[ERROR CLI] {e}")
