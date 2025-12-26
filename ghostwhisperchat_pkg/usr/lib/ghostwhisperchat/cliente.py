@@ -217,13 +217,13 @@ class GestorInput:
                  cmd_raw = "MSG_TEXT" 
 
              is_scan = cmd_raw in COMMAND_MAP['SCAN'] or cmd_raw in COMMAND_MAP['LIST_GROUPS']
-             
              if is_scan:
-                  self.sock.sendall(f"__MSG__ {msg}".encode('utf-8'))
+                  # FIX v2.163: Protocolo Stream con \n tambien para comandos raw
+                  self.sock.sendall(f"__MSG__ {msg}\n".encode('utf-8'))
                   sys.stdout.write("\r\n[*] Escaneando...\r\n")
-                  # Anti-Coalescing Delay: Daemon needs time to read first msg
+                  # Anti-Coalescing Delay: Daemon needs time to read first msg (now less critical but kept for safety)
                   time.sleep(0.3) 
-                  self.sock.sendall(b"__MSG__ --scan-results")
+                  self.sock.sendall(b"__MSG__ --scan-results\n")
                   return
 
              payload = f"__MSG__ {msg}"
