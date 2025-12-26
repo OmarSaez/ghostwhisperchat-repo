@@ -156,7 +156,11 @@ class GestorInput:
                  # Renderizar (Puede tardar unos ms)
                  self.print_incoming(f"{C.YELLOW_TXT}[*] Procesando imagen...{C.RESET}")
                  try:
+                     # DEBUG TIME
+                     t0 = time.time()
                      res = imagen_ascii.render_ascii(im_path, im_width)
+                     dt = time.time() - t0
+                     self.print_incoming(f"{C.GREY}[DEBUG] Render time: {dt:.2f}s | Size: {len(res)} chars{C.RESET}")
                  except Exception as e:
                      self.print_incoming(f"{C.RED_TXT}[X] Crash Rendering: {e}{C.RESET}")
                      return
@@ -165,12 +169,11 @@ class GestorInput:
                      self.print_incoming(f"{C.RED_TXT}[X] {res}{C.RESET}")
                      return
                  
-                 # Empaquetar para envio seguro (sin newlines reales)
-                 # Agregamos header visible y un salto de linea inicial para alineacion perfecta
+                 # Empaquetar
                  res = f"\n{C.CYAN_TXT}[IMAGEN ASCII] {os.path.basename(im_path)}{C.RESET}\n" + res
                  msg = res.replace("\n", "<<ASCII_NL>>")
                  
-                 # Actualizar cmd_raw para que pase la logica de abajo como si fuera texto normal
+                 # Actualizar cmd_raw
                  cmd_raw = "MSG_TEXT" 
 
              is_scan = cmd_raw in COMMAND_MAP['SCAN'] or cmd_raw in COMMAND_MAP['LIST_GROUPS']
@@ -190,7 +193,10 @@ class GestorInput:
                  disp = os.environ.get('DISPLAY')
                  if disp: payload = f"{payload} __ENV_DISPLAY__={disp}"
                  
+             self.print_incoming(f"{C.GREY}[DEBUG] Enviando {len(payload)} bytes al socket...{C.RESET}")
              self.sock.sendall(payload.encode('utf-8'))
+             self.print_incoming(f"{C.GREY}[DEBUG] Enviado OK.{C.RESET}")
+
         except Exception as e:
              self.print_incoming(f"[ERROR CLI] {e}")
 
