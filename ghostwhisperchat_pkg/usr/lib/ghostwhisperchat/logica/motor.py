@@ -118,8 +118,8 @@ class Motor:
                     
                     elif s in sockets_ui:
                         try:
-                            # FIX v2.151: Aumentar buffer a 1MB (Max HD Image Payload Ultra)
-                            data = s.recv(1048576) 
+                            # FIX v2.152: Buffer Masivo 16MB (Ultimate Fix)
+                            data = s.recv(16777216) 
                             if data: self.procesar_input_chat_ui(s, data.decode('utf-8'))
                             else: self.desconectar_ui(s)
                         except: self.desconectar_ui(s)
