@@ -205,18 +205,17 @@ class GestorInput:
                  
                  
                  # Empaquetar con Protocolo Seguro Base64 (v2.150)
-                 # 1. Header visible (fuera del b64 para previews simples)
                  import base64
-                 header = f"\n{C.CYAN}[IMAGEN ASCII] {os.path.basename(im_path)}{C.RESET}\n"
                  
-                 # 2. Convertir contenido completo a B64
-                 # Concatenamos reset al final por seguridad
+                 # Header SAFE (Usamos <<ASCII_NL>> en vez de \n real para que viaje en 1 linea)
+                 header_safe = f"<<ASCII_NL>>{C.CYAN}[IMAGEN ASCII] {os.path.basename(im_path)}{C.RESET}<<ASCII_NL>>"
+                 
+                 # Payload B64
                  full_content = res + C.RESET
                  b64_data = base64.b64encode(full_content.encode('utf-8')).decode('ascii')
                  
-                 # 3. Mensaje final: [B64_IMG] + Header + | + B64
-                 # Usamos un separador '|' para separar el header texto plano del payload
-                 msg = f"[B64_IMG]{header}|{b64_data}"
+                 # Mensaje final: [B64_IMG] + HeaderSafe + | + B64
+                 msg = f"[B64_IMG]{header_safe}|{b64_data}"
                  
                  # Actualizar cmd_raw
                  cmd_raw = "MSG_TEXT" 
