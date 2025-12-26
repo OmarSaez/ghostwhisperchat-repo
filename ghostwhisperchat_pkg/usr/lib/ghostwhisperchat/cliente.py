@@ -310,23 +310,27 @@ def modo_ui_chat(target_id, es_grupo):
 
     # 2. Thread de Lectura (Incoming Messages)
     def escuchar():
+        buffer_bytes = b""
         while helper.running:
             try:
-                # FIX v2.152: Buffer Masivo de 16MB para soportar cualquier imagen ASCII TrueColor
-                data = s.recv(16777216)
-                if not data:
+                # FIX v2.153: Buffer Acumulativo Real (Stream Handling)
+                chunk = s.recv(262144) 
+                if not chunk:
                     helper.running = False
-                    # Raw mode makes printing hard here, relying on main loop break
                     break
                 
-                msg_in_block = data.decode('utf-8')
+                buffer_bytes += chunk
                 
-                # Split by lines to handle multiple messages in one packet (Buffer coalescing)
-                lines = msg_in_block.split('\n')
-                
-                for line in lines:
-                    line = line.strip()
-                    if not line: continue
+                # Procesar mensajes completos (terminados en \n)
+                while b'\n' in buffer_bytes:
+                    line_bytes, buffer_bytes = buffer_bytes.split(b'\n', 1)
+                    if not line_bytes: continue
+                    
+                    try:
+                        line_str = line_bytes.decode('utf-8').strip()
+                        if line_str: helper.print_incoming(line_str)
+                    except Exception as e:
+                        helper.print_incoming(f"[ERROR RX] {e}")
                     
                     # Check for special Close Trigger
                     if "__CLOSE_UI__" in line:
