@@ -176,24 +176,16 @@ class GestorInput:
                  
                  im_path = parts[1].strip("'").strip('"')
                  
-                 # Deteccion de ancho de terminal para evitar line-wrapping destructivo
-                 try:
-                     term_w = os.get_terminal_size().columns
-                 except:
-                     term_w = 80
+                 # Lógica de Ancho v2.155:
+                 # 1. Default estricto: 60.
+                 # 2. Si usuario define ancho: Se usa ese valor (Clampeado 10-190).
+                 # Ya no hay auto-ajuste a la ventana local.
                  
-                 # Default: 60 (Estándar solicitado por usuario)
-                 im_width = 60
+                 im_width = 60 # Default
                  
-                 # Si usuario pide ancho especifico:
                  if len(parts) > 2 and parts[2].isdigit():
-                     im_width = int(parts[2])
-                     
-                 # Clamp de Seguridad FINAL:
-                 # 1. Que quepa en la terminal actual (menos margen)
-                 im_width = min(im_width, term_w - 4)
-                 # 2. Limites Hardcoded del Motor (10 - 190)
-                 im_width = max(10, min(im_width, 190))
+                     user_val = int(parts[2])
+                     im_width = max(10, min(user_val, 190))
                  
                  # Renderizar (Puede tardar unos ms)
                  self.print_incoming(f"{C.YELLOW}[*] Procesando imagen...{C.RESET}")
