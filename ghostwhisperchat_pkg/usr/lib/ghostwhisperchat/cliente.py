@@ -149,9 +149,21 @@ class GestorInput:
                      return
                  
                  im_path = parts[1].strip("'").strip('"')
-                 im_width = 60
+                 
+                 # Deteccion de ancho de terminal para evitar line-wrapping destructivo
+                 try:
+                     term_w = os.get_terminal_size().columns
+                 except:
+                     term_w = 80
+                 
+                 # Default: Ancho terminal - 4 (margen) o 60, lo que sea mejor
+                 safe_width = min(60, term_w - 4)
+                 
+                 im_width = safe_width
                  if len(parts) > 2 and parts[2].isdigit():
-                     im_width = int(parts[2])
+                     user_w = int(parts[2])
+                     # Clamp user width al ancho de terminal para evitar desastre
+                     im_width = min(user_w, term_w - 2)
                  
                  # Renderizar (Puede tardar unos ms)
                  self.print_incoming(f"{C.YELLOW}[*] Procesando imagen...{C.RESET}")
