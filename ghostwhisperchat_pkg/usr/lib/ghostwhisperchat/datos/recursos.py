@@ -76,8 +76,8 @@ class Colores:
     BLACK_TXT = "\033[38;5;0m"
 
 # Versionado - Estable version con apodos, nombres reales, dashboard pro color, estados y @todos
-APP_VER_NUM = "2.149.7"
-APP_VER_TAG = "FIX7 - Soporte Imagen ASCII"
+APP_VER_NUM = "2.149.8"
+APP_VER_TAG = "TEST1 - Soporte Imagen ASCII HD"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 BANNER = r"""
@@ -222,6 +222,10 @@ ABBREVIATIONS_DISPLAY = {
         "ENVIAR ARCHIVO": {
             'aliases': ['--archivo', '-f', '--enviar', '--mandar', '--adjuntar'],
             'desc': "Enviar un archivo a la sala actual (puedes arrastrarlo al chat para la ruta)."
+        },
+        "ENVIAR IMAGEN ASCII": {
+            'aliases': ['--imagen', '-P', '--foto', '--picture', '-i'],
+            'desc': "Mandar foto como Arte ASCII. Uso: --imagen <ruta> <opcional:ancho>"
         },
         "CAMBIAR NOMBRE": {
             'aliases': ['--cambiarnombre', '-n', '--nick', '--apodo', '--nombre'],
