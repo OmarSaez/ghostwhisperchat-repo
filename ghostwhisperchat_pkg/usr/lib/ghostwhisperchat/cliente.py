@@ -308,7 +308,8 @@ def modo_ui_chat(target_id, es_grupo):
     def escuchar():
         while helper.running:
             try:
-                data = s.recv(4096)
+                # FIX v2.150: Buffer aumentado a 128KB para recibir imagenes B64 enteras
+                data = s.recv(131072)
                 if not data:
                     helper.running = False
                     # Raw mode makes printing hard here, relying on main loop break
