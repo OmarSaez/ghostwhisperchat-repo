@@ -118,7 +118,8 @@ class Motor:
                     
                     elif s in sockets_ui:
                         try:
-                            data = s.recv(4096)
+                            # FIX v2.150: Aumentar buffer para soportar imagenes B64 grandes (128KB)
+                            data = s.recv(131072) 
                             if data: self.procesar_input_chat_ui(s, data.decode('utf-8'))
                             else: self.desconectar_ui(s)
                         except: self.desconectar_ui(s)
