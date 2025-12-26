@@ -182,15 +182,18 @@ class GestorInput:
                  except:
                      term_w = 80
                  
-                 # Default: Ancho terminal - 4 (margen) o 80 standard, pero permitiendo hasta 190 si cabe
-                 # Prioridad: Si cabe en pantalla, úsalo. Max absoluto 190.
-                 safe_width = min(190, term_w - 4)
+                 # Default: 60 (Estándar solicitado por usuario)
+                 im_width = 60
                  
-                 im_width = safe_width
+                 # Si usuario pide ancho especifico:
                  if len(parts) > 2 and parts[2].isdigit():
-                     user_w = int(parts[2])
-                     # Clamp user width al ancho de terminal para evitar desastre
-                     im_width = min(user_w, term_w - 2)
+                     im_width = int(parts[2])
+                     
+                 # Clamp de Seguridad FINAL:
+                 # 1. Que quepa en la terminal actual (menos margen)
+                 im_width = min(im_width, term_w - 4)
+                 # 2. Limites Hardcoded del Motor (10 - 190)
+                 im_width = max(10, min(im_width, 190))
                  
                  # Renderizar (Puede tardar unos ms)
                  self.print_incoming(f"{C.YELLOW}[*] Procesando imagen...{C.RESET}")
@@ -309,8 +312,8 @@ def modo_ui_chat(target_id, es_grupo):
     def escuchar():
         while helper.running:
             try:
-                # FIX v2.150: Buffer aumentado a 256KB para imagenes HD (hasta 190 ancho)
-                data = s.recv(262144)
+                # FIX v2.150: Buffer aumentado a 1MB para imagenes HD Ultra
+                data = s.recv(1048576)
                 if not data:
                     helper.running = False
                     # Raw mode makes printing hard here, relying on main loop break

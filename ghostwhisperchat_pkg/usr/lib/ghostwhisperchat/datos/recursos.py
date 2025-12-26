@@ -76,8 +76,8 @@ class Colores:
     BLACK_TXT = "\033[38;5;0m"
 
 # Versionado - Estable version con apodos, nombres reales, dashboard pro color, estados y @todos
-APP_VER_NUM = "2.149.8"
-APP_VER_TAG = "TEST1 - Soporte Imagen ASCII HD"
+APP_VER_NUM = "2.149.9"
+APP_VER_TAG = "Estable - 1MB Buffer - Default 60"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 BANNER = r"""
