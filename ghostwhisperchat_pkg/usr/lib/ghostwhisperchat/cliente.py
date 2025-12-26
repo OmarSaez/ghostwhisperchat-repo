@@ -145,7 +145,7 @@ class GestorInput:
              if cmd_raw in IMG_ALIASES:
                  parts = msg.strip().split()
                  if len(parts) < 2:
-                     self.print_incoming(f"{C.RED_TXT}[X] Uso: --imagen <ruta> [ancho]{C.RESET}")
+                     self.print_incoming(f"{C.RED}[X] Uso: --imagen <ruta> [ancho]{C.RESET}")
                      return
                  
                  im_path = parts[1].strip("'").strip('"')
@@ -154,19 +154,19 @@ class GestorInput:
                      im_width = int(parts[2])
                  
                  # Renderizar (Puede tardar unos ms)
-                 self.print_incoming(f"{C.YELLOW_TXT}[*] Procesando imagen...{C.RESET}")
+                 self.print_incoming(f"{C.YELLOW}[*] Procesando imagen...{C.RESET}")
                  try:
                      res = imagen_ascii.render_ascii(im_path, im_width)
                  except Exception as e:
-                     self.print_incoming(f"{C.RED_TXT}[X] Crash Rendering: {e}{C.RESET}")
+                     self.print_incoming(f"{C.RED}[X] Crash Rendering: {e}{C.RESET}")
                      return
                  
                  if res.startswith("ERROR:"):
-                     self.print_incoming(f"{C.RED_TXT}[X] {res}{C.RESET}")
+                     self.print_incoming(f"{C.RED}[X] {res}{C.RESET}")
                      return
                  
                  # Empaquetar
-                 res = f"\n{C.CYAN_TXT}[IMAGEN ASCII] {os.path.basename(im_path)}{C.RESET}\n" + res
+                 res = f"\n{C.CYAN}[IMAGEN ASCII] {os.path.basename(im_path)}{C.RESET}\n" + res
                  msg = res.replace("\n", "<<ASCII_NL>>")
                  
                  # Actualizar cmd_raw
