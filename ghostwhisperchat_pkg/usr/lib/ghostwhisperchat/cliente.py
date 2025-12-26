@@ -23,7 +23,7 @@ class GestorInput:
         self.sock = socket_client
         self.buffer = []
         self.prompt = "Tu: "
-        self.lock = threading.Lock()
+        self.lock = threading.RLock() # RLock para evitar deadlock en llamadas anidadas
         self.running = True
         self.history = []
         self.history_index = 0
@@ -156,11 +156,7 @@ class GestorInput:
                  # Renderizar (Puede tardar unos ms)
                  self.print_incoming(f"{C.YELLOW_TXT}[*] Procesando imagen...{C.RESET}")
                  try:
-                     # DEBUG TIME
-                     t0 = time.time()
                      res = imagen_ascii.render_ascii(im_path, im_width)
-                     dt = time.time() - t0
-                     self.print_incoming(f"{C.GREY}[DEBUG] Render time: {dt:.2f}s | Size: {len(res)} chars{C.RESET}")
                  except Exception as e:
                      self.print_incoming(f"{C.RED_TXT}[X] Crash Rendering: {e}{C.RESET}")
                      return
@@ -193,9 +189,7 @@ class GestorInput:
                  disp = os.environ.get('DISPLAY')
                  if disp: payload = f"{payload} __ENV_DISPLAY__={disp}"
                  
-             self.print_incoming(f"{C.GREY}[DEBUG] Enviando {len(payload)} bytes al socket...{C.RESET}")
              self.sock.sendall(payload.encode('utf-8'))
-             self.print_incoming(f"{C.GREY}[DEBUG] Enviado OK.{C.RESET}")
 
         except Exception as e:
              self.print_incoming(f"[ERROR CLI] {e}")
