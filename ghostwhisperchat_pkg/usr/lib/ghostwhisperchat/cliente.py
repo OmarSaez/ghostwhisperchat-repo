@@ -326,11 +326,14 @@ def modo_ui_chat(target_id, es_grupo):
                     line_bytes, buffer_bytes = buffer_bytes.split(b'\n', 1)
                     if not line_bytes: continue
                     
+                    line = ""
                     try:
-                        line_str = line_bytes.decode('utf-8').strip()
-                        if line_str: helper.print_incoming(line_str)
+                        line = line_bytes.decode('utf-8').strip()
                     except Exception as e:
                         helper.print_incoming(f"[ERROR RX] {e}")
+                        continue
+
+                    if not line: continue
                     
                     # Check for special Close Trigger
                     if "__CLOSE_UI__" in line:
