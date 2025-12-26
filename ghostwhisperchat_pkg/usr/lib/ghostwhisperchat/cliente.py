@@ -166,7 +166,7 @@ class GestorInput:
                      return
                  
                  # Empaquetar
-                 res = f"\n{C.CYAN}[IMAGEN ASCII] {os.path.basename(im_path)}{C.RESET}\n" + res
+                 res = f"\n{C.CYAN}[IMAGEN ASCII] {os.path.basename(im_path)}{C.RESET}\n" + res + C.RESET
                  msg = res.replace("\n", "<<ASCII_NL>>")
                  
                  # Actualizar cmd_raw

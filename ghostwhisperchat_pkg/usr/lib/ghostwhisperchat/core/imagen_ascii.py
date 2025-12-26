@@ -25,7 +25,7 @@ def render_ascii(image_path, width=60):
     except ValueError:
         width = 60
         
-    width = max(10, min(width, 190))
+    width = max(10, min(width, 120)) # Reducido de 190 a 120 por seguridad
 
     try:
         img = Image.open(image_path)
