@@ -41,7 +41,33 @@ class GestorInput:
         """Imprime mensaje entrante sin romper el input actual"""
         with self.lock:
             self._limpiar_linea()
-            # Decodificar newlines de ASCII Art (Safety token)
+            
+            # --- PROTOCOLO IMAGEN SEGURA (v2.150) ---
+            if "[B64_IMG]" in msg:
+                try:
+                    # Formato: ... [B64_IMG]HEADER|PAYLOAD_B64 ... (Puede venir embedido en un chat con hora)
+                    # El prefix [B64_IMG] marca el inicio de la zona segura.
+                    # Asumimos que el mensaje entero ES la imagen si tiene el tag, 
+                    # pero debemos conservar la parte "[Hora] (Nick): " que motor.py agrego al principio.
+                    
+                    parts = msg.split("[B64_IMG]")
+                    prefix = parts[0] # "[12:00] (Nick): "
+                    contact_content = parts[1] # "HEADER|B64"
+                    
+                    if "|" in contact_content:
+                        header, b64_payload = contact_content.split("|", 1)
+                        import base64
+                        decoded_img = base64.b64decode(b64_payload).decode('utf-8', errors='replace')
+                        
+                        # Reconstruimos msg final
+                        # Header tiene sus propios newlines
+                        msg = f"{prefix}{header}{decoded_img}"
+                    else:
+                        msg = f"{prefix}[Error Protocolo img]"
+                except Exception as e:
+                    msg = f"[Error Decode Img: {e}]"
+
+            # Decodificar newlines de ASCII Art Legacy (por si acaso queda alguno)
             msg = msg.replace("<<ASCII_NL>>", "\n")
             
             # Asegurar retorno de carro para raw mode (\n -> \r\n)
@@ -177,9 +203,20 @@ class GestorInput:
                      self.print_incoming(f"{C.RED}[X] {res}{C.RESET}")
                      return
                  
-                 # Empaquetar
-                 res = f"\n{C.CYAN}[IMAGEN ASCII] {os.path.basename(im_path)}{C.RESET}\n" + res + C.RESET
-                 msg = res.replace("\n", "<<ASCII_NL>>")
+                 
+                 # Empaquetar con Protocolo Seguro Base64 (v2.150)
+                 # 1. Header visible (fuera del b64 para previews simples)
+                 import base64
+                 header = f"\n{C.CYAN}[IMAGEN ASCII] {os.path.basename(im_path)}{C.RESET}\n"
+                 
+                 # 2. Convertir contenido completo a B64
+                 # Concatenamos reset al final por seguridad
+                 full_content = res + C.RESET
+                 b64_data = base64.b64encode(full_content.encode('utf-8')).decode('ascii')
+                 
+                 # 3. Mensaje final: [B64_IMG] + Header + | + B64
+                 # Usamos un separador '|' para separar el header texto plano del payload
+                 msg = f"[B64_IMG]{header}|{b64_data}"
                  
                  # Actualizar cmd_raw
                  cmd_raw = "MSG_TEXT" 
