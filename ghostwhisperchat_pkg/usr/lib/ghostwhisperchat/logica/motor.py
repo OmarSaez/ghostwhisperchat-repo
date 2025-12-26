@@ -33,6 +33,7 @@ class Motor:
         
         # Mapeo de UI Sockets: { "ID_CHAT": socket_ipc }
         self.ui_sessions = {} 
+        self.ui_buffers = {} # v2.156: Buffer bytes para IPC UI 
         
         # Buffer efímero para resultados de escaneo (--enlinea)
         self.scan_buffer = []
@@ -118,11 +119,27 @@ class Motor:
                     
                     elif s in sockets_ui:
                         try:
-                            # FIX v2.152: Buffer Masivo 16MB (Ultimate Fix)
-                            data = s.recv(16777216) 
-                            if data: self.procesar_input_chat_ui(s, data.decode('utf-8'))
-                            else: self.desconectar_ui(s)
-                        except: self.desconectar_ui(s)
+                            # FIX v2.156: Lectura Stream con Acumulacion (Igual que Cliente)
+                            data = s.recv(16777216)
+                            if data:
+                                if s not in self.ui_buffers: self.ui_buffers[s] = b""
+                                self.ui_buffers[s] += data
+                                
+                                # Procesar lineas completas
+                                while b'\n' in self.ui_buffers[s]:
+                                    line_bytes, self.ui_buffers[s] = self.ui_buffers[s].split(b'\n', 1)
+                                    if not line_bytes: continue
+                                    
+                                    try:
+                                        msg_str = line_bytes.decode('utf-8').strip()
+                                        if msg_str: self.procesar_input_chat_ui(s, msg_str)
+                                    except: pass
+                            else:
+                                if s in self.ui_buffers: del self.ui_buffers[s]
+                                self.desconectar_ui(s)
+                        except: 
+                            if s in self.ui_buffers: del self.ui_buffers[s]
+                            self.desconectar_ui(s)
     
                     elif s == self.red.sock_udp:
                         try:

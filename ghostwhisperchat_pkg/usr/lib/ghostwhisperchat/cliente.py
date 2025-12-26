@@ -233,7 +233,8 @@ class GestorInput:
                  disp = os.environ.get('DISPLAY')
                  if disp: payload = f"{payload} __ENV_DISPLAY__={disp}"
                  
-             self.sock.sendall(payload.encode('utf-8'))
+             # FIX v2.156: Append \n delimiter so Daemon can accumulate stream
+             self.sock.sendall((payload + "\n").encode('utf-8'))
 
         except Exception as e:
              self.print_incoming(f"[ERROR CLI] {e}")
