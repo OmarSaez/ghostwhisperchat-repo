@@ -349,6 +349,10 @@ def modo_ui_chat(target_id, es_grupo):
                     # HIGHLIGHT: MENTION
                     if "__MENTION__" in line:
                         line = line.replace("__MENTION__ ", "")
+                        # FIX v2.164: Reemplazar Resets internos para mantener el fondo amarillo
+                        # Si hay un reset en medio (despues del nick), volvemos a aplicar el fondo.
+                        line = line.replace(C.RESET, C.RESET + C.BG_YELLOW + C.BLACK_TXT)
+                        # Aplicar estilo global
                         line = f"{C.BG_YELLOW}{C.BLACK_TXT}{line}{C.RESET}"
                         
                     # Use Helper to print safely

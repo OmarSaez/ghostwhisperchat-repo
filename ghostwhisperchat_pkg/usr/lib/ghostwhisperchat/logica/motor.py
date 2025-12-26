@@ -1626,7 +1626,7 @@ class Motor:
                  enviar_notificacion("GhostWhisperChat", f"{origen['nick']} dejó el chat privado.")
 
                  # Instruct client to close after delay
-                 s.sendall(b"__CLOSE_UI__")
+                 s.sendall(b"__CLOSE_UI__\n")
                  # We keep our UI open so user can see history or exit manually.
 
         elif tipo == "MSG":

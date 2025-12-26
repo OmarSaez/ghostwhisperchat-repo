@@ -76,8 +76,8 @@ class Colores:
     BLACK_TXT = "\033[38;5;0m"
 
 # Versionado - Estable version con apodos, nombres reales, dashboard pro color, estados y @todos
-APP_VER_NUM = "2.149.32"
-APP_VER_TAG = "TEST32 - Fix Commands"
+APP_VER_NUM = "2.149.33"
+APP_VER_TAG = "TEST33 - Highlight & Remote Close Fix"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 BANNER = r"""
