@@ -136,7 +136,8 @@ class Motor:
 
                     else: 
                         try:
-                            data = s.recv(65536)
+                            # FIX v2.152: Aumentar buffer TCP RED a 16MB para coincidir con UI
+                            data = s.recv(16777216)
                             if data:
                                 if s not in self.tcp_buffers: self.tcp_buffers[s] = b""
                                 self.tcp_buffers[s] += data

@@ -76,7 +76,7 @@ class Colores:
     BLACK_TXT = "\033[38;5;0m"
 
 # Versionado - Estable version con apodos, nombres reales, dashboard pro color, estados y @todos
-APP_VER_NUM = "2.149.10"
+APP_VER_NUM = "2.149.11"
 APP_VER_TAG = "Estable - 16MB Buffer - Ultimate Image Support"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
