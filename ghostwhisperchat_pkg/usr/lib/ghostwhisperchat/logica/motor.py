@@ -860,7 +860,8 @@ class Motor:
              if msg_content.startswith("--"):
                  contexto = ("UI", chat_id)
                  res = self.ejecutar_comando_transitorio(msg_content, context_ui=contexto)
-                 ui_sock.sendall(f"\n[SISTEMA] {res}\n".encode('utf-8'))
+                 if res:
+                     ui_sock.sendall(f"\n[SISTEMA] {res}\n".encode('utf-8'))
                  return
 
              # ui_sock.sendall(f"Tu: {msg_content}\n".encode('utf-8'))
