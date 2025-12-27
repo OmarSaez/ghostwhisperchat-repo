@@ -76,8 +76,8 @@ class Colores:
     BLACK_TXT = "\033[38;5;0m"
 
 # Versionado - Estable version con apodos, nombres reales, dashboard pro color, estados y @todos
-APP_VER_NUM = "2.149.39"
-APP_VER_TAG = "Estable - Absolute Path Fix"
+APP_VER_NUM = "2.149.40"
+APP_VER_TAG = "TEST - Fix Missing FILE Command"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 BANNER = r"""
@@ -289,7 +289,8 @@ COMMAND_MAP = {
     'SHORTCUTS':    ['--abreviaciones', '-ab', '--alias'],
     'CLEAR':        ['--limpiar', '-k', '--borrar', '--cls', '--vaciar', '--clear'],
     'LOG_TOGGLE':   ['--log', '-r', '--guardar', '--registro', '--grabar'],
-    'DL_TOGGLE':    ['--descarga', '-b', '--bajar', '--autobajar', '--dl']
+    'DL_TOGGLE':    ['--descarga', '-b', '--bajar', '--autobajar', '--dl'],
+    'FILE':         ['--archivo', '-f', '--enviar', '--file']
 }
 
 import time
