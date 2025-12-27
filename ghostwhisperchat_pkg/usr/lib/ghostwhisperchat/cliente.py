@@ -170,7 +170,11 @@ class GestorInput:
              # --- INTERCEPCION IMAGEN ASCII ---
              # Alias: --imagen, --foto, --picture, -P, -i
              IMG_ALIASES = ["--imagen", "--foto", "--picture", "-P", "-i"]
-             if cmd_raw in IMG_ALIASES:
+             
+             # FIX v2.167: 'foto' is a common word. Only trigger command if it starts with '-'
+             is_explicit_command = msg.strip().startswith("-")
+             
+             if cmd_raw in IMG_ALIASES and is_explicit_command:
                  parts = msg.strip().split()
                  if len(parts) < 2:
                      self.print_incoming(f"{C.RED}[X] Uso: --imagen <ruta> [ancho]{C.RESET}")

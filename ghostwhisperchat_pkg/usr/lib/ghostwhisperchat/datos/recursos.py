@@ -76,8 +76,8 @@ class Colores:
     BLACK_TXT = "\033[38;5;0m"
 
 # Versionado - Estable version con apodos, nombres reales, dashboard pro color, estados y @todos
-APP_VER_NUM = "2.149.42"
-APP_VER_TAG = "TEST - Final Polish (Silent & Clean)"
+APP_VER_NUM = "2.149.43"
+APP_VER_TAG = "TEST - 'foto' Keyword Fix"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 BANNER = r"""
@@ -137,6 +137,9 @@ AYUDA = f"""
 {Colores.MAGENTA}{Colores.BOLD}>> UTILIDADES{Colores.RESET}
   {Colores.GREEN}--archivo <Ruta>{Colores.RESET} ............. Enviar archivo (Soporta Drag & Drop).
         {Colores.GREY}[Alias: -f, --enviar]{Colores.RESET}
+
+  {Colores.GREEN}--imagen <Ruta>{Colores.RESET} .............. Enviar imagen visual (ASCII) y original.
+        {Colores.GREY}[Alias: -i, --foto, --pic]{Colores.RESET}
 
   {Colores.GREEN}--cambiarnombre <Nuevo>{Colores.RESET} ....... Cambiar tu Nick actual.
         {Colores.GREY}[Alias: -n, --nick]{Colores.RESET}
