@@ -708,13 +708,16 @@ class Motor:
             self.red.enviar_udp_broadcast(pkg)
             return "[*] Buscando grupos públicos..."
 
-        elif cmd == "FILE":
+        elif cmd == "FILE" or cmd == "PHOTO_BG":
             if not context_ui: return "[X] Solo en un chat activo."
+            is_silent = (cmd == "PHOTO_BG") # FIX v2.166: Modo silencioso para fotos background
+            
             chat_id = context_ui[1]
             if not args: return "[X] Uso: --archivo <Ruta>"
             
             ruta = args[0].strip("'\"") # Remove quotes if shell didn't
             if not os.path.exists(ruta):
+                if is_silent: return None # Fail silently
                 return f"[X] Archivo no encontrado: {ruta}"
             
             import base64
@@ -742,6 +745,7 @@ class Motor:
             size = os.path.getsize(ruta)
             max_size = 2 * 1024 * 1024 * 1024 # 2GB
             if size > max_size:
+                if is_silent: return None
                 return f"[X] Archivo muy grande ({size/1024/1024:.1f}MB). Max 2GB."
                 
             try:
@@ -792,8 +796,8 @@ class Motor:
                             try: self.red.enviar_tcp_priv(ip, pkg, port=port)
                             except: pass
                         
-                        # Progress Update
-                        if ui_sess:
+                        # Progress Update (Suppress if silent)
+                        if ui_sess and not is_silent:
                             pct = int(((i + 1) / total_chunks) * 100)
                             # ASCII Animation Frame roughly
                             # Just simple percentage
@@ -803,13 +807,15 @@ class Motor:
                         # Slight delay to allow network flush and prevent freezing
                         time.sleep(0.2)
                 
-                if ui_sess: 
+                if ui_sess and not is_silent: 
                     ui_sess.sendall(b"\n")
                     from ghostwhisperchat.datos.recursos import Colores
                     # Estilo ligero: Verde Texto (sin background), como pidio usuario.
                     msg_done = f"\n{Colores.C_GREEN_NEON} [SISTEMA] Archivo enviado correctamente: {filename} {Colores.RESET}\n"
                     ui_sess.sendall(msg_done.encode('utf-8'))
                 
+                if is_silent: return None # No message needed
+
                 return f"[*] Archivo '{filename}' enviado exitosamente ({total_chunks} partes)."
             except Exception as e:
                 return f"[X] Error enviando archivo: {e}"
@@ -1517,6 +1523,11 @@ class Motor:
                           
                      noti_body = f"{origen['nick']} te envio un archivo"
                      
+                     # FIX v2.166: Personalizacion Foto vs Archivo
+                     if es_imagen:
+                         noti_title = "Descarga de foto"
+                         noti_body = f"{origen['nick']} te mando una foto"
+                     
                      from ghostwhisperchat.core.utilidades import enviar_notificacion
                      enviar_notificacion(noti_title, noti_body)
                       
@@ -1524,8 +1535,11 @@ class Motor:
                      try:
                          from ghostwhisperchat.datos.recursos import Colores
                          
-                         # Simple format as requested: [SISTEMA] [!] (nick) te a enviado (nombre archivo)
-                         msg_alert = f"\n{Colores.YELLOW}[SISTEMA] [!] {origen['nick']} te ha enviado: {os.path.basename(final_path)}{Colores.RESET}\n"
+                         safe_fname = os.path.basename(final_path)
+                         if es_imagen:
+                             msg_alert = f"\n{Colores.C_GREEN_NEON}[SISTEMA] [!] Recepcion de foto real: {safe_fname}{Colores.RESET}\n"
+                         else:
+                             msg_alert = f"\n{Colores.YELLOW}[SISTEMA] [!] {origen['nick']} te ha enviado: {safe_fname}{Colores.RESET}\n"
                          
                          # Broadcast carefully
                          active_sessions = list(self.ui_sessions.values())

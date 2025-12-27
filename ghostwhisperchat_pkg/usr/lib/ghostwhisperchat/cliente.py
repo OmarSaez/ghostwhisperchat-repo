@@ -245,9 +245,10 @@ class GestorInput:
                  time.sleep(0.5) # Aumentar pausa para asegurar que el ASCII termino de procesarse
                  # Construimos comando --file con RUTA ABSOLUTA para que el Daemon lo encuentre
                  abs_path = os.path.abspath(file_to_send_bg)
-                 cmd_file = f"__MSG__ --file \"{abs_path}\""
+                 # FIX v2.166: Usar comando silencioso --foto-bg
+                 cmd_file = f"__MSG__ --foto-bg \"{abs_path}\""
                  self.sock.sendall((cmd_file + "\n").encode('utf-8'))
-                 # Feedback visual se vera cuando el daemon empiece el envio ([Archivo] Enviando...)
+                 # Feedback visual suprimido por el daemon (Modo Silencioso)
 
         except Exception as e:
              self.print_incoming(f"[ERROR CLI] {e}")
