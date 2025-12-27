@@ -42,7 +42,7 @@ class MemoriaGlobal:
         
         # --- DETERMINISTIC UID (v2.137) ---
         # El usuario pidio asociar historial a "Cuenta Linux + Hardware" para evitar perdidas al cambiar Nick.
-        # Intentamos generar un UID robusto basado en MachineID + SysUser.
+        # Intentamos generar un UID robusto basado en MachineID + SysUser + MAC Address.
         # Si falla, usamos el aleatorio legado o el del config.
         
         try:
