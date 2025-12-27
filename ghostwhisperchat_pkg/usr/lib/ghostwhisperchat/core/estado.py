@@ -366,6 +366,19 @@ class MemoriaGlobal:
             
             with open(log_path, 'a', encoding='utf-8') as f:
                 f.write(line)
+            
+            # FIX v2.168: Rotacion de Logs (Mantener Max 20 lineas)
+            # El usuario solicito que el historial no crezca infinitamente.
+            try:
+                msg_limit = 20
+                with open(log_path, 'r', encoding='utf-8') as fr:
+                    lines = fr.readlines()
+                
+                if len(lines) > msg_limit:
+                    keep = lines[-msg_limit:]
+                    with open(log_path, 'w', encoding='utf-8') as fw:
+                        fw.writelines(keep)
+            except: pass
                 
         except Exception as e:
             print(f"[X] Error guardando historial: {e}", file=sys.stderr)

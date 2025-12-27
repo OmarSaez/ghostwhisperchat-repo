@@ -211,7 +211,7 @@ class GestorInput:
                  import base64
                  
                  # Header SAFE (Usamos <<ASCII_NL>> en vez de \n real para que viaje en 1 linea)
-                 header_safe = f"<<ASCII_NL>>{C.CYAN}[IMAGEN ASCII] {os.path.basename(im_path)}{C.RESET}<<ASCII_NL>>"
+                 header_safe = f"{C.CYAN}[IMAGEN ASCII] {os.path.basename(im_path)}{C.RESET}<<ASCII_NL>>"
                  
                  # Payload B64
                  full_content = res + C.RESET
