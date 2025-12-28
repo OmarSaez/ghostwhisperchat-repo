@@ -32,10 +32,28 @@ class GestorInput:
         self.typing_status_msg = ""
         
     def _limpiar_linea(self):
-        # Mover al inicio, borrar linea completa (Input prop)
+        # FIX v2.171: Soporte para Input Multilinea (Wrapping)
+        # Si el input ocupa mas de 1 linea, hay que subir mas veces.
+        import shutil
+        cols, _ = shutil.get_terminal_size()
+        
+        # Calcular longitud visual total (Prompt + Buffer)
+        full_text = self.prompt + "".join(self.buffer)
+        
+        # Numero de filas extra que ocupa el texto (Wrapping)
+        # Nota: Si cols=80 y len=80, a veces cursor baja, a veces no. 
+        # len // cols suele ser una buena aproximacion para N lineas adicionales.
+        extra_lines = len(full_text) // cols
+        
+        # 1. Borrar linea actual (donde esta el cursor)
         sys.stdout.write("\r\033[K")
         
-        # Si hay status visible, subir y borrar tambien esa linea
+        # 2. Subir y borrar lineas de input anteriores (si las hay)
+        if extra_lines > 0:
+            for _ in range(extra_lines):
+                sys.stdout.write("\033[A\r\033[K") # Subir, Inicio, Borrar
+        
+        # 3. Si hay status visible, subir UNA mas y borrarla
         if self.typing_status_msg:
              sys.stdout.write("\033[A\r\033[K") 
         
