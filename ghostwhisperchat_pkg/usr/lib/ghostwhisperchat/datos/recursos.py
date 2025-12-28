@@ -79,8 +79,8 @@ class Colores:
     BLACK_TXT = "\033[38;5;0m"
 
 # Versionado - Estable - foto,colores,@todos,estados
-APP_VER_NUM = "2.151.13"
-APP_VER_TAG = "Test13 - Fix Doble Print"
+APP_VER_NUM = "2.152"
+APP_VER_TAG = "Estable - Escribiendo,foto,colores,@todos,estados"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 BANNER = r"""
