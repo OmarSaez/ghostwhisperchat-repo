@@ -49,7 +49,11 @@ class Motor:
         self.pending_private_target = None
         
         # Menciones Cooldowns: {chat_id: timestamp_ultimo_pop}
-        self.mention_cooldowns = {} 
+        # Menciones Cooldowns: {chat_id: timestamp_ultimo_pop}
+        self.mention_cooldowns = {}
+        
+        # Typing Status Tracking: { chat_id: { uid: (timestamp, nick) } }
+        self.typing_states = {} 
 
     def iniciar_ipc(self):
         if os.path.exists(IPC_SOCK_PATH):
@@ -857,6 +861,15 @@ class Motor:
             msg_content = parts[1]
         
         if chat_id and msg_content:
+             # --- FIX v2.169: INTERCEPCION TYPING ---
+             if msg_content.startswith("__TYPING__ "):
+                  try:
+                      st_str = msg_content.split()[1]
+                      is_typing = (st_str == "1")
+                      self._difundir_typing(chat_id, is_typing)
+                  except: pass
+                  return # Stop processing (Not a text message)
+             
              if msg_content.startswith("--"):
                  contexto = ("UI", chat_id)
                  res = self.ejecutar_comando_transitorio(msg_content, context_ui=contexto)
@@ -1251,6 +1264,68 @@ class Motor:
                  sys_user=origen.get('sys_user'),
                  status_msg=origen.get('status_msg')
              )
+
+        if tipo == "TYPING":
+             status = payload.get("status")
+             chat_context = payload.get("gid") # Si es grupo
+             sender_uid = origen['uid']
+             sender_nick = origen['nick']
+             
+             # Contexto de UI (Donde mostrar "Juan escribiendo...")
+             # Si es grupo, el contexto es 'chat_context'.
+             # Si es privado, el contexto es 'sender_uid' (o su IP/Nick según lógica de UI).
+             # En chat privado, el ID de session suele ser el UID del peer.
+             
+             target_ui_id = chat_context if chat_context else sender_uid
+             
+             # Actualizar estado de Escritores
+             # self.typing_states = { chat_id: { uid: (timestamp, nick) } }
+             if not hasattr(self, 'typing_states'): self.typing_states = {}
+             if target_ui_id not in self.typing_states: self.typing_states[target_ui_id] = {}
+             
+             if status:
+                 self.typing_states[target_ui_id][sender_uid] = (time.time(), sender_nick)
+             else:
+                 if sender_uid in self.typing_states[target_ui_id]:
+                     del self.typing_states[target_ui_id][sender_uid]
+             
+             # Calcular Texto Final
+             active = self.typing_states[target_ui_id]
+             
+             # Limpieza rapida de viejos (>3.5s)
+             now = time.time()
+             to_del = [u for u, (t, n) in active.items() if now - t > 3.5]
+             for u in to_del: del active[u]
+             
+             writers = [n for _, n in active.values()]
+             
+             label = ""
+             if len(writers) == 1:
+                 label = f"{writers[0]} escribiendo..."
+             elif len(writers) == 2:
+                 label = f"{writers[0]} y {writers[1]} escribiendo..."
+             elif len(writers) > 2:
+                 label = "Varios usuarios escribiendo..."
+             
+             # Enviar a la UI correspondiente
+             # Buscar session que coincida con target_ui_id
+             # En privado, la session ID puede ser el UID o la IP?
+             # motor.py usa UIDs o IPs. 'procesar_ipc' intenta resolver UIDs.
+             
+             target_sock = None
+             if target_ui_id in self.ui_sessions:
+                 target_sock = self.ui_sessions[target_ui_id]
+             else:
+                 # Fallback para privados donde la session quizas esta por IP
+                 # Intento buscar session por IP del peer
+                 pass
+
+             if target_sock:
+                 cmd = f"__TYPING_UPDATE__ {label}\n"
+                 try: target_sock.sendall(cmd.encode('utf-8'))
+                 except: pass
+                 
+             return # Fin manejo TYPING
 
         if tipo == "JOIN_REQ":
             gid = payload.get("gid")

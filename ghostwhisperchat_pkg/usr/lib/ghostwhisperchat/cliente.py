@@ -23,19 +23,38 @@ class GestorInput:
         self.sock = socket_client
         self.buffer = []
         self.prompt = "Tu: "
-        self.lock = threading.RLock() # RLock para evitar deadlock en llamadas anidadas
+        self.lock = threading.RLock() 
         self.running = True
         self.history = []
         self.history_index = 0
         
+        # Typing Visual State
+        self.typing_status_msg = ""
+        
     def _limpiar_linea(self):
-        # Mover al inicio, borrar linea completa
+        # Mover al inicio, borrar linea completa (Input prop)
         sys.stdout.write("\r\033[K")
         
+        # Si hay status visible, subir y borrar tambien esa linea
+        if self.typing_status_msg:
+             sys.stdout.write("\033[A\r\033[K") 
+        
     def _pintar_linea(self):
+        # Si hay status, pintar arriba
+        if self.typing_status_msg:
+             # Pinta status y baja linea
+             sys.stdout.write(f"{C.ITALIC}{C.GREY}{self.typing_status_msg}{C.RESET}\r\n")
+        
         # Pintar prompt + buffer actual
         sys.stdout.write(f"{self.prompt}{''.join(self.buffer)}")
         sys.stdout.flush()
+
+    def update_typing_status(self, label):
+        """Actualiza el label de escribiendo y repinta"""
+        with self.lock:
+            self._limpiar_linea()
+            self.typing_status_msg = label # Actualizar estado
+            self._pintar_linea()
 
     def print_incoming(self, msg):
         """Imprime mensaje entrante sin romper el input actual"""
@@ -45,37 +64,54 @@ class GestorInput:
             # --- PROTOCOLO IMAGEN SEGURA (v2.150) ---
             if "[B64_IMG]" in msg:
                 try:
-                    # Formato: ... [B64_IMG]HEADER|PAYLOAD_B64 ... (Puede venir embedido en un chat con hora)
-                    # El prefix [B64_IMG] marca el inicio de la zona segura.
-                    # Asumimos que el mensaje entero ES la imagen si tiene el tag, 
-                    # pero debemos conservar la parte "[Hora] (Nick): " que motor.py agrego al principio.
-                    
                     parts = msg.split("[B64_IMG]")
-                    prefix = parts[0] # "[12:00] (Nick): "
-                    contact_content = parts[1] # "HEADER|B64"
+                    prefix = parts[0] 
+                    contact_content = parts[1] 
                     
                     if "|" in contact_content:
                         header, b64_payload = contact_content.split("|", 1)
                         import base64
                         decoded_img = base64.b64decode(b64_payload).decode('utf-8', errors='replace')
-                        
-                        # Reconstruimos msg final
-                        # Header tiene sus propios newlines
                         msg = f"{prefix}{header}{decoded_img}"
                     else:
                         msg = f"{prefix}[Error Protocolo img]"
                 except Exception as e:
                     msg = f"[Error Decode Img: {e}]"
 
-            # Decodificar newlines de ASCII Art Legacy (por si acaso queda alguno)
             msg = msg.replace("<<ASCII_NL>>", "\n")
-            
-            # Asegurar retorno de carro para raw mode (\n -> \r\n)
             msg = msg.replace('\n', '\r\n')
+            
             sys.stdout.write(f"{msg}\r\n") 
             self._pintar_linea()
             
+    def _enviar_typing(self, estado):
+        """Envia senal de typing al daemon (1=Start, 0=Stop)"""
+        try:
+            # Usamos protocolo oculto __TYPING__
+            # El daemon lo interceptara antes de enviarlo como msg de texto
+            cmd = f"__MSG__ __TYPING__ {1 if estado else 0}\n"
+            self.sock.sendall(cmd.encode('utf-8'))
+        except: pass
+
+    def _watchdog_typing(self):
+        """Hilo secundario que detecta inactividad para enviar STOP typing"""
+        while self.running:
+            time.sleep(0.5)
+            # Si estoy marcado como 'escribiendo' y pasaron 4s sin teclas
+            if self.is_typing and (time.time() - self.last_keystroke > 4.0):
+                self.is_typing = False
+                self._enviar_typing(False)
+    
     def input_loop(self):
+        # Init Typing State
+        self.is_typing = False
+        self.last_keystroke = 0
+        self.last_typing_sent = 0
+        
+        # Start Watchdog
+        t_wd = threading.Thread(target=self._watchdog_typing, daemon=True)
+        t_wd.start()
+        
         fd = sys.stdin.fileno()
         old_settings = termios.tcgetattr(fd)
         try:
@@ -83,12 +119,30 @@ class GestorInput:
             while self.running:
                 ch = sys.stdin.read(1)
                 
+                # --- Typing Detection Logic ---
+                timestamp = time.time()
+                self.last_keystroke = timestamp
+                
+                # Si es un caracter imprimible (no enter, no control)
+                if ch.isprintable() and ch not in ['\r', '\n']:
+                     # Si no estabamos escribiendo, o paso el tiempo heartbeat
+                     if not self.is_typing or (timestamp - self.last_typing_sent > 2.0):
+                         self.is_typing = True
+                         self.last_typing_sent = timestamp
+                         self._enviar_typing(True)
+                
+                
                 with self.lock:
                     if ch == '\x03': # Ctrl+C
                         self.running = False
                         break
                         
                     elif ch == '\r' or ch == '\n': # Enter
+                        # Stop Typing Immediately on Enter
+                        if self.is_typing:
+                            self.is_typing = False
+                            self._enviar_typing(False)
+                        
                         # --- DETECCION INTELIGENTE DE PASTE (Bloques ASCII) ---
                         # Si hay más datos esperando inmediatamente en el stdin, es muy probable
                         # que sea un paste de texto multilínea. Agregamos \n en vez de enviar.
@@ -125,6 +179,8 @@ class GestorInput:
                             self.buffer.pop()
                             sys.stdout.write("\b \b")
                             sys.stdout.flush()
+                        
+                        # Backspace tambien cuenta como actividad typing (ya actualizado arriba)
                         
                     elif ch == '\x1b': # Escape seq (Flechas)
                         # Leer siguientes 2
@@ -350,6 +406,13 @@ def modo_ui_chat(target_id, es_grupo):
                     if "__CLOSE_UI__" in line:
                          helper.running = False
                          break
+                    
+                    # TYPING INDICATOR (v2.169)
+                    if "__TYPING_UPDATE__" in line:
+                         label = line.replace("__TYPING_UPDATE__ ", "", 1).strip()
+                         helper.update_typing_status(label)
+                         continue
+
 
                     # FILTER: Hide ID confirmation message
                     if "Conectado al Daemon. ID:" in line:

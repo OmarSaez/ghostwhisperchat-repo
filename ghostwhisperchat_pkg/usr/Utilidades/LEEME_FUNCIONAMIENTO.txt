@@ -1,0 +1,140 @@
+================================================================================
+ MANUAL TÉCNICO Y DE FUNCIONAMIENTO - GHOSTWHISPERCHAT v2.150
+================================================================================
+
+Este documento describe la arquitectura, los módulos principales y los protocolos
+de comunicación utilizados en GhostWhisperChat.
+
+--------------------------------------------------------------------------------
+1. ARQUITECTURA GENERAL
+--------------------------------------------------------------------------------
+GhostWhisperChat funciona bajo una arquitectura Cliente-Servidor local (Daemon-Client)
+dentro de un entorno Peer-to-Peer (P2P) en la red LAN.
+
+A. El Demonio (Servicio de Fondo):
+   - Se ejecuta como un servicio de systemd (`systemctl --user start ghostwhisperchat`).
+   - Mantiene el estado de la red (quién está conectado, grupos activos).
+   - Escucha en puertos UDP (Descubrimiento) y TCP (Mensajería).
+   - Gestiona la persistencia (historial, configuración).
+
+B. El Cliente (Interfaz de Usuario):
+   - Es un script ligero (`cliente.py`) que el usuario ejecuta en la terminal.
+   - No tiene lógica de red compleja.
+   - Se comunica con el Demonio via Unix Socket (IPC).
+   - Envía comandos como (`__MSG__`, `__CLOSE_UI__`) y recibe texto formateado para imprimir.
+   - Se encarga del renderizado visual (Colores ANSI, Arte ASCII).
+
+--------------------------------------------------------------------------------
+2. DESCRIPCIÓN DE MÓDULOS (Carpetas)
+--------------------------------------------------------------------------------
+
+[ /usr/lib/ghostwhisperchat/ ]
+
+* demonio.py:
+  Punto de entrada. Inicia el `Launcher` y mantiene el proceso vivo.
+
+* cliente.py:
+  CLI. Procesa argumentos (`--dm`, `--sala`), captura input del usuario, intercepta
+  imágenes para renderizar ASCII y gestiona la visualización.
+
+[ .../logica/ ]
+
+* motor.py (El Cerebro):
+  Gestiona toda la lógica de negocio.
+  - Bucle principal `select()` para manejar múltiples sockets.
+  - Procesamiento de comandos (`/slash` o `--flags`).
+  - Lógica de Grupos (Unirse, Sincronizar, Salir).
+  - Recepción de Archivos y reconstrucción de chunks.
+  
+* comandos.py:
+  Diccionarios de alias y funciones de ayuda.
+
+[ .../core/ ]
+
+* transporte.py:
+  Wrapper de bajo nivel para Sockets (crear, bindear, enviar, cerrar).
+  Maneja puertos fijos: 44492 (UDP Discovery), 44493 (UDP Grupos), 44494 (TCP Mensajes).
+
+* estado.py:
+  Persistencia.
+  - Carga/Guarda `config.json` (Nick, UID).
+  - Gestiona `contacts.json` (Lista de amigos).
+  - Escribe el historial de chat (`.log`) con rotación automática (Max 20 líneas).
+
+* utilidades.py:
+  Herramientas auxiliares: Envío de notificaciones de escritorio (`notify-send`),
+  normalización de rutas, validaciones de IP.
+
+* imagen_ascii.py:
+  Motor gráfico. Convierte imágenes (JPG/PNG) a cadenas de caracteres ASCII
+  usando bloques `▀` y códigos ANSI TrueColor.
+
+--------------------------------------------------------------------------------
+3. PROTOCOLOS DE COMUNICACIÓN
+--------------------------------------------------------------------------------
+
+A. Mensajería (TCP)
+   Paquetes JSON serializados.
+   Estructura base: `{"type": "TIPO", "payload": {...}, "origin": {...}}`
+   
+   - MSG: Mensaje de texto normal.
+   - JOIN_REQ / JOIN_ACK: Solicitud de entrada a grupos.
+   - SYNC / SYNC_REQ: Sincronización de listas de miembros en grupos.
+   - LEAVE: Aviso de desconexión.
+
+B. Transferencia de Archivos
+   Los archivos se dividen en fragmentos (Chunks) de 10MB para no bloquear la red.
+   
+   - Packet: `FILE_CHUNK`
+     {
+       "filename": "documento.pdf",
+       "chunk_id": 1,
+       "total_chunks": 5,
+       "data": "base64_blob...",
+       "filesize": 12345
+     }
+   
+   El receptor acumula los chunks en archivos temporales (`.part`). Al recibir
+   el último chunk, renombra el archivo.
+
+C. Protocolo de Imágenes (Dual-Send)
+   Estrategia híbrida para enviar fotos por terminal.
+   
+   1. Capa Visual (Inmediata):
+      El Cliente renderiza la imagen a ASCII y la envía como texto especial:
+      `[B64_IMG]Header|Base64_ASCII_Data`
+      Esto permite que el receptor "vea" la imagen en su consola al instente.
+      
+   2. Capa de Datos (Fondo):
+      El Cliente dispara automáticamente el comando interno `--foto-bg <ruta>`.
+      El Demonio envía el archivo original usando el protocolo de Archivos (B),
+      pero en "Modo Silencioso" (sin barras de progreso).
+      
+      Al completarse, el receptor detecta que es imagen y notifica:
+      "Descarga de foto real".
+
+--------------------------------------------------------------------------------
+4. TIPOS DE CHAT
+--------------------------------------------------------------------------------
+
+1. Chat 1 a 1 (Privado)
+   - Conexión TCP directa entre dos IPs.
+   - Handshake simple.
+   - Historial guardado por UID del contacto.
+
+2. Grupo Público (Salas)
+   - Identificado por un `GID` (Group ID) generado al crear.
+   - Anuncios via UDP Multicast (o simulación Broadcast) para que otros lo vean en `--vergrupos`.
+   - Cualquiera puede unirse (`--unirse`).
+   - Mantiene una lista de miembros ("Mesh") y reenvía mensajes a todos.
+
+3. Grupo Privado (Candado)
+   - Similar al Público, pero al crearse se define una Contraseña.
+   - La contraseña NO viaja por la red. Se envía un Hash (SHA256).
+   - Al intentar unirse, el solicitante envía su Hash.
+   - Los miembros existentes validan el Hash. Si coincide, permiten la entrada (`JOIN_ACK`) y sincronizan (`SYNC`).
+   - Si no coincide, rechazan (`JOIN_REJ`).
+
+================================================================================
+Generado para GhostWhisperChat v2.150
+================================================================================
