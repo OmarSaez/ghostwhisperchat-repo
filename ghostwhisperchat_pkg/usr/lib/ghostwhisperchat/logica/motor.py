@@ -865,11 +865,14 @@ class Motor:
         if chat_id and msg_content:
              # --- FIX v2.169: INTERCEPCION TYPING ---
              if msg_content.startswith("__TYPING__ "):
-                  try:
-                      st_str = msg_content.split()[1]
-                      is_typing = (st_str == "1")
-                      self._difundir_typing(chat_id, is_typing)
-                  except: pass
+                  # try:
+                  st_str = msg_content.split()[1]
+                  is_typing = (st_str == "1")
+                  print(f"[DEBUG_TYPING_LOGIC] Calling difundir for {chat_id} typing={is_typing}", file=sys.stderr)
+                  res_dif = self._difundir_typing(chat_id, is_typing)
+                  print(f"[DEBUG_TYPING_LOGIC] Result: {res_dif}", file=sys.stderr)
+                  # except Exception as e:
+                  #    print(f"[DEBUG_TYPING_ERR] {e}", file=sys.stderr)
                   return # Stop processing (Not a text message)
              
              if msg_content.startswith("--"):
@@ -1972,13 +1975,24 @@ class Motor:
             
             payload = {"status": status}
             targets = []
-             
-            # Caso 1: Grupo
+            
+            # --- FIX v2.152: Resolver Nombre Grupo -> GID ---
+            real_gid = None
             if target_id in self.memoria.grupos_activos:
-                 payload["gid"] = target_id
+                real_gid = target_id
+            else:
+                # Buscar por nombre (Reverse Lookup)
+                for g_gid, g_data in self.memoria.grupos_activos.items():
+                    if g_data.get('nombre') == target_id:
+                        real_gid = g_gid
+                        break
+             
+            # Caso 1: Grupo (Si encontramos GID valido)
+            if real_gid:
+                 payload["gid"] = real_gid
                  pkg = empaquetar("TYPING", payload, self.memoria.get_origen())
                  
-                 g = self.memoria.grupos_activos[target_id]
+                 g = self.memoria.grupos_activos[real_gid]
                  members = g.get('miembros', {})
                  
                  for uid, m in members.items():
@@ -1986,7 +2000,7 @@ class Motor:
                      if m.get('ip'):
                          targets.append((m['ip'], 44494))
 
-            # Caso 2: Privado
+            # Caso 2: Privado (Solo si no era grupo)
             else:
                  p = self.memoria.buscar_peer(target_id)
                  if not p and target_id in self.memoria.contactos:
