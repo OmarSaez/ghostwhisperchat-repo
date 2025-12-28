@@ -2031,7 +2031,9 @@ class Motor:
                     # Debug Err
                     print(f"[DEBUG_TYPING_OUT] Err {ip}: {e}", file=sys.stderr)
                     pass
-        except: pass
+        except Exception as e:
+            import sys
+            print(f"[DEBUG_TRACE_CRASH] {e}", file=sys.stderr)
 
 if __name__ == "__main__":
     motor = Motor()
