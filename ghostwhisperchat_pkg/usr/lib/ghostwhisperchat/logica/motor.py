@@ -1981,11 +1981,13 @@ class Motor:
             if target_id in self.memoria.grupos_activos:
                 real_gid = target_id
             else:
-                # Buscar por nombre (Reverse Lookup)
                 for g_gid, g_data in self.memoria.grupos_activos.items():
                     if g_data.get('nombre') == target_id:
                         real_gid = g_gid
                         break
+            
+            # TRACE EXTREMO
+            print(f"[DEBUG_TRACE] target='{target_id}' | resolved='{real_gid}' | in_active={target_id in self.memoria.grupos_activos}", file=sys.stderr)
              
             # Caso 1: Grupo (Si encontramos GID valido)
             if real_gid:
@@ -1995,8 +1997,12 @@ class Motor:
                  g = self.memoria.grupos_activos[real_gid]
                  members = g.get('miembros', {})
                  
+                 print(f"[DEBUG_TRACE] Members: {list(members.keys())} | My UID: {self.memoria.mi_uid}", file=sys.stderr)
+                 
                  for uid, m in members.items():
-                     if uid == self.memoria.mi_uid: continue
+                     if uid == self.memoria.mi_uid: 
+                         # print("Skipping self", file=sys.stderr)
+                         continue
                      if m.get('ip'):
                          targets.append((m['ip'], 44494))
 
