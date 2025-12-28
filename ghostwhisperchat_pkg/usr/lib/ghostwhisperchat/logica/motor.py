@@ -850,6 +850,8 @@ class Motor:
         chat_id = None
         
         if mensaje.startswith("__MSG__"):
+            if "__TYPING__" in mensaje:
+                 print(f"[DEBUG_IPC] Recibido IPC TYPING: {mensaje}", file=sys.stderr)
             msg_content = mensaje.replace("__MSG__ ", "", 1)
             for uid, s in self.ui_sessions.items():
                 if s == ui_sock:
@@ -1276,9 +1278,14 @@ class Motor:
              # Si es privado, el contexto es 'sender_uid' (o su IP/Nick según lógica de UI).
              # En chat privado, el ID de session suele ser el UID del peer.
              
+             # --- DEBUG TYPING ---
+             print(f"[DEBUG_TYPING] Received from {sender_nick} (UID: {sender_uid}) in Context: {chat_context}", file=sys.stderr)
+             print(f"[DEBUG_TYPING] Active Sessions: {list(self.ui_sessions.keys())}", file=sys.stderr)
+             
              target_ui_id = chat_context if chat_context else sender_uid
              
              # Actualizar estado de Escritores
+
              # self.typing_states = { chat_id: { uid: (timestamp, nick) } }
              if not hasattr(self, 'typing_states'): self.typing_states = {}
              if target_ui_id not in self.typing_states: self.typing_states[target_ui_id] = {}
@@ -1308,18 +1315,25 @@ class Motor:
                  label = "Varios usuarios escribiendo..."
              
              # Enviar a la UI correspondiente
-             # Buscar session que coincida con target_ui_id
-             # En privado, la session ID puede ser el UID o la IP?
-             # motor.py usa UIDs o IPs. 'procesar_ipc' intenta resolver UIDs.
-             
+             # FIX v2.151: Smart Lookup (UID vs Nickname mismatch)
              target_sock = None
+             
+             # 1. Intento directo (Si la UI se abrio con UID)
              if target_ui_id in self.ui_sessions:
                  target_sock = self.ui_sessions[target_ui_id]
-             else:
-                 # Fallback para privados donde la session quizas esta por IP
-                 # Intento buscar session por IP del peer
-                 pass
-
+             
+             # 2. Intento por Nick (Si la UI se abrio con Nick "Pepe")
+             elif not chat_context: # Solo para Privados
+                 # target_ui_id es el sender_uid
+                 # Buscamos en todas las sesiones si alguna coincide con el nick de este UID
+                 expected_nick = sender_nick
+                 for s_id, sock in self.ui_sessions.items():
+                     if s_id == expected_nick:
+                         target_sock = sock
+                         # Actualizamos el target_ui_id ficticio para el diccionario de estados
+                         # (Ojo: esto puede ser chapuza, mejor solo encontramos el socket)
+                         break
+             
              if target_sock:
                  cmd = f"__TYPING_UPDATE__ {label}\n"
                  try: target_sock.sendall(cmd.encode('utf-8'))

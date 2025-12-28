@@ -1,0 +1,3 @@
+Debugging TYPING issue.
+Added logs to client send routine and daemon receive routine.
+This will verify if the signal leaves the client and if it reaches the daemon via IPC.

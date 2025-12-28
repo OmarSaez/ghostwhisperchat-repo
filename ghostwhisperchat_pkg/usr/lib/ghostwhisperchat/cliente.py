@@ -90,6 +90,7 @@ class GestorInput:
             # Usamos protocolo oculto __TYPING__
             # El daemon lo interceptara antes de enviarlo como msg de texto
             cmd = f"__MSG__ __TYPING__ {1 if estado else 0}\n"
+            with open("/tmp/gwc_client_debug.txt", "a") as f: f.write(f"Sending IPC: {cmd}")
             self.sock.sendall(cmd.encode('utf-8'))
         except: pass
 
