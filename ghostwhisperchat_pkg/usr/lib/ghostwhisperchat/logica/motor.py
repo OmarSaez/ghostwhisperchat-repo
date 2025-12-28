@@ -2014,4 +2014,6 @@ class Motor:
         except: pass
 
 if __name__ == "__main__":
-```
+    motor = Motor()
+    motor.iniciar_ipc()
+    motor.bucle_principal()
