@@ -3,10 +3,12 @@
 
 class Colores:
     # ANSI Color Codes
-    RESET = "\033[0m"
-    BOLD = "\033[1m"
-    
     # Texto
+    BOLD   = "\033[1m"
+    UNDER  = "\033[4m"
+    ITALIC = "\033[3m" # Added for Typing Indicator
+    RESET  = "\033[0m"
+    
     WHITE = "\033[97m"
     GREY = "\033[90m"
     BLACK = "\033[30m"
@@ -56,6 +58,7 @@ class Colores:
     
     # 6. Neutro
     C_SILVER      = "\033[38;5;250m"
+    GREY          = "\033[38;5;240m" # Added for Typing Indicator (Dark Grey)
 
     NICK_COLORS = [
         C_GREEN_NEON, C_GREEN_LIME, C_OLIVE,
@@ -76,8 +79,8 @@ class Colores:
     BLACK_TXT = "\033[38;5;0m"
 
 # Versionado - Estable - foto,colores,@todos,estados
-APP_VER_NUM = "2.151.8"
-APP_VER_TAG = "Fix Final - Import Corrected"
+APP_VER_NUM = "2.151.9"
+APP_VER_TAG = "Test8 - Color Fix & Ready"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 BANNER = r"""
