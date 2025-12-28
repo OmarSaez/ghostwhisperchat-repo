@@ -76,8 +76,8 @@ class Colores:
     BLACK_TXT = "\033[38;5;0m"
 
 # Versionado - Estable - foto,colores,@todos,estados
-APP_VER_NUM = "2.151.7"
-APP_VER_TAG = "Test7 - Crash Reveal"
+APP_VER_NUM = "2.151.8"
+APP_VER_TAG = "Fix Final - Import Corrected"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 BANNER = r"""

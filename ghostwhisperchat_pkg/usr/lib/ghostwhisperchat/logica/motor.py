@@ -1969,7 +1969,8 @@ class Motor:
     def _difundir_typing(self, target_id, status):
         """Envia paquete ligero TYPING a la red con timeout corto"""
         try:
-            from ghostwhisperchat.core.transporte import empaquetar, PORT_GROUP
+            from ghostwhisperchat.core.protocolo import empaquetar
+            from ghostwhisperchat.core.transporte import PORT_GROUP
             import socket
             import sys
             
