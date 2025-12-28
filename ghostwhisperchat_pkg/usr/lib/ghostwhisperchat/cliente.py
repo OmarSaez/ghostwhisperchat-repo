@@ -186,8 +186,12 @@ class GestorInput:
                         else:
                             # Enter manual -> Enviar mensaje acumulado
                             linea = "".join(self.buffer)
-                            self.buffer = [] # Limpiar buffer visualmente
+                            
+                            # FIX v2.172: Limpiar visualmente ANTES de vaciar el buffer
+                            # Para que el calculo de altura (shutil) funcione con el texto real
                             self._limpiar_linea()
+                            
+                            self.buffer = [] # Ahora si vaciamos
                             self._pintar_linea() # Queda "Tu: " vacio esperando eco o siguiente msg
                             
                             # Procesar comando (sin bloquear el lock mucho tiempo)
