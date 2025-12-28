@@ -1961,3 +1961,57 @@ class Motor:
                  except: pass
                  
         return processed
+
+    # FIX v2.169: Helper para difundir estado de escritura (Fire & Forget)
+    def _difundir_typing(self, target_id, status):
+        """Envia paquete ligero TYPING a la red con timeout corto"""
+        try:
+            from ghostwhisperchat.core.transporte import empaquetar, PORT_GROUP
+            import socket
+            import sys
+            
+            payload = {"status": status}
+            targets = []
+             
+            # Caso 1: Grupo
+            if target_id in self.memoria.grupos_activos:
+                 payload["gid"] = target_id
+                 pkg = empaquetar("TYPING", payload, self.memoria.get_origen())
+                 
+                 g = self.memoria.grupos_activos[target_id]
+                 members = g.get('miembros', {})
+                 
+                 for uid, m in members.items():
+                     if uid == self.memoria.mi_uid: continue
+                     if m.get('ip'):
+                         targets.append((m['ip'], 44494))
+
+            # Caso 2: Privado
+            else:
+                 p = self.memoria.buscar_peer(target_id)
+                 if not p and target_id in self.memoria.contactos:
+                     p = self.memoria.contactos[target_id]
+                 
+                 if p and p.get('ip'):
+                     pkg = empaquetar("TYPING", payload, self.memoria.get_origen())
+                     targets.append((p['ip'], 44494))
+            
+            # Sending Loop
+            for ip, port in targets:
+                try:
+                    # Debug Out
+                    print(f"[DEBUG_TYPING_OUT] Sending to {ip}:{port} Status={status}", file=sys.stderr)
+                    
+                    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    s.settimeout(0.5) # Fast timeout
+                    s.connect((ip, port))
+                    s.sendall(pkg + b'\n')
+                    s.close()
+                except Exception as e:
+                    # Debug Err
+                    print(f"[DEBUG_TYPING_OUT] Err {ip}: {e}", file=sys.stderr)
+                    pass
+        except: pass
+
+if __name__ == "__main__":
+```
