@@ -81,7 +81,10 @@ class GestorInput:
             msg = msg.replace("<<ASCII_NL>>", "\n")
             msg = msg.replace('\n', '\r\n')
             
-            sys.stdout.write(f"{msg}\r\n") 
+            # FIX v2.170: Forzar retorno de carro inicial para asegurar alineacion en resize
+            sys.stdout.write(f"\r{msg}\r\n") 
+            sys.stdout.flush()
+            
             self._pintar_linea()
             
     def _enviar_typing(self, estado):
