@@ -1986,9 +1986,6 @@ class Motor:
                     if g_data.get('nombre') == target_id:
                         real_gid = g_gid
                         break
-            
-            # TRACE EXTREMO
-            print(f"[DEBUG_TRACE] target='{target_id}' | resolved='{real_gid}' | in_active={target_id in self.memoria.grupos_activos}", file=sys.stderr)
              
             # Caso 1: Grupo (Si encontramos GID valido)
             if real_gid:
@@ -1998,12 +1995,8 @@ class Motor:
                  g = self.memoria.grupos_activos[real_gid]
                  members = g.get('miembros', {})
                  
-                 print(f"[DEBUG_TRACE] Members: {list(members.keys())} | My UID: {self.memoria.mi_uid}", file=sys.stderr)
-                 
                  for uid, m in members.items():
-                     if uid == self.memoria.mi_uid: 
-                         # print("Skipping self", file=sys.stderr)
-                         continue
+                     if uid == self.memoria.mi_uid: continue
                      if m.get('ip'):
                          targets.append((m['ip'], 44494))
 
@@ -2020,21 +2013,13 @@ class Motor:
             # Sending Loop
             for ip, port in targets:
                 try:
-                    # Debug Out
-                    print(f"[DEBUG_TYPING_OUT] Sending to {ip}:{port} Status={status}", file=sys.stderr)
-                    
                     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                     s.settimeout(0.5) # Fast timeout
                     s.connect((ip, port))
                     s.sendall(pkg + b'\n')
                     s.close()
-                except Exception as e:
-                    # Debug Err
-                    print(f"[DEBUG_TYPING_OUT] Err {ip}: {e}", file=sys.stderr)
-                    pass
-        except Exception as e:
-            import sys
-            print(f"[DEBUG_TRACE_CRASH] {e}", file=sys.stderr)
+                except: pass
+        except: pass
 
 if __name__ == "__main__":
     motor = Motor()

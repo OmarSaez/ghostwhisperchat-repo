@@ -409,8 +409,9 @@ def modo_ui_chat(target_id, es_grupo):
                          break
                     
                     # TYPING INDICATOR (v2.169)
-                    if "__TYPING_UPDATE__" in line:
-                         label = line.replace("__TYPING_UPDATE__ ", "", 1).strip()
+                    # Deteccion robusta para evitar ghost printing
+                    if line.strip().startswith("__TYPING_UPDATE__"):
+                         label = line.strip().replace("__TYPING_UPDATE__", "", 1).strip()
                          helper.update_typing_status(label)
                          continue
 
