@@ -79,7 +79,7 @@ class Colores:
     BLACK_TXT = "\033[38;5;0m"
 
 # Versionado - Estable - foto,colores,@todos,estados
-APP_VER_NUM = "2.153.5"
+APP_VER_NUM = "2.153.13"
 APP_VER_TAG = "Feature - All Smart Features Ready"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
