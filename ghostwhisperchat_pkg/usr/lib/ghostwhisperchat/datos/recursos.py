@@ -79,8 +79,8 @@ class Colores:
     BLACK_TXT = "\033[38;5;0m"
 
 # Versionado - Estable - foto,colores,@todos,estados
-APP_VER_NUM = "2.153.14"
-APP_VER_TAG = "Fix - Notifications & Smart Resolve"
+APP_VER_NUM = "2.153.16"
+APP_VER_TAG = "Fix - Paranoid Join Notification"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 BANNER = r"""

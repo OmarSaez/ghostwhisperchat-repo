@@ -92,7 +92,7 @@ def enviar_notificacion(titulo, mensaje):
         import sys
         env = os.environ.copy()
         # Debug Log
-        # print(f"[NOTIFY] Enviando: {titulo} - {mensaje}", file=sys.stderr)
+        print(f"[NOTIFY] Enviando: {titulo} - {mensaje}", file=sys.stderr)
         
         subprocess.Popen(['notify-send', titulo, mensaje], env=env)
     except Exception as e:
