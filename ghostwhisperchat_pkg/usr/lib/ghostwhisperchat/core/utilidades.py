@@ -88,8 +88,16 @@ import os
 def enviar_notificacion(titulo, mensaje):
     """Envía una notificación de escritorio simple."""
     try:
-        subprocess.Popen(['notify-send', titulo, mensaje])
-    except: pass
+        # Pasar entorno explicito (DISPLAY, DBUS)
+        import sys
+        env = os.environ.copy()
+        # Debug Log
+        # print(f"[NOTIFY] Enviando: {titulo} - {mensaje}", file=sys.stderr)
+        
+        subprocess.Popen(['notify-send', titulo, mensaje], env=env)
+    except Exception as e:
+        import sys
+        print(f"[NOTIFY_ERR] Falló notify-send: {e}", file=sys.stderr)
 
 def preguntar_invitacion_chat(remitente_nick, remitente_id, grupo_nombre=None):
     """

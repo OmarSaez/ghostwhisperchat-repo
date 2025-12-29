@@ -187,6 +187,107 @@ class Motor:
              self.running = False
 
 
+    def _resolver_objetivo_smart(self, target_raw):
+        """
+        Busca un usuario por Nick o IP. 
+        Orden: IP -> Contactos -> Escaneo Red Activo (Simpler Polling).
+        Retorna: (ip_encontrada, error_msg_o_sugerencias)
+        """
+        try:
+            import re
+            import time
+            import socket
+            from ghostwhisperchat.core.utilidades import normalize_text
+            
+            # 1. Es IP directa?
+            if re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$", target_raw):
+                return target_raw, None
+                
+            target_norm = normalize_text(target_raw)
+            
+            # Helper interno seguro
+            def buscar_en_diccionario(dicc):
+                matches = []
+                if not dicc: return None, matches
+                for uid, d in dicc.items():
+                    if isinstance(d, dict) and 'nick' in d:
+                        n = normalize_text(d['nick'])
+                        if n == target_norm: return d['ip'], None
+                        if n.startswith(target_norm): matches.append(d)
+                return None, matches
+
+            # 2. Busqueda Local
+            print(f"[SMART] Buscando '{target_norm}' en local...", file=sys.stderr)
+            ip, matches = buscar_en_diccionario(self.memoria.peers)
+            if ip: return ip, None
+            
+            # Check agenda too
+            if not ip:
+                 ip_c, matches_c = buscar_en_diccionario(self.memoria.contactos)
+                 if ip_c: return ip_c, None
+                 if matches_c: matches.extend(matches_c)
+
+            # 3. Escaneo Red (Active Polling con Timeout socket)
+            print(f"[SMART] Buscando en red (UDP)...", file=sys.stderr)
+            self.scan_buffer = [] 
+            
+            # Fix: Usar metodo existente enviar_udp_broadcast con paquete WHO_NAME
+            from ghostwhisperchat.core.protocolo import empaquetar
+            pkg = empaquetar("WHO_NAME", {"nick": target_raw}, self.memoria.get_origen())
+            self.red.enviar_udp_broadcast(pkg) 
+            
+            start_time = time.time()
+            found_ip = None
+            
+            # Guardar timeout original
+            old_timeout = self.red.sock_udp.gettimeout()
+            self.red.sock_udp.settimeout(0.2) # Non-blockingish
+            
+            try:
+                for _ in range(8): # ~1.6s
+                    try:
+                        while True: # Drain buffer
+                            data, addr = self.red.sock_udp.recvfrom(65535)
+                            self.manejar_paquete_udp(data, addr)
+                    except socket.timeout:
+                        pass # Buffer vacio por ahora
+                    except BlockingIOError:
+                        pass
+                    except Exception as e:
+                        print(f"[SMART_WARN] UDP Reading error: {e}", file=sys.stderr)
+                    
+                    # Chequear buffer
+                    for res in self.scan_buffer:
+                        n = normalize_text(res.get('nick', ''))
+                        if n == target_norm:
+                            found_ip = res['ip']
+                            break
+                    
+                    if found_ip: break
+                    time.sleep(0.1) # Breve pausa
+            finally:
+                # Restaurar socket a bloquear (o lo que fuera, select lo maneja)
+                self.red.sock_udp.settimeout(old_timeout)
+
+            if found_ip: return found_ip, None
+
+            # 4. Resultados
+            candidates = set()
+            if matches: 
+                for m in matches: candidates.add(m['nick'])
+            for res in self.scan_buffer:
+                n = normalize_text(res.get('nick', ''))
+                if n.startswith(target_norm): candidates.add(res['nick'])
+                    
+            if not candidates:
+                return None, f"No se encontró a '{target_raw}'."
+                
+            sug = ", ".join(list(candidates)[:3])
+            return None, f"'{target_raw}' no existe. ¿Quizás: {sug}?"
+            
+        except Exception as e:
+            return None, f"Error SmartResolve: {e}"
+
     def _sincronizar_ui_usuarios(self, chat_id):
         """Manda la lista de nicks al UI para el autocompletado (Comando Oculto)"""
         if chat_id not in self.ui_sessions: return
