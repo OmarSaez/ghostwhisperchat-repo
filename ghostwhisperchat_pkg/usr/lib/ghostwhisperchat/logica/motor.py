@@ -1699,16 +1699,16 @@ class Motor:
                      # No, ANNOUNCE is usually one-way or they will connect.
                      # But we should have the socket from the 'sock' arg in handle_tcp if it's persistent.
                      self.red.registrar_socket_tcp(sock, f"GRP_IN_{gid}_{new_user['uid']}")
-                                          # YELLOW INDICATOR [+]
-                      if gid in self.ui_sessions:
-                          # Formated Join Msg
-                          self.ui_sessions[gid].sendall(f"\n[SISTEMA] [+] {new_user['nick']} se ha unido al grupo.\n".encode('utf-8'))
-                      
-                      # Notificacion de Escritorio (Fix Paranoico v2.153.16)
-                      # Usamos import local y sleep igual que en LEAVE por consistencia
-                      time.sleep(0.1) 
-                      from ghostwhisperchat.core.utilidades import enviar_notificacion
-                      enviar_notificacion(f"Grupo {g['nombre']}", f"{new_user['nick']} se unió al grupo.")
+                     # YELLOW INDICATOR [+]
+                     if gid in self.ui_sessions:
+                         # Formated Join Msg
+                         self.ui_sessions[gid].sendall(f"\n[SISTEMA] [+] {new_user['nick']} se ha unido al grupo.\n".encode('utf-8'))
+                     
+                     # Notificacion de Escritorio (Fix Paranoico v2.153.16)
+                     # Usamos import local y sleep igual que en LEAVE por consistencia
+                     time.sleep(0.1) 
+                     from ghostwhisperchat.core.utilidades import enviar_notificacion
+                     enviar_notificacion(f"Grupo {g['nombre']}", f"{new_user['nick']} se unió al grupo.")
 
         elif tipo == "LEAVE":
              gid = payload.get("gid")

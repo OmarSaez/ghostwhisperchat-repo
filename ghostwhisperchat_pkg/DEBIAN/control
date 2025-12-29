@@ -1,8 +1,10 @@
 Package: ghostwhisperchat
-Version: 2.153.16
+Version: 2.153.17
 Section: net
 Priority: optional
 Architecture: all
-Maintainer: Omar Saez <omar.saez@usach.cl>
-Description: GhostWhisperChat - Chat LAN silencioso para comunicación 1 a 1 y grupos.
-Depends: python3 (>= 3.6), zenity, libnotify-bin, psmisc, zip, unzip, python3-pil
+Depends: python3, python3-cryptography, libnotify-bin, portaudio19-dev, python3-pyaudio, vorbis-tools, zenity, xterm, pulseaudio-utils
+Maintainer: Omar Saez <omarsaez@ghostwhisper.chat>
+Description: GhostWhisperChat - Chat P2P Local Seguro (Edición Hacker)
+ Sistema de chat descentralizado con cifrado E2E, transferencia de archivos,
+ llamadas de voz, y descubrimiento automático en LAN.
