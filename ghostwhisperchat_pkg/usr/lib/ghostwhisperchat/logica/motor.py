@@ -652,24 +652,42 @@ class Motor:
                  return f"{Colores.RED}[CRASH] Error generando Dashboard:\n{traceback.format_exc()}{Colores.RESET}"
 
         elif cmd == "CONTACTS":
-             # Usamos peers para historial reciente por ahora
-             ct = self.memoria.peers
-             if not ct: return "No hay contactos recientes."
-             res = "--- CONTACTOS (Caché) ---\n"
+             # Usar la agenda real persistente + Peers activos
+             ct = self.memoria.contactos
+             peers_active = self.memoria.peers
              
-             for uid_key, data in ct.items():
-                  if data['uid'] == self.memoria.mi_uid: continue
+             if not ct and not peers_active: return "No hay contactos guardados."
+             
+             # Unir ambos (set de UIDs)
+             all_uids = set(ct.keys()) | set(peers_active.keys())
+             
+             res = "--- CONTACTOS (Agenda) ---\n"
+             
+             for uid in all_uids:
+                  if uid == self.memoria.mi_uid: continue
                   
+                  # Data base del contacto (Agenda)
+                  data = ct.get(uid, {}).copy()
+                  
+                  # Sobrescribir con datos frescos si esta activo (RAM)
+                  if uid in peers_active:
+                      data.update(peers_active[uid])
+                      
                   nick = data.get('nick', 'Desconocido')
                   ip_addr = data.get('ip', '?.?.?.?')
                   s_user = data.get('sys_user', '?')
+                  
+                  # Estado
                   st = data.get('status', 'OFFLINE')
+                  if uid in peers_active: 
+                      st = peers_active[uid].get('status', 'ONLINE')
+                  
                   msg = data.get('status_msg', '')
                   
                   # Formato Rico: - Nick [user@ip] [ESTADO: "Msg"] (UID)
                   linea = f"- {nick} [{s_user}@{ip_addr}] [{st}"
                   if msg: linea += f": \"{msg}\""
-                  linea += f"] ({uid_key})"
+                  linea += f"] ({uid})"
                   
                   res += linea + "\n"
              return res

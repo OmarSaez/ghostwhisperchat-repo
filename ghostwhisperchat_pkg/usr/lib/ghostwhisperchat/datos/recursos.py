@@ -79,8 +79,8 @@ class Colores:
     BLACK_TXT = "\033[38;5;0m"
 
 # Versionado - Estable - foto,colores,@todos,estados
-APP_VER_NUM = "2.153.19"
-APP_VER_TAG = "ROLLBACK- Stable - All Fixes Applied"
+APP_VER_NUM = "2.153.20"
+APP_VER_TAG = "Feature - Persistence Clean Apply"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 BANNER = r"""

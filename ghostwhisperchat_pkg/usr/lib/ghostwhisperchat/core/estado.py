@@ -273,6 +273,9 @@ class MemoriaGlobal:
             self.peers[uid].update(update_data)
             if port_priv: self.peers[uid]['port_priv'] = port_priv
             if port_group: self.peers[uid]['port_group'] = port_group
+            
+            # Persistencia Automatica
+            self.registrar_contacto(uid, nick, ip)
 
     def obtener_peer(self, uid):
         return self.peers.get(uid)
