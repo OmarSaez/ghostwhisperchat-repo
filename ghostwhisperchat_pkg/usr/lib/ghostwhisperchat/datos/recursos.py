@@ -78,9 +78,9 @@ class Colores:
     # Texto High Contrast para fondos claros
     BLACK_TXT = "\033[38;5;0m"
 
-# Versionado - Estable - foto,colores,@todos,estados
-APP_VER_NUM = "2.153.22"
-APP_VER_TAG = "CRITICAL FIX - Deadlock Resolved"
+# Versionado - Estable - Autocompletado,foto,colores,@todos,estados
+APP_VER_NUM = "2.154"
+APP_VER_TAG = "Estable - Autocompletado,foto,colores,@todos,estados"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 BANNER = r"""

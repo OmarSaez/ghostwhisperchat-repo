@@ -546,8 +546,6 @@ def modo_ui_chat(target_id, es_grupo):
                              line = f"{C.RED}{line}{C.RESET}"
                         elif "[-]" in line or "[!]" in line:
                              line = f"{C.YELLOW}{line}{C.RESET}"
-                        elif "[+]" in line:
-                             line = f"{C.YELLOW}{line}{C.RESET}"
                         else:
                              line = f"{C.GREEN}{line}{C.RESET}"
                     
