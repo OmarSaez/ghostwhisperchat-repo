@@ -79,8 +79,8 @@ class Colores:
     BLACK_TXT = "\033[38;5;0m"
 
 # Versionado - Estable - foto,colores,@todos,estados
-APP_VER_NUM = "2.153"
-APP_VER_TAG = "Feature - Smart Autocomplete (TAB)"
+APP_VER_NUM = "2.153.2"
+APP_VER_TAG = "Fix - Syntax Error in Motor"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 BANNER = r"""

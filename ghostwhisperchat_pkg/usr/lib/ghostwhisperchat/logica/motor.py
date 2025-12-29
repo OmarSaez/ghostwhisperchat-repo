@@ -1523,7 +1523,7 @@ class Motor:
                          
                          self.red.enviar_tcp(s, ann_pkg)
                          self.red.registrar_socket_tcp(s, f"GRP_PEER_{gid}_{uid}")
-                     print(f"[MESH] Conectado y anunciado a {m.get('nick')}", file=sys.stderr)
+                         print(f"[MESH] Conectado y anunciado a {m.get('nick')}", file=sys.stderr)
                      except Exception as e:
                          print(f"[MESH] Fallo conexion mesh a {target_ip}: {e}", file=sys.stderr)
                  
