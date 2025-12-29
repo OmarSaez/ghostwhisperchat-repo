@@ -555,9 +555,22 @@ class Motor:
              ct = self.memoria.peers
              if not ct: return "No hay contactos recientes."
              res = "--- CONTACTOS (Caché) ---\n"
-             for ip, data in ct.items():
+             
+             for uid_key, data in ct.items():
                   if data['uid'] == self.memoria.mi_uid: continue
-                  res += f"[{data['nick']}] ({ip})\n"
+                  
+                  nick = data.get('nick', 'Desconocido')
+                  ip_addr = data.get('ip', '?.?.?.?')
+                  s_user = data.get('sys_user', '?')
+                  st = data.get('status', 'OFFLINE')
+                  msg = data.get('status_msg', '')
+                  
+                  # Formato Rico: - Nick [user@ip] [ESTADO: "Msg"] (UID)
+                  linea = f"- {nick} [{s_user}@{ip_addr}] [{st}"
+                  if msg: linea += f": \"{msg}\""
+                  linea += f"] ({uid_key})"
+                  
+                  res += linea + "\n"
              return res
 
         elif cmd == "SHORTCUTS":
@@ -870,6 +883,27 @@ class Motor:
             
         elif cmd == "CLEAR":
             return "\033c"
+
+        # --- MANEJO DE COMANDOS DESCONOCIDOS (Sugerencias) ---
+        elif cmd == "UNKNOWN":
+             import difflib
+             from ghostwhisperchat.datos.recursos import COMMAND_MAP
+             
+             raw = args[0] if args else "???"
+             all_cmds = []
+             for aliases in COMMAND_MAP.values():
+                 all_cmds.extend(aliases)
+             
+             # Fuzzy Search
+             matches = difflib.get_close_matches(raw, all_cmds, n=1, cutoff=0.5)
+             
+             err = f"[?] Comando '{raw}' no encontrado."
+             if matches:
+                 err += f" ¿Quizás quisiste decir '{matches[0]}'?"
+             else:
+                 err += " Usa --ayuda para ver la lista."
+                 
+             return err
 
         return f"[?] Comando: {comando_str}"
 

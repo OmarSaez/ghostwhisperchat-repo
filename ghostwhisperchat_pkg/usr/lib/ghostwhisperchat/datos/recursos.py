@@ -79,8 +79,8 @@ class Colores:
     BLACK_TXT = "\033[38;5;0m"
 
 # Versionado - Estable - foto,colores,@todos,estados
-APP_VER_NUM = "2.153.2"
-APP_VER_TAG = "Fix - Syntax Error in Motor"
+APP_VER_NUM = "2.153.5"
+APP_VER_TAG = "Feature - All Smart Features Ready"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 BANNER = r"""
@@ -287,7 +287,8 @@ COMMAND_MAP = {
     'LIST_GROUPS':      ['--vergrupos', '-g', '--grupos', '--explorar', '--salas'],
     'CONTACTS':         ['--contactos', '-c', '--amigos', '--agenda', '--historial', '--contacts'],
     'VISIBILITY_TOGGLE':['--invisible', '-v', '--fantasma', '--oculto', '--visibilidad'],
-    'FILE':         ['--archivo', '-f', '--enviar', '--mandar', '--adjuntar'],
+    'FILE':         ['--archivo', '-f', '--enviar', '--mandar', '--adjuntar', '--file'],
+    'IMAGE':        ['--imagen', '-i', '--foto', '--picture', '-P'],
     'CHANGE_NICK':  ['--cambiarnombre', '-n', '--nick', '--apodo', '--nombre'],
     'STATUS':       ['--estado', '-e', '--situacion', '--mood', '--st'],
     'GLOBAL_STATUS':['--estados-globales', '-i', '--info', '--config', '--todo'],
@@ -296,7 +297,6 @@ COMMAND_MAP = {
     'CLEAR':        ['--limpiar', '-k', '--borrar', '--cls', '--vaciar', '--clear'],
     'LOG_TOGGLE':   ['--log', '-r', '--guardar', '--registro', '--grabar'],
     'DL_TOGGLE':    ['--descarga', '-b', '--bajar', '--autobajar', '--dl'],
-    'FILE':         ['--archivo', '-f', '--enviar', '--file'],
     'PHOTO_BG':     ['--foto-bg'] # Comando interno silencioso
 }
 
