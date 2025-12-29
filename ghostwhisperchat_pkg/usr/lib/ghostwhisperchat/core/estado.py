@@ -12,7 +12,7 @@ HISTORY_DIR = os.path.expanduser("~/.ghostwhisperchat/history")
 
 class MemoriaGlobal:
     _instance = None
-    _lock = threading.Lock()
+    _lock = threading.RLock()
 
     def __new__(cls):
         with cls._lock:

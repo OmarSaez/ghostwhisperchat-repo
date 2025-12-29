@@ -652,44 +652,46 @@ class Motor:
                  return f"{Colores.RED}[CRASH] Error generando Dashboard:\n{traceback.format_exc()}{Colores.RESET}"
 
         elif cmd == "CONTACTS":
-             # Usar la agenda real persistente + Peers activos
-             ct = self.memoria.contactos
-             peers_active = self.memoria.peers
-             
-             if not ct and not peers_active: return "No hay contactos guardados."
-             
-             # Unir ambos (set de UIDs)
-             all_uids = set(ct.keys()) | set(peers_active.keys())
-             
              res = "--- CONTACTOS (Agenda) ---\n"
-             
-             for uid in all_uids:
-                  if uid == self.memoria.mi_uid: continue
-                  
-                  # Data base del contacto (Agenda)
-                  data = ct.get(uid, {}).copy()
-                  
-                  # Sobrescribir con datos frescos si esta activo (RAM)
-                  if uid in peers_active:
-                      data.update(peers_active[uid])
+             try:
+                 # 1. Merge sources
+                 ct = self.memoria.contactos or {}
+                 peers_active = self.memoria.peers or {}
+                 
+                 all_uids = set(ct.keys()) | set(peers_active.keys())
+                 
+                 if not all_uids: return "No hay contactos guardados."
+                 
+                 for uid in all_uids:
+                      if uid == self.memoria.mi_uid: continue
                       
-                  nick = data.get('nick', 'Desconocido')
-                  ip_addr = data.get('ip', '?.?.?.?')
-                  s_user = data.get('sys_user', '?')
-                  
-                  # Estado
-                  st = data.get('status', 'OFFLINE')
-                  if uid in peers_active: 
-                      st = peers_active[uid].get('status', 'ONLINE')
-                  
-                  msg = data.get('status_msg', '')
-                  
-                  # Formato Rico: - Nick [user@ip] [ESTADO: "Msg"] (UID)
-                  linea = f"- {nick} [{s_user}@{ip_addr}] [{st}"
-                  if msg: linea += f": \"{msg}\""
-                  linea += f"] ({uid})"
-                  
-                  res += linea + "\n"
+                      # Base data from Agenda
+                      data = ct.get(uid, {}).copy()
+                      
+                      # Update with Active Peer data
+                      if uid in peers_active:
+                          data.update(peers_active[uid])
+                          # Force status from active peer
+                          data['status'] = peers_active[uid].get('status', 'ONLINE')
+                      else:
+                          # If not active, it's offline
+                          data['status'] = 'OFFLINE'
+                          
+                      nick = data.get('nick', 'Desconocido')
+                      ip_addr = data.get('ip', '?.?.?.?')
+                      s_user = data.get('sys_user', '?')
+                      st = data.get('status', 'OFFLINE')
+                      msg = data.get('status_msg', '')
+                      
+                      # Formato Rico
+                      linea = f"- {nick} [{s_user}@{ip_addr}] [{st}"
+                      if msg: linea += f": \"{msg}\""
+                      linea += f"] ({uid})"
+                      
+                      res += linea + "\n"
+             except Exception as e:
+                 res = f"[X] Error listando contactos: {e}"
+                 
              return res
 
         elif cmd == "SHORTCUTS":
