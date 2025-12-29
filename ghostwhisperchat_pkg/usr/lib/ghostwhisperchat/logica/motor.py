@@ -187,6 +187,31 @@ class Motor:
              self.running = False
 
 
+    def _sincronizar_ui_usuarios(self, chat_id):
+        """Manda la lista de nicks al UI para el autocompletado (Comando Oculto)"""
+        if chat_id not in self.ui_sessions: return
+        
+        nicks = set()
+        
+        # Si es grupo, sacar miembros
+        if chat_id in self.memoria.grupos_activos:
+            g = self.memoria.grupos_activos[chat_id]
+            for m in g['miembros'].values():
+                if m.get('nick'): nicks.add(m['nick'])
+        
+        # Si es privado, sacar el peer
+        else:
+            p = self.memoria.buscar_peer(chat_id)
+            if p: nicks.add(p['nick'])
+            
+        # Enviar comando oculto
+        if nicks:
+            lista_str = ",".join(nicks)
+            cmd = f"__SYNC_USERS__ {lista_str}\n"
+            try:
+                self.ui_sessions[chat_id].sendall(cmd.encode('utf-8'))
+            except: pass
+
     def procesar_ipc_mensaje(self, mensaje, conn):
         """Maneja comandos transitorios y registros de UI"""
         if mensaje.startswith("__REGISTER_UI__"):
@@ -254,6 +279,9 @@ class Motor:
                 self.ui_sessions[chat_id] = conn
                 print(f"[UI] Registrada ventana para {chat_id}", file=sys.stderr)
                 conn.sendall(f"[*] Conectado al Daemon. ID: {chat_id}\n".encode('utf-8'))
+                
+                # Sincronizacion Inicial de Usuarios para Autocompletado (Feature v2.153)
+                self._sincronizar_ui_usuarios(chat_id)
             return
 
         elif mensaje.startswith("REGISTER_UI"):
@@ -262,6 +290,7 @@ class Motor:
                 chat_id = parts[1]
                 self.ui_sessions[chat_id] = conn
                 print(f"[IPC] UI registrada para chat_id: {chat_id}", file=sys.stderr)
+                self._sincronizar_ui_usuarios(chat_id)
             return
 
         elif mensaje.startswith("--"):
@@ -1494,9 +1523,13 @@ class Motor:
                          
                          self.red.enviar_tcp(s, ann_pkg)
                          self.red.registrar_socket_tcp(s, f"GRP_PEER_{gid}_{uid}")
-                         print(f"[MESH] Conectado y anunciado a {m.get('nick')}", file=sys.stderr)
+                     print(f"[MESH] Conectado y anunciado a {m.get('nick')}", file=sys.stderr)
                      except Exception as e:
                          print(f"[MESH] Fallo conexion mesh a {target_ip}: {e}", file=sys.stderr)
+                 
+                 # Feature v2.153: Actualizar UI tras recibir SYNC
+                 self._sincronizar_ui_usuarios(gid)
+                 
              else:
                  print(f"[DEBUG] SYNC ignorado: GID {gid} no esta en grupos activos", file=sys.stderr)
                  
@@ -1519,6 +1552,11 @@ class Motor:
                          sys_user=new_user.get('sys_user'),
                          status_msg=new_user.get('status_msg')
                      )
+                     
+                     print(f"[GROUP] Miembro anunciado: {new_user['nick']}", file=sys.stderr)
+                     
+                     # Feature v2.153: Actualizar UI tras ANNOUNCE
+                     self._sincronizar_ui_usuarios(gid)
                      
                      print(f"[MESH] Usuario ANNOUNCED en {g['nombre']}: {new_user['nick']} (Msg: {new_user.get('status_msg')})", file=sys.stderr)
                      

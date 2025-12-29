@@ -12,6 +12,7 @@ import termios # Raw mode input
 import tty     # Raw mode utility
 import shutil
 import argparse
+import difflib # Autocompletado Inteligente
 from ghostwhisperchat.datos.recursos import Colores as C, BANNER
 from ghostwhisperchat.core import imagen_ascii # Modulo ASCII Art
 
@@ -27,6 +28,9 @@ class GestorInput:
         self.running = True
         self.history = []
         self.history_index = 0
+        
+        # Smart Autocomplete Cache
+        self.known_users = set() # Nicks aprendidos de la sesion
         
         # Typing Visual State
         self.typing_status_msg = ""
@@ -76,6 +80,29 @@ class GestorInput:
 
     def print_incoming(self, msg):
         """Imprime mensaje entrante sin romper el input actual"""
+        # --- SCAPING PASIVO DE USUARIOS (Autocompletado) ---
+        try:
+             # 1. Chat normal: "[12:00] Alex: hola"
+             if "]: " in msg: # Heuristica rapida
+                 parts = msg.split("]: ", 1)
+                 if len(parts) > 1:
+                     # parts[0] es "[12:00] Alex"
+                     # Sacar lo que este despues del ultimo espacio o ']'
+                     candidate = parts[0].split(']')[-1].strip()
+                     if candidate and " " not in candidate: # Nicks no suelen tener espacios
+                         self.known_users.add(candidate)
+            
+             # 2. Join/Leave: "[+] Alex se ha unido"
+             if "[+]" in msg or "[-]" in msg:
+                 # "[+] Alex se ha..."
+                 for marker in ["[+]", "[-]"]:
+                     if marker in msg:
+                         sub = msg.split(marker, 1)[1].strip()
+                         # "Alex se ha unido..." -> Alex
+                         candidate = sub.split(" ")[0]
+                         if candidate: self.known_users.add(candidate)
+        except: pass
+
         with self.lock:
             self._limpiar_linea()
             
@@ -207,6 +234,9 @@ class GestorInput:
                             sys.stdout.flush()
                         
                         # Backspace tambien cuenta como actividad typing (ya actualizado arriba)
+
+                    elif ch == '\t': # TAB Key (Autocompletado)
+                        self._handle_tab()
                         
                     elif ch == '\x1b': # Escape seq (Flechas)
                         # Leer siguientes 2
@@ -334,10 +364,65 @@ class GestorInput:
                  # FIX v2.166: Usar comando silencioso --foto-bg
                  cmd_file = f"__MSG__ --foto-bg \"{abs_path}\""
                  self.sock.sendall((cmd_file + "\n").encode('utf-8'))
-                 # Feedback visual suprimido por el daemon (Modo Silencioso)
+                # Feedback visual suprimido por el daemon (Modo Silencioso)
 
         except Exception as e:
              self.print_incoming(f"[ERROR CLI] {e}")
+
+    def _handle_tab(self):
+        """Autocompletado Inteligente (Contextual + Fuzzy)"""
+        current_input = "".join(self.buffer)
+        if not current_input: return
+        
+        tokens = current_input.split(" ")
+        target_word = tokens[-1]
+        if not target_word: return 
+        
+        suggestions = []
+        from ghostwhisperchat.datos.recursos import COMMAND_MAP
+        
+        # --- CASO 1: COMANDOS ---
+        if target_word.startswith("-"):
+             all_cmds = []
+             for key, aliases in COMMAND_MAP.items():
+                 all_cmds.extend(aliases)
+             # Exact prefix match
+             suggestions = [c for c in all_cmds if c.startswith(target_word)]
+             # Fuzzy fallback
+             if not suggestions:
+                  suggestions = difflib.get_close_matches(target_word, all_cmds, n=3, cutoff=0.55)
+
+        # --- CASO 2: MENCIONES (@) ---
+        elif target_word.startswith("@"):
+             prefix = target_word[1:]
+             matches = [u for u in self.known_users if u.lower().startswith(prefix.lower())]
+             suggestions = ["@"+u for u in matches]
+
+        # --- CASO 3: ARGUMENTO DE USUARIO (Contextual) ---
+        else:
+             # Si el comando previo espera un usuario
+             prev_token = tokens[-2] if len(tokens) >= 2 else ""
+             USER_ARG_CMDS = ["--dm", "-d", "--priv", "--agregar", "-a", "--info", "-i", "--privado", "--susurrar"]
+             
+             if prev_token in USER_ARG_CMDS:
+                  matches = [u for u in self.known_users if u.lower().startswith(target_word.lower())]
+                  suggestions = matches
+        
+        # --- APLICAR ---
+        if len(suggestions) == 1:
+             # Reemplazar ultima palabra
+             tokens[-1] = suggestions[0]
+             # Reconstruir buffer
+             new_text = " ".join(tokens) + " "
+             self.buffer = list(new_text)
+             self._limpiar_linea()
+             self._pintar_linea()
+             
+        elif len(suggestions) > 1:
+             # Hint
+             hint = " ".join(suggestions[:5])
+             sys.stdout.write(f"\r\n{C.CYAN} Sugerencias: {hint}{C.RESET}\r\n")
+             self._pintar_linea()
 
 def enviar_comando_transitorio(cmd_str):
     """Envía un comando, espera respuesta inmediata y sale."""
@@ -438,6 +523,16 @@ def modo_ui_chat(target_id, es_grupo):
                     if line.strip().startswith("__TYPING_UPDATE__"):
                          label = line.strip().replace("__TYPING_UPDATE__", "", 1).strip()
                          helper.update_typing_status(label)
+                         continue
+                    
+                    # SYNC USERS (v2.153) - Autocomplete Cache Update
+                    if line.strip().startswith("__SYNC_USERS__"):
+                         data = line.strip().replace("__SYNC_USERS__", "", 1).strip()
+                         if data:
+                             # Formato: nick1,nick2,nick3
+                             users = data.split(",")
+                             for u in users:
+                                 if u: helper.known_users.add(u.strip())
                          continue
 
 
