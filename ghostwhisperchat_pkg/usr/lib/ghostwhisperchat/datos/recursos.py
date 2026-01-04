@@ -79,8 +79,8 @@ class Colores:
     BLACK_TXT = "\033[38;5;0m"
 
 # Versionado - Estable - Autocompletado,foto,colores,@todos,estados
-APP_VER_NUM = "2.154.4"
-APP_VER_TAG = "Debug - Network Tracing"
+APP_VER_NUM = "2.155"
+APP_VER_TAG = "Stable - MultiAccount Full Fix"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 BANNER = r"""

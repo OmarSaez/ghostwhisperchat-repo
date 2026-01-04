@@ -781,7 +781,10 @@ class Motor:
              if peer:
                   req = empaquetar("CHAT_REQ", {}, self.memoria.get_origen())
                   try:
-                      self.red.enviar_tcp_priv(peer['ip'], req)
+                      # FIX v2.155: Use Dynamic Port from Peer RAM to avoid Multi-Account conflict
+                      port_p = peer.get('port_priv')
+                      print(f"[CHAT_CMD] Conectando a {target} (IP:{peer['ip']} Port:{port_p or 'DEF'})", file=sys.stderr)
+                      self.red.enviar_tcp_priv(peer['ip'], req, port=port_p)
                       return f"[*] Contacto '{target}' encontrado en caché. Solicitud enviada."
                   except: 
                       pass # Fallback if TCP fails
