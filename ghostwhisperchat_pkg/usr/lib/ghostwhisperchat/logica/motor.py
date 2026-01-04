@@ -1235,7 +1235,8 @@ class Motor:
                              try:
                                  s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                                  s.settimeout(0.5)
-                                 s.connect((ip, PORT_GROUP))
+                                 tgt_pg = m.get('port_group') or PORT_GROUP
+                                 s.connect((ip, tgt_pg))
                                  s.sendall(leave_pkg + b'\n')
                                  s.close()
                              except Exception as e:
@@ -1596,7 +1597,9 @@ class Motor:
                         'ip': origen['ip'], 
                         'uid': origen['uid'], 
                         'status': status,
-                        'sys_user': s_user
+                        'sys_user': s_user,
+                        'port_group': origen.get('port_group'),
+                        'port_priv': origen.get('port_priv')
                     }
                     print(f"[GROUP] Agregado nuevo miembro: {origen['nick']} <{s_user}> ({origen['ip']})", file=sys.stderr)
                 
