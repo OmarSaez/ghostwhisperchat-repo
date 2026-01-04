@@ -1269,10 +1269,24 @@ class Motor:
         origen = data.get("origen")
 
         if origen:
-            # User Request: Do NOT save UDP scan results to persistent contacts.
-            # Only TCP interactions (Chat) should save to contacts.
-            # self.memoria.actualizar_peer(addr[0], origen['uid'], origen['nick'])
-            pass
+             # FIX v2.155: Multicount Support - Register Dynamic Ports in RAM
+             # We update 'peers' (RAM) but avoid 'actualizar_peer' to prevent polluting persistent agenda
+             uid = origen['uid']
+             port_p = origen.get('port_priv')
+             
+             with self.memoria._lock:
+                 if uid not in self.memoria.peers:
+                     self.memoria.peers[uid] = {}
+                 
+                 # Update routing info efficiently
+                 self.memoria.peers[uid].update({
+                     "uid": uid,
+                     "nick": origen['nick'],
+                     "ip": addr[0],
+                     "last_seen": time.time(),
+                     "status": "ONLINE"
+                 })
+                 if port_p: self.memoria.peers[uid]['port_priv'] = port_p
 
         if tipo == "SEARCH":
             target_name = payload.get("group_name")
@@ -1322,6 +1336,7 @@ class Motor:
              
              responder_nick = origen['nick']
              responder_ip = addr[0]
+             responder_port = origen.get('port_priv', 44494)
              
              # Check if we are waiting to invite this person
              if self.pending_invite_gid and self.pending_invite_nick == normalize_text(responder_nick):
@@ -1340,7 +1355,7 @@ class Motor:
                       }, self.memoria.get_origen())
                       
                       try:
-                          self.red.enviar_tcp_priv(responder_ip, invite_pkg)
+                          self.red.enviar_tcp_priv(responder_ip, invite_pkg, port=responder_port)
                           # Notify UI active session if possible (fire and forget log)
                           if gid in self.ui_sessions:
                                # INFO INDICATOR [*] - User invited, but not yet joined
@@ -1359,7 +1374,7 @@ class Motor:
                  
                  req = empaquetar("CHAT_REQ", {}, self.memoria.get_origen())
                  try:
-                     self.red.enviar_tcp_priv(responder_ip, req)
+                     self.red.enviar_tcp_priv(responder_ip, req, port=responder_port)
                      # Add to peers immediately to ensure History mapping works if we open UI
                      self.memoria.actualizar_peer(
                          responder_ip, 
