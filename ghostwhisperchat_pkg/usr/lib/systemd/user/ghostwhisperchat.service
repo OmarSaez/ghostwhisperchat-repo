@@ -9,9 +9,8 @@ ExecStartPre=/bin/sleep 10
 ExecStart=/usr/bin/gwc --start
 Restart=always
 RestartSec=10
-# Quitamos hardcode DISPLAY=:0 para permitir que herede el real si es posible, o que se inyecte despues.
-# Pero por compatibilidad basica lo dejamos si systemd user sessions no lo propagan bien.
-Environment=DISPLAY=:0
+# FIX v2.155: Remove hardcoded DISPLAY to allow multi-seat/multi-user GUI (e.g. :1 for Alex)
+# Environment=DISPLAY=:0
 
 [Install]
 WantedBy=default.target
