@@ -1261,10 +1261,16 @@ class Motor:
     # --- MANEJO RED (UDP + TCP) ---
 
     def manejar_paquete_udp(self, data_bytes, addr):
+        # [DEBUG TRACE]
+        print(f"[UDP_RAW] Recibido {len(data_bytes)}b de {addr} en {self.memoria.mi_nick} ({self.memoria.mi_uid[:8]})", file=sys.stderr)
+
         valid, data = desempaquetar(data_bytes)
         if not valid: return
 
         tipo = data.get("tipo")
+        origen = data.get("origen")
+        if origen:
+             print(f"[UDP_DEC] Tipo={tipo} De={origen.get('nick')} Port={origen.get('port_priv')}", file=sys.stderr)
         payload = data.get("payload")
         origen = data.get("origen")
 
@@ -1279,6 +1285,7 @@ class Motor:
                      self.memoria.peers[uid] = {}
                  
                  # Update routing info efficiently
+                 print(f"[PEER_UPD] Actualizando RAM para {origen.get('nick')} -> Port: {port_p or 'DEFAULT'}", file=sys.stderr)
                  self.memoria.peers[uid].update({
                      "uid": uid,
                      "nick": origen['nick'],
@@ -1374,6 +1381,7 @@ class Motor:
                  
                  req = empaquetar("CHAT_REQ", {}, self.memoria.get_origen())
                  try:
+                     print(f"[TCP_CONNECT] Iniciando Chat con {responder_nick} en {responder_ip}:{responder_port}", file=sys.stderr)
                      self.red.enviar_tcp_priv(responder_ip, req, port=responder_port)
                      # Add to peers immediately to ensure History mapping works if we open UI
                      self.memoria.actualizar_peer(

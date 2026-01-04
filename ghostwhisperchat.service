@@ -6,7 +6,7 @@ After=network.target
 Type=simple
 ExecStart=/usr/bin/gwc --start
 Restart=always
-RestartSec=10
+RestartSec=3
 Environment=DISPLAY=:0
 
 [Install]
