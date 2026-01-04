@@ -1240,23 +1240,19 @@ class Motor:
                                  s.sendall(leave_pkg + b'\n')
                                  s.close()
                              except Exception as e:
-                                 # print(f"[X] LEAVE fail to {ip}: {e}", file=sys.stderr) 
                                  pass
                          
                          # FULL EXIT: Remove group from memory
                          del self.memoria.grupos_activos[chat_id]
                          print(f"[Estado] Grupo {chat_id} eliminado de memoria.", file=sys.stderr)
-                         # Or CHAT_BYE?
-                         # Architecture says: [-] Nick has left.
-                         # So yes, LEAVE is correct for "Session Ended".
-                         
-                    # 2. Is it a Private Peer? (chat_id is UID)
+                    
                     else:
                         peer = self.memoria.buscar_peer(chat_id)
-                        if peer:
-                            print(f"[MESH] Enviando CHAT_BYE a {peer['nick']}", file=sys.stderr)
+                        if peer and 'ip' in peer:
                             bye_pkg = empaquetar("CHAT_BYE", {}, self.memoria.get_origen())
-                            try: self.red.enviar_tcp_priv(peer['ip'], bye_pkg)
+                            p_port = peer.get('port_priv')
+                            print(f"[PRIV] Enviando CHAT_BYE a {peer.get('nick')} ({peer['ip']}:{p_port})", file=sys.stderr)
+                            try: self.red.enviar_tcp_priv(peer['ip'], bye_pkg, port=p_port)
                             except: pass
                 except Exception as e:
                     print(f"[X] Error en desconexion UI: {e}", file=sys.stderr)
@@ -1671,6 +1667,7 @@ class Motor:
                      
                      sync_list.append(m_copy)
                  
+                 
                  # FEATURE FIX: Ensure HOST (Me) is in the list with FULL details (including status_msg)
                  # Sometime 'miembros' dict already has me.
                  # If so, does it have my 'status_msg'? 
@@ -1685,6 +1682,25 @@ class Motor:
                  sync_pkg = empaquetar("SYNC", {"gid": gid, "members": sync_list}, self.memoria.get_origen())
                  print(f"[MESH] Respondiendo SYNC_REQ con {len(sync_list)} miembros.", file=sys.stderr)
                  self.red.enviar_tcp(sock, sync_pkg)
+
+        elif tipo == "CHAT_BYE":
+             sender_uid = origen['uid']
+             print(f"[PRIV] CHAT_BYE recibido de {origen['nick']}", file=sys.stderr)
+             
+             if sender_uid in self.ui_sessions:
+                 try:
+                     self.ui_sessions[sender_uid].sendall(b"\n[SISTEMA] [-] El usuario ha cerrado el chat.\n")
+                     # Optional: Auto-close implies removing session, but we might want to let user read history.
+                     # If we close socket, UI process usually dies.
+                     # Let's just notify for now. Or close if that's the desired behavior.
+                     # User said: "dm cierra la consola del otro". So we must close.
+                     # time.sleep(2) 
+                     # self.ui_sessions[sender_uid].close()
+                     # del self.ui_sessions[sender_uid]
+                 except: pass
+                 
+                 from ghostwhisperchat.core.utilidades import enviar_notificacion
+                 enviar_notificacion("Chat Finalizado", f"{origen['nick']} ha cerrado la sesión.")
 
         elif tipo == "SYNC":
              gid = payload.get("gid")
@@ -1914,7 +1930,11 @@ class Motor:
                     try:
                          from ghostwhisperchat.core.transporte import PORT_GROUP
                          s_join = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                         s_join.connect((origen_data['ip'], PORT_GROUP))
+                         
+                         # FIX v2.155: Connect to host dynamic group port
+                         tgt_gp = origen_data.get('port_group') or PORT_GROUP
+                         s_join.connect((origen_data['ip'], tgt_gp))
+                         
                          s_join.sendall(req_pkg + b'\n')
                          s_join.setblocking(False) # <--- CRITICAL: Set non-blocking before select loop
                          self.red.registrar_socket_tcp(s_join, f"GRP_OUT_{g_id}")
@@ -1937,8 +1957,10 @@ class Motor:
             def _prompt_private():
                 acepta = preguntar_invitacion_chat(origen['nick'], origen['uid'])
                 if acepta:
+                    # FIX v2.155: Reply to correct dynamic port
+                    target_port = origen.get('port_priv')
                     ack = empaquetar("CHAT_ACK", {}, self.memoria.get_origen())
-                    self.red.enviar_tcp_priv(origen['ip'], ack)
+                    self.red.enviar_tcp_priv(origen['ip'], ack, port=target_port)
                     
                     # Launch UI
                     abrir_chat_ui(origen['uid'], nombre_legible=origen['nick'], es_grupo=False)
