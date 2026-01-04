@@ -1,20 +1,4 @@
 Package: ghostwhisperchat
-Version: 2.153.22
-Architecture: all
-Maintainer: Omar Saez <omarsaez@ghostwhisper.chat>
-Depends: python3, python3-cryptography, libnotify-bin, portaudio19-dev, python3-pyaudio, vorbis-tools, zenity, xterm, pulseaudio-utils
-Filename: pool/main/g/ghostwhisperchat/ghostwhisperchat_2.153.22_all.deb
-Size: 177288
-MD5sum: e3196b500d7b7046fa21803e98461a85
-SHA1: 763e41ab4c6575ba6ac3811f0c2fb5603b28a991
-SHA256: 1f0124c68e4397a15608405d3dca92bd495cf4344d80cbabd90494df72125c34
-Section: net
-Priority: optional
-Description: GhostWhisperChat - Chat P2P Local Seguro (Edición Hacker)
- Sistema de chat descentralizado con cifrado E2E, transferencia de archivos,
- llamadas de voz, y descubrimiento automático en LAN.
-
-Package: ghostwhisperchat
 Version: 2.154
 Architecture: all
 Maintainer: Omar Saez <omarsaez@ghostwhisper.chat>
@@ -40,6 +24,22 @@ Size: 177416
 MD5sum: 57c992fe21399f5c1ee8c9dd2ddeedc5
 SHA1: 254eeee24c63679c82d7d0d703179e3847880879
 SHA256: 79f530044ab19f39f962022c58270e6f9bb32283b9b28acf484e8999df864065
+Section: net
+Priority: optional
+Description: GhostWhisperChat - Chat P2P Local Seguro (Edición Hacker)
+ Sistema de chat descentralizado con cifrado E2E, transferencia de archivos,
+ llamadas de voz, y descubrimiento automático en LAN.
+
+Package: ghostwhisperchat
+Version: 2.154.2
+Architecture: all
+Maintainer: Omar Saez <omarsaez@ghostwhisper.chat>
+Depends: python3, python3-cryptography, libnotify-bin, portaudio19-dev, python3-pyaudio, vorbis-tools, zenity, xterm, pulseaudio-utils
+Filename: pool/main/g/ghostwhisperchat/ghostwhisperchat_2.154.2_all.deb
+Size: 177430
+MD5sum: 7f6e963e24a268a7bcd75453bdd2fe81
+SHA1: 9158dc95fcf2378cfefbe24258ace8a74c25d5f3
+SHA256: a0da3af7f823680f1941d35e295117a4ffda2f536b33dc475897089c963aada4
 Section: net
 Priority: optional
 Description: GhostWhisperChat - Chat P2P Local Seguro (Edición Hacker)

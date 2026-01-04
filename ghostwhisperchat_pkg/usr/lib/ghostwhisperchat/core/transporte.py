@@ -28,11 +28,12 @@ class GestorRed:
             self.sock_udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             self.sock_udp.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
             self.sock_udp.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            try:
-                # Allow multiple instances to share UDP port for listening
-                if hasattr(socket, "SO_REUSEPORT"):
-                    self.sock_udp.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
-            except: pass
+            # FIX v2.155: Disable SO_REUSEPORT to prevent Load Balancing.
+            # We want ALL local instances to receive the Broadcast.
+            # try:
+            #    if hasattr(socket, "SO_REUSEPORT"):
+            #        self.sock_udp.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+            # except: pass
             
             self.sock_udp.bind(('0.0.0.0', PORT_DISCOVERY))
             self.sock_udp.setblocking(False)
