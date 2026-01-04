@@ -543,9 +543,10 @@ class Motor:
                  "password_hash": pwd
              }, self.memoria.get_origen())
              
-             print(f"[GROUP] Invitando a {target_nick} ({target_peer['ip']})...", file=sys.stderr)
+             port_p = target_peer.get('port_priv')
+             print(f"[GROUP] Invitando a {target_nick} ({target_peer['ip']}:{port_p or 'DEF'})...", file=sys.stderr)
              try:
-                 self.red.enviar_tcp_priv(target_peer['ip'], invite_pkg)
+                 self.red.enviar_tcp_priv(target_peer['ip'], invite_pkg, port=port_p)
                  return f"[*] Invitación enviada a {target_nick}."
              except Exception as e:
                  return f"[X] Error enviando invitación: {e}"
@@ -1419,10 +1420,18 @@ class Motor:
                 gid = payload.get("gid")
                 name = payload.get("name")
                 ambassador_ip = addr[0]
-                print(f"[RADAR] Grupo encontrado: {name} en {ambassador_ip}", file=sys.stderr)
+                # FIX v2.155: Extract host group port (if dynamic)
+                ambassador_port = origen.get('port_group') 
+                print(f"[RADAR] Grupo encontrado: {name} en {ambassador_ip}:{ambassador_port}", file=sys.stderr)
                 
                 # Add to scan buffer if not present (Discovery)
-                group_entry = {"type": "GROUP", "name": name, "gid": gid, "ip": ambassador_ip}
+                group_entry = {
+                    "type": "GROUP", 
+                    "name": name, 
+                    "gid": gid, 
+                    "ip": ambassador_ip,
+                    "port_group": ambassador_port
+                }
                 if not any(x.get('gid') == gid for x in self.scan_buffer):
                       self.scan_buffer.append(group_entry)
 
@@ -1447,8 +1456,10 @@ class Motor:
                         req_pkg = empaquetar("JOIN_REQ", {"gid": gid, "password_hash": pwd_to_send}, self.memoria.get_origen())
                         try:
                             from ghostwhisperchat.core.transporte import PORT_GROUP
+                            target_port = ambassador_port or PORT_GROUP
                             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                            s.connect((ambassador_ip, PORT_GROUP))
+                            print(f"[MESH] Conectando a grupo en {ambassador_ip}:{target_port}", file=sys.stderr)
+                            s.connect((ambassador_ip, target_port))
                             s.sendall(req_pkg + b'\n')
                             self.red.registrar_socket_tcp(s, f"GRP_OUT_{gid}")
                         except Exception as e:
