@@ -304,7 +304,8 @@ class MemoriaGlobal:
                             "ip": self.mi_ip,
                             "sys_user": self.sys_user,
                             "status": "ONLINE",
-                            "port_priv": getattr(self, 'mi_port_priv', 44494)
+                            "port_priv": getattr(self, 'mi_port_priv', 44494),
+                            "port_group": getattr(self, 'mi_port_group', 44496)
                         }
                     },
                     "mensajes": [],
