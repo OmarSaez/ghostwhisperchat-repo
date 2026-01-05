@@ -1728,7 +1728,9 @@ class Motor:
                      try:
                          s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                          s.settimeout(2.0)
-                         s.connect((target_ip, PORT_GROUP))
+                         # FIX v2.160.4: Connect to Dynamic Group Port (Mesh Fix)
+                         tgt_gp = m.get('port_group') or PORT_GROUP
+                         s.connect((target_ip, tgt_gp))
                          # s.setblocking(False) # Blocking for announce is safer
                          
                          self.red.enviar_tcp(s, ann_pkg)
