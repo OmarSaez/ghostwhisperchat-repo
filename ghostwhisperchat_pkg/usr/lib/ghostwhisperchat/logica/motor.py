@@ -1692,6 +1692,8 @@ class Motor:
                      self.ui_sessions[sender_uid].sendall(b"\n[SISTEMA] [-] El usuario ha cerrado el chat. Cerrando en 3s...\n")
                      # User Requested: Auto-close UI to keep history/state consistent.
                      time.sleep(3) 
+                     try: self.ui_sessions[sender_uid].shutdown(socket.SHUT_RDWR)
+                     except: pass
                      self.ui_sessions[sender_uid].close()
                      del self.ui_sessions[sender_uid]
                  except: pass
@@ -1882,14 +1884,14 @@ class Motor:
                          else:
                              msg_alert = f"\n{Colores.YELLOW}[SISTEMA] [!] {origen['nick']} te ha enviado: {safe_fname}{Colores.RESET}\n"
                          
-                         # Broadcast carefully
-                         active_sessions = list(self.ui_sessions.values())
-                         if not active_sessions:
-                             print("[DEBUG] No UI sessions active to notify file receipt.", file=sys.stderr)
+                         # FIX v2.160.2: Broadcast ONLY to relevant session
+                         target_sess_id = f_gid if f_gid else origen['uid']
                          
-                         for sess in active_sessions:
-                             try: sess.sendall(msg_alert.encode('utf-8'))
-                             except: pass
+                         if target_sess_id in self.ui_sessions:
+                              try: self.ui_sessions[target_sess_id].sendall(msg_alert.encode('utf-8'))
+                              except: pass
+                         else:
+                              print(f"[FILE] Recibido archivo de {origen['nick']} (UI cerrada)", file=sys.stderr)
                              
                      except Exception as e:
                           print(f"[X] Error notificando archivo: {e}", file=sys.stderr)
