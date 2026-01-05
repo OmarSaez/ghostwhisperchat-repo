@@ -287,12 +287,18 @@ class GestorInput:
              is_explicit_command = msg.strip().startswith("-")
              
              if cmd_raw in IMG_ALIASES and is_explicit_command:
-                 parts = msg.strip().split()
+                 import shlex
+                 try:
+                     parts = shlex.split(msg.strip())
+                 except ValueError:
+                     self.print_incoming(f"{C.RED}[X] Error de sintaxis (comillas sin cerrar){C.RESET}")
+                     return
+
                  if len(parts) < 2:
                      self.print_incoming(f"{C.RED}[X] Uso: --imagen <ruta> [ancho]{C.RESET}")
                      return
                  
-                 im_path = parts[1].strip("'").strip('"')
+                 im_path = parts[1] # shlex handles quotes
                  file_to_send_bg = im_path # Marcamos para envio background
                  
                  # Lógica de Ancho v2.155:
