@@ -1689,14 +1689,11 @@ class Motor:
              
              if sender_uid in self.ui_sessions:
                  try:
-                     self.ui_sessions[sender_uid].sendall(b"\n[SISTEMA] [-] El usuario ha cerrado el chat.\n")
-                     # Optional: Auto-close implies removing session, but we might want to let user read history.
-                     # If we close socket, UI process usually dies.
-                     # Let's just notify for now. Or close if that's the desired behavior.
-                     # User said: "dm cierra la consola del otro". So we must close.
-                     # time.sleep(2) 
-                     # self.ui_sessions[sender_uid].close()
-                     # del self.ui_sessions[sender_uid]
+                     self.ui_sessions[sender_uid].sendall(b"\n[SISTEMA] [-] El usuario ha cerrado el chat. Cerrando en 3s...\n")
+                     # User Requested: Auto-close UI to keep history/state consistent.
+                     time.sleep(3) 
+                     self.ui_sessions[sender_uid].close()
+                     del self.ui_sessions[sender_uid]
                  except: pass
                  
                  from ghostwhisperchat.core.utilidades import enviar_notificacion

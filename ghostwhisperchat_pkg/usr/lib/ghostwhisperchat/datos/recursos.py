@@ -79,8 +79,8 @@ class Colores:
     BLACK_TXT = "\033[38;5;0m"
 
 # Versionado - Estable - Autocompletado,foto,colores,@todos,estados
-APP_VER_NUM = "2.160"
-APP_VER_TAG = "Feature - Multi-Account & Bye"
+APP_VER_NUM = "2.160.1"
+APP_VER_TAG = "Fix - AutoClose Chat"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 BANNER = r"""
