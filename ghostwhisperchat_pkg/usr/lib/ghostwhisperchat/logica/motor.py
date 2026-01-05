@@ -1485,7 +1485,10 @@ class Motor:
                  origen['uid'], 
                  origen['nick'],
                  sys_user=origen.get('sys_user'),
-                 status_msg=origen.get('status_msg')
+                 status_msg=origen.get('status_msg'),
+                 # FIX v2.160.5: Persist Dynamic Ports from Peer
+                 port_priv=origen.get('port_priv'),
+                 port_group=origen.get('port_group')
              )
 
         if tipo == "TYPING":

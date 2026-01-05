@@ -79,8 +79,8 @@ class Colores:
     BLACK_TXT = "\033[38;5;0m"
 
 # Versionado - Estable - Autocompletado,foto,colores,@todos,estados
-APP_VER_NUM = "2.160.4"
-APP_VER_TAG = "Fix - Mesh Announce"
+APP_VER_NUM = "2.160.5"
+APP_VER_TAG = "Fix - Port Persistence"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 BANNER = r"""
