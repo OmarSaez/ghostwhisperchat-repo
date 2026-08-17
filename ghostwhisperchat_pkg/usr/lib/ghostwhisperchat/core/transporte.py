@@ -18,8 +18,56 @@ class GestorRed:
         self.sock_tcp_group = None # 44496 (Listen)
         self.sock_tcp_priv = None  # 44494 (Listen)
         
+        self.socks_host = "127.0.0.1"
+        self.socks_port = 9050
+        
         self.tcp_connections = []  # Lista de sockets TCP activos (conectados o aceptados)
         self.inputs = []           # Lista para select()
+
+    def set_socks_proxy(self, host="127.0.0.1", port=9050):
+        """Configura los parámetros del proxy SOCKS5 local para Tor"""
+        self.socks_host = host
+        self.socks_port = port
+
+    def _conectar_socks5(self, host, port, timeout=15.0):
+        """
+        Establece una conexión TCP hacia un host .onion a través del proxy SOCKS5 local de Tor.
+        Implementación estándar en Python socket puro (sin dependencias externas).
+        """
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(timeout)
+        s.connect((self.socks_host, self.socks_port))
+
+        # 1. Saludo SOCKS5 (Autenticación no requerida: \x05\x01\x00)
+        s.sendall(b"\x05\x01\x00")
+        resp = s.recv(2)
+        if len(resp) < 2 or resp[0] != 0x05 or resp[1] != 0x00:
+            s.close()
+            raise OSError("Fallo de negociación SOCKS5 con Tor")
+
+        # 2. Petición CONNECT hacia dominio (.onion) -> ATYP 0x03
+        host_bytes = host.encode('ascii')
+        port_bytes = int(port).to_bytes(2, byteorder='big')
+        req = bytes([0x05, 0x01, 0x00, 0x03, len(host_bytes)]) + host_bytes + port_bytes
+        s.sendall(req)
+
+        resp = s.recv(4)
+        if len(resp) < 4 or resp[0] != 0x05 or resp[1] != 0x00:
+            rep_code = resp[1] if len(resp) > 1 else -1
+            s.close()
+            raise OSError(f"Tor SOCKS5 no pudo conectar con {host}:{port} (Código: {rep_code})")
+
+        # Drenar encabezado de dirección de respuesta SOCKS5
+        atyp = resp[3]
+        if atyp == 0x01:   # IPv4
+            s.recv(4 + 2)
+        elif atyp == 0x03: # Dominio
+            dlen = s.recv(1)[0]
+            s.recv(dlen + 2)
+        elif atyp == 0x04: # IPv6
+            s.recv(16 + 2)
+
+        return s
 
     def iniciar_servidores(self):
         """Levanta los 3 sockets principales en modo escucha, buscando puertos libres."""
@@ -57,19 +105,7 @@ class GestorRed:
             # 2. TCP Groups (Searching 44496+)
             self.sock_tcp_group, self.real_port_group = bind_socket_range(PORT_GROUP)
             
-            # 3. TCP Private (Searching 44494 - wait, if we increment they might overlap with 44495/6?)
-            # PORT_PRIVATE=44494, PORT_DISCOVERY=44495, PORT_GROUP=44496
-            # If Maria takes 44494, Jose wants 44494->Busy.
-            # If Jose takes 44495 (TCP), it is fine (UDP is distinct).
-            # But just to be clean, let's step by a larger offset or just sequential.
-            # Actually, let's check port map.
-            # 44494 (Priv), 44495 (UDP), 44496 (Group).
-            # If Maria has all 3.
-            # Jose wants 44494 -> Busy. 44495 (TCP) -> Free? Yes.
-            # So Jose takes 44495 TCP for Private.
-            # Jose wants 44496 -> Busy. 44497 (TCP) -> Free.
-            # It works. TCP and UDP namespaces are separate.
-            
+            # 3. TCP Private (Searching 44494)
             self.sock_tcp_priv, self.real_port_priv = bind_socket_range(PORT_PRIVATE)
             
             # Preparar inputs para select
@@ -101,20 +137,25 @@ class GestorRed:
         except OSError as e:
             print(f"[!] Error UDP Unicast: {e}")
 
-    def conectar_tcp(self, ip, puerto):
+    def conectar_tcp(self, host, puerto):
         """
-        Inicia conexión TCP saliente.
+        Inicia conexión TCP saliente (LAN directa o WAN vía Tor SOCKS5).
         Retorna el socket conectado si éxito, o None.
         """
         try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.settimeout(2.0) # Timeout corto para conectar
-            s.connect((ip, puerto))
+            if str(host).endswith(".onion"):
+                s = self._conectar_socks5(host, puerto, timeout=15.0)
+            else:
+                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                s.settimeout(2.0) # Timeout corto para LAN
+                s.connect((host, puerto))
+
             s.setblocking(False)
             self.inputs.append(s)
             self.tcp_connections.append(s)
             return s
-        except OSError:
+        except OSError as e:
+            print(f"[!] Error conectar_tcp a {host}:{puerto} -> {e}", file=sys.stderr)
             return None
 
     def cerrar_tcp(self, sock):
@@ -131,16 +172,6 @@ class GestorRed:
     def enviar_tcp(self, sock, data_bytes):
         """Envía datos por un socket TCP existente"""
         try:
-            # Protocolo simple: Longitud (4 bytes) + Body
-            # Para evitar fragmentación/pegado en el stream
-            # *Nota*: Arquitectura v2.0 dice JSON puro, pero TCP requiere framing.
-            # Asumiremos que el receptor lee JSON válidos, pero lo ideal es enviar longitud.
-            # Si enviamos JSON crudo, el receptor depende de detectar llaves {} o buffers.
-            # Implementaremos un simple delimitador de nueva línea por simplicidad
-            # o longitud si queremos ser robustos.
-            # "Se elimina el uso de separadores propietarios... Todo es JSON" -> 
-            # y que el receptor lea readline().
-            
             try:
                 peer = sock.getpeername()
             except:
@@ -152,7 +183,6 @@ class GestorRed:
                 
             print(f"[OUT_TCP] -> {peer}: {log_data}", file=sys.stderr)
             
-            # Reliable Send: Block momentarily to ensure full delivery without complex buffering
             try:
                 sock.setblocking(True)
                 sock.sendall(data_bytes + b'\n')
@@ -160,8 +190,8 @@ class GestorRed:
                 return True
             except Exception as e:
                 print(f"[X] Sendall failed to {peer}: {e}", file=sys.stderr)
-                sock.setblocking(False) # Restore just in case
-                raise e # Re-raise to trigger generic handler or just return False
+                sock.setblocking(False)
+                raise e
         except Exception as e:
             print(f"[X] Error critico enviar_tcp: {e}", file=sys.stderr)
             self.cerrar_tcp(sock)
@@ -182,26 +212,30 @@ class GestorRed:
         except OSError:
             return None, None
 
-    def enviar_tcp_priv(self, ip, data_bytes, port=PORT_PRIVATE):
+    def enviar_tcp_priv(self, ip_o_host, data_bytes, port=PORT_PRIVATE):
         """
-        Envía un mensaje TCP transitorio al puerto Privado (Dynamic).
+        Envía un mensaje TCP transitorio al puerto Privado (LAN o WAN Tor).
         Patrón: Connect -> Send -> Close. Ideal para Handshakes (REQ/ACK/NO)
         """
         try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.settimeout(15.0) # More time for large files
-            s.connect((ip, port))
+            is_onion = str(ip_o_host).endswith(".onion")
+            if is_onion:
+                s = self._conectar_socks5(ip_o_host, port, timeout=15.0)
+            else:
+                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                s.settimeout(15.0) # More time for large files
+                s.connect((ip_o_host, port))
             
             if len(data_bytes) > 2000:
-                print(f"[OUT_TCP_PRIV] -> {ip}:{port}: (Large Payload) {len(data_bytes)} bytes", file=sys.stderr)
+                print(f"[OUT_TCP_PRIV] -> {ip_o_host}:{port}: (Large Payload) {len(data_bytes)} bytes", file=sys.stderr)
             else:
-                print(f"[OUT_TCP_PRIV] -> {ip}:{port}: {data_bytes.strip()}", file=sys.stderr)
+                print(f"[OUT_TCP_PRIV] -> {ip_o_host}:{port}: {data_bytes.strip()}", file=sys.stderr)
             
             s.sendall(data_bytes + b'\n')
             s.close()
             return True
         except Exception as e:
-            print(f"[X] Error TCP Priv Transient a {ip}:{port}: {e}", file=sys.stderr)
+            print(f"[X] Error TCP Priv Transient a {ip_o_host}:{port}: {e}", file=sys.stderr)
             return False
 
     def registrar_socket_tcp(self, sock, label=None):

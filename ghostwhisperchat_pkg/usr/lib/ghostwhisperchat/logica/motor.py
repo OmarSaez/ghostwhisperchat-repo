@@ -23,6 +23,7 @@ class Motor:
         self.memoria = MemoriaGlobal()
         self.red = GestorRed()
         self.ipc_sock = None
+        self.tor = None
         
         # Buffer de TCP para evitar fragmentacion (10MB packets)
         self.tcp_buffers = {}
@@ -48,7 +49,6 @@ class Motor:
         # Trigger temporal para CHAT Privado (buscar y conectar)
         self.pending_private_target = None
         
-        # Menciones Cooldowns: {chat_id: timestamp_ultimo_pop}
         # Menciones Cooldowns: {chat_id: timestamp_ultimo_pop}
         self.mention_cooldowns = {}
         
@@ -88,6 +88,24 @@ class Motor:
             port_group=self.red.real_port_group
         )
         print(f"[*] Puertos Dinamicos: Priv={self.red.real_port_priv}, Group={self.red.real_port_group}", file=sys.stderr)
+
+        # Iniciar Capa Tor (WAN P2P Overlay) en segundo plano
+        try:
+            from ghostwhisperchat.core.tor_manager import TorManager
+            self.tor = TorManager(port_priv=self.red.real_port_priv, port_group=self.red.real_port_group)
+            
+            def _iniciar_tor_async():
+                if self.tor.iniciar():
+                    self.memoria.mi_onion = self.tor.onion_address
+                    self.red.set_socks_proxy(self.tor.socks_host, self.tor.socks_port)
+                    self.memoria.guardar_configuracion()
+                    print(f"[*] Tor Onion Activo: {self.tor.onion_address}", file=sys.stderr)
+                else:
+                    print(f"[*] Tor no activo ({self.tor.status_message}). Modo LAN.", file=sys.stderr)
+
+            threading.Thread(target=_iniciar_tor_async, daemon=True).start()
+        except Exception as e:
+            print(f"[!] No se pudo cargar TorManager: {e}", file=sys.stderr)
 
         self.iniciar_ipc()
         self.running = True
@@ -186,12 +204,11 @@ class Motor:
         finally:
              self.running = False
 
-
     def _resolver_objetivo_smart(self, target_raw):
         """
-        Busca un usuario por Nick o IP. 
-        Orden: IP -> Contactos -> Escaneo Red Activo (Simpler Polling).
-        Retorna: (ip_encontrada, error_msg_o_sugerencias)
+        Busca un usuario por Nick, IP o dirección .onion. 
+        Orden: Onion Directa -> IP Directa -> Memoria Local (RAM/Agenda) -> Escaneo UDP LAN -> Fallback Onion Agenda.
+        Retorna: (destino_encontrado, error_msg_o_sugerencias)
         """
         try:
             import re
@@ -199,7 +216,11 @@ class Motor:
             import socket
             from ghostwhisperchat.core.utilidades import normalize_text
             
-            # 1. Es IP directa?
+            # 1. Es dirección Onion directa?
+            if str(target_raw).endswith(".onion"):
+                return target_raw, None
+
+            # 2. Es IP directa?
             if re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$", target_raw):
                 return target_raw, None
                 
@@ -212,26 +233,29 @@ class Motor:
                 for uid, d in dicc.items():
                     if isinstance(d, dict) and 'nick' in d:
                         n = normalize_text(d['nick'])
-                        if n == target_norm: return d['ip'], None
+                        if n == target_norm:
+                            dest = d.get('ip')
+                            if not dest or dest in ['127.0.0.1', 'localhost']:
+                                dest = d.get('onion') or dest
+                            return dest, None
                         if n.startswith(target_norm): matches.append(d)
                 return None, matches
 
-            # 2. Busqueda Local
+            # 3. Busqueda Local
             print(f"[SMART] Buscando '{target_norm}' en local...", file=sys.stderr)
-            ip, matches = buscar_en_diccionario(self.memoria.peers)
-            if ip: return ip, None
+            dest, matches = buscar_en_diccionario(self.memoria.peers)
+            if dest: return dest, None
             
             # Check agenda too
-            if not ip:
-                 ip_c, matches_c = buscar_en_diccionario(self.memoria.contactos)
-                 if ip_c: return ip_c, None
+            if not dest:
+                 dest_c, matches_c = buscar_en_diccionario(self.memoria.contactos)
+                 if dest_c: return dest_c, None
                  if matches_c: matches.extend(matches_c)
 
-            # 3. Escaneo Red (Active Polling con Timeout socket)
+            # 4. Escaneo Red (Active Polling con Timeout socket)
             print(f"[SMART] Buscando en red (UDP)...", file=sys.stderr)
             self.scan_buffer = [] 
             
-            # Fix: Usar metodo existente enviar_udp_broadcast con paquete WHO_NAME
             from ghostwhisperchat.core.protocolo import empaquetar
             pkg = empaquetar("WHO_NAME", {"nick": target_raw}, self.memoria.get_origen())
             self.red.enviar_udp_broadcast(pkg) 
@@ -239,9 +263,8 @@ class Motor:
             start_time = time.time()
             found_ip = None
             
-            # Guardar timeout original
             old_timeout = self.red.sock_udp.gettimeout()
-            self.red.sock_udp.settimeout(0.2) # Non-blockingish
+            self.red.sock_udp.settimeout(0.2)
             
             try:
                 for _ in range(8): # ~1.6s
@@ -250,28 +273,32 @@ class Motor:
                             data, addr = self.red.sock_udp.recvfrom(65535)
                             self.manejar_paquete_udp(data, addr)
                     except socket.timeout:
-                        pass # Buffer vacio por ahora
+                        pass
                     except BlockingIOError:
                         pass
                     except Exception as e:
                         print(f"[SMART_WARN] UDP Reading error: {e}", file=sys.stderr)
                     
-                    # Chequear buffer
                     for res in self.scan_buffer:
                         n = normalize_text(res.get('nick', ''))
                         if n == target_norm:
-                            found_ip = res['ip']
+                            found_ip = res.get('ip')
                             break
                     
                     if found_ip: break
-                    time.sleep(0.1) # Breve pausa
+                    time.sleep(0.1)
             finally:
-                # Restaurar socket a bloquear (o lo que fuera, select lo maneja)
                 self.red.sock_udp.settimeout(old_timeout)
 
             if found_ip: return found_ip, None
 
-            # 4. Resultados
+            # 5. Fallback a dirección Onion en Agenda
+            for uid, c in self.memoria.contactos.items():
+                if isinstance(c, dict) and normalize_text(c.get('nick', '')) == target_norm:
+                    if c.get('onion'):
+                        return c['onion'], None
+
+            # 6. Sugerencias si no fue encontrado
             candidates = set()
             if matches: 
                 for m in matches: candidates.add(m['nick'])
@@ -280,7 +307,7 @@ class Motor:
                 if n.startswith(target_norm): candidates.add(res['nick'])
                     
             if not candidates:
-                return None, f"No se encontró a '{target_raw}'."
+                return None, f"No se encontró a '{target_raw}' ni en LAN ni con ID Global Onion."
                 
             sug = ", ".join(list(candidates)[:3])
             return None, f"'{target_raw}' no existe. ¿Quizás: {sug}?"
@@ -492,15 +519,53 @@ class Motor:
              abrir_chat_ui(gid, nombre_legible=nombre, es_grupo=True, env_vars=env_injection)
              return f"[*] Grupo privado '{nombre}' creado."
 
+        elif cmd == "MY_ID":
+            from ghostwhisperchat.datos.recursos import Colores
+            onion = self.memoria.mi_onion
+            if onion:
+                return (
+                    f"\n{Colores.GREEN}======================================================{Colores.RESET}\n"
+                    f"{Colores.BOLD}🌐 TU IDENTIDAD GLOBAL (GWC-ID):{Colores.RESET}\n"
+                    f"   {Colores.CYAN}{onion}{Colores.RESET}\n\n"
+                    f"{Colores.GREY}Comparte esta dirección .onion para que puedan chatear contigo\n"
+                    f"desde cualquier red o lugar del mundo usando: gwc --dm {onion}{Colores.RESET}\n"
+                    f"{Colores.GREEN}======================================================{Colores.RESET}\n"
+                )
+            else:
+                msg = self.tor.status_message if hasattr(self, 'tor') and self.tor else "Tor no iniciado"
+                if "Conectando" in msg or "Iniciando" in msg or "bootstrap" in msg.lower():
+                    return f"{Colores.YELLOW}[⏳] {msg} Por favor espera unos segundos y vuelve a consultar con: gwc --mi-id{Colores.RESET}"
+                return f"{Colores.YELLOW}[!] Identidad global no disponible ({msg}). Operando en Modo Solo LAN.{Colores.RESET}"
+
         elif cmd == "ADD":
              if not context_ui: return "[X] Solo en un grupo."
              gid = context_ui[1] # Chat ID is GID in group context
              if gid not in self.memoria.grupos_activos: return "[X] No es un grupo válido."
              
-             if not args: return "[X] Uso: --agregar <Nick>"
+             if not args: return "[X] Uso: --agregar <Nick/Onion>"
              target_nick = args[0]
              
-             # Buscar peer por nick
+             g = self.memoria.grupos_activos[gid]
+             pwd = g.get('clave_hash')
+             invite_pkg = empaquetar("INVITE", {
+                 "gid": gid, 
+                 "name": g['nombre'],
+                 "password_hash": pwd
+             }, self.memoria.get_origen())
+
+             # 1. Dirección Onion directa
+             if str(target_nick).endswith(".onion"):
+                 try:
+                     print(f"[GROUP] Invitando por WAN (Tor) a {target_nick}...", file=sys.stderr)
+                     ok = self.red.enviar_tcp_priv(target_nick, invite_pkg, port=44494)
+                     if ok:
+                         return f"[*] Invitación WAN (Tor) enviada a {target_nick}."
+                     else:
+                         return f"[X] No se pudo conectar con {target_nick} por Tor."
+                 except Exception as e:
+                     return f"[X] Error enviando invitación a {target_nick}: {e}"
+
+             # 2. Buscar peer por nick
              target_peer = self.memoria.buscar_peer(target_nick)
              
              if not target_peer: 
@@ -511,6 +576,14 @@ class Motor:
                      target_peer = self.memoria.buscar_peer(target_nick)
              
              if not target_peer:
+                 # Check if in contacts with onion
+                 for uid, c in self.memoria.contactos.items():
+                     if isinstance(c, dict) and c.get('nick', '').lower() == target_nick.lower() and c.get('onion'):
+                         try:
+                             ok = self.red.enviar_tcp_priv(c['onion'], invite_pkg, port=44494)
+                             if ok: return f"[*] Invitación enviada vía Tor Onion a {target_nick}."
+                         except: pass
+
                  # Fuzzy / Offline Search
                  msg_extra = ""
                  sugs = self.memoria.buscar_contacto_fuzzy(target_nick)
@@ -532,21 +605,12 @@ class Motor:
                  
                  return f"{msg_extra}[*] Lanzando invitación asíncrona a '{target_nick}'..."
 
-                 
              # Send INVITE packet
-             g = self.memoria.grupos_activos[gid]
-             pwd = g.get('clave_hash') # Send hash so they can join automatically if accepted
-             
-             invite_pkg = empaquetar("INVITE", {
-                 "gid": gid, 
-                 "name": g['nombre'],
-                 "password_hash": pwd
-             }, self.memoria.get_origen())
-             
-             port_p = target_peer.get('port_priv')
-             print(f"[GROUP] Invitando a {target_nick} ({target_peer['ip']}:{port_p or 'DEF'})...", file=sys.stderr)
+             dest_host = target_peer.get('onion') if target_peer.get('onion') and (target_peer.get('ip') in ['127.0.0.1', 'localhost', None] or not target_peer.get('ip')) else target_peer.get('ip') or target_peer.get('onion')
+             port_p = target_peer.get('port_priv', 44494)
+             print(f"[GROUP] Invitando a {target_nick} ({dest_host}:{port_p or 'DEF'})...", file=sys.stderr)
              try:
-                 self.red.enviar_tcp_priv(target_peer['ip'], invite_pkg, port=port_p)
+                 self.red.enviar_tcp_priv(dest_host, invite_pkg, port=port_p)
                  return f"[*] Invitación enviada a {target_nick}."
              except Exception as e:
                  return f"[X] Error enviando invitación: {e}"
@@ -561,7 +625,6 @@ class Motor:
 
         elif cmd == "GLOBAL_STATUS":
              try:
-                 # FIX CRITICO: Importar Colores localmente para asegurar disponibilidad
                  from ghostwhisperchat.datos.recursos import Colores
                  
                  m = self.memoria
@@ -589,27 +652,26 @@ class Motor:
                  
                  status_str = " ".join(st_flags)
                  
-                 # --- Build Response (Clean Minimal v2.119) ---
-                 
-                 # Header Simple y Elegante
+                 # --- Build Response ---
                  res =  f"\n{Colores.BLUE}======================================================{Colores.RESET}\n"
                  res += f"{Colores.BLUE}{Colores.BOLD}       GHOSTWHISPERCHAT NETWORK DASHBOARD       {Colores.RESET}\n"
                  res += f"{Colores.BLUE}======================================================{Colores.RESET}\n\n"
                  
                  res += f"{Colores.BOLD}👤 MI NODO:{Colores.RESET}\n"
-                 res += f"   • Nick:     {my_c}{nick}{Colores.RESET}\n"
-                 res += f"   • Status:   {status_str}\n"
+                 res += f"   • Nick:      {my_c}{nick}{Colores.RESET}\n"
+                 res += f"   • Status:    {status_str}\n"
                  
                  custom_st = getattr(m, 'mi_estado_msg', None) or "(Sin estado)"
-                 res += f"   • Info:     {Colores.C_GOLD}\"{custom_st}\"{Colores.RESET}\n"
+                 res += f"   • Info:      {Colores.C_GOLD}\"{custom_st}\"{Colores.RESET}\n"
                  
-                 # Import version dynamically or ensure imported at top, but local is safer for hot-loading
                  from ghostwhisperchat.datos.recursos import APP_VERSION
                  
-                 res += f"   • IP:       {Colores.GREEN}{m.mi_ip}{Colores.RESET}\n"
-                 res += f"   • Versión:  {Colores.C_PINK_PASTEL}{APP_VERSION}{Colores.RESET}\n"
-                 res += f"   • UID:      {Colores.CYAN}{str(m.mi_uid)[:12]}...{Colores.RESET}\n"
-                 res += f"   • Puertos:  TCP={ident.get('port_priv')} / MESH={ident.get('port_group')}\n\n"
+                 res += f"   • IP Local:  {Colores.GREEN}{m.mi_ip}{Colores.RESET}\n"
+                 onion_disp = f"{Colores.CYAN}{m.mi_onion}{Colores.RESET}" if m.mi_onion else f"{Colores.YELLOW}(Modo Solo LAN / Tor no activo){Colores.RESET}"
+                 res += f"   • GWC-ID:    {onion_disp}\n"
+                 res += f"   • Versión:   {Colores.C_PINK_PASTEL}{APP_VERSION}{Colores.RESET}\n"
+                 res += f"   • UID:       {Colores.CYAN}{str(m.mi_uid)[:12]}...{Colores.RESET}\n"
+                 res += f"   • Puertos:   TCP={ident.get('port_priv')} / MESH={ident.get('port_group')}\n\n"
 
                  # Peers
                  all_peers = list(m.peers.values())
@@ -762,12 +824,23 @@ class Motor:
              return f"[*] Auto-Descarga: {self.memoria.auto_download}"
              
         elif cmd == "CHAT":
-             if not args: return "[X] Uso: --dm <NICK_O_IP>"
+             if not args: return "[X] Uso: --dm <NICK_O_IP_O_ONION>"
              target = args[0]
              
-             # 1. IP Directa
+             # 1. Dirección Onion Directa
+             if str(target).endswith(".onion"):
+                  req = empaquetar("CHAT_REQ", {}, self.memoria.get_origen())
+                  try:
+                      ok = self.red.enviar_tcp_priv(target, req, port=44494)
+                      if ok:
+                          return f"[*] Solicitud WAN (Tor) enviada a {target}"
+                      else:
+                          return f"[X] No se pudo conectar con {target} a través de la red Tor."
+                  except Exception as e:
+                      return f"[X] Excepción conectando con {target}: {e}"
+
+             # 2. IP Directa
              import re
-             # Simple regex for IP
              if re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$", target):
                   req = empaquetar("CHAT_REQ", {}, self.memoria.get_origen())
                   try:
@@ -777,31 +850,44 @@ class Motor:
                   except Exception as e:
                       return f"[X] Excepcion conectando: {e}"
 
-             # 2. Cache Check (Exact active peer)
+             # 3. Cache Check (Exact active peer)
              peer = self.memoria.buscar_peer(target)
              if peer:
                   req = empaquetar("CHAT_REQ", {}, self.memoria.get_origen())
+                  dest_host = peer.get('onion') if peer.get('onion') and (peer.get('ip') in ['127.0.0.1', 'localhost', None] or not peer.get('ip')) else peer.get('ip') or peer.get('onion')
+                  port_p = peer.get('port_priv', 44494)
                   try:
-                      # FIX v2.155: Use Dynamic Port from Peer RAM to avoid Multi-Account conflict
-                      port_p = peer.get('port_priv')
-                      print(f"[CHAT_CMD] Conectando a {target} (IP:{peer['ip']} Port:{port_p or 'DEF'})", file=sys.stderr)
-                      self.red.enviar_tcp_priv(peer['ip'], req, port=port_p)
-                      return f"[*] Contacto '{target}' encontrado en caché. Solicitud enviada."
+                      print(f"[CHAT_CMD] Conectando a {target} ({dest_host}:{port_p})", file=sys.stderr)
+                      ok = self.red.enviar_tcp_priv(dest_host, req, port=port_p)
+                      if ok:
+                          return f"[*] Contacto '{target}' encontrado en caché. Solicitud enviada."
                   except: 
-                      pass # Fallback if TCP fails
-             
-             # 3. Fuzzy Suggestions (Contacts + Peers)
+                      pass
+
+             # 4. Fallback: Agenda con dirección Onion
+             for uid, c in self.memoria.contactos.items():
+                 if isinstance(c, dict) and c.get('nick', '').lower() == target.lower() and c.get('onion'):
+                     req = empaquetar("CHAT_REQ", {}, self.memoria.get_origen())
+                     try:
+                         print(f"[CHAT_CMD] Conectando vía Tor a contacto '{target}' ({c['onion']})...", file=sys.stderr)
+                         ok = self.red.enviar_tcp_priv(c['onion'], req, port=44494)
+                         if ok:
+                             return f"[*] Contacto '{target}' encontrado en agenda. Solicitud WAN enviada vía Tor."
+                     except:
+                         pass
+
+             # 5. Fuzzy Suggestions (Contacts + Peers)
              sugs = self.memoria.buscar_contacto_fuzzy(target)
              msg_extra = ""
              if sugs:
-                 msg_extra = f"\n[?] Usuario no encontrado. Querias buscar a:\n"
-                 for s in sugs[:3]: # Top 3 best matches
-                     # Show Nick, IP and Source
+                 msg_extra = f"\n[?] Usuario no encontrado. Querías buscar a:\n"
+                 for s in sugs[:3]:
                      src = s.get('source', 'UNK')
-                     msg_extra += f"   > {s['nick']} ({s['ip']}) [{src}]\n"
+                     dest_repr = s.get('onion') or s.get('ip', '?.?.?.?')
+                     msg_extra += f"   > {s['nick']} ({dest_repr}) [{src}]\n"
                  msg_extra += "\n"
 
-             # 4. Discovery (WHO_NAME)
+             # 6. Discovery LAN (WHO_NAME)
              from ghostwhisperchat.core.utilidades import normalize_text
              self.pending_private_target = normalize_text(target)
              
@@ -944,27 +1030,33 @@ class Motor:
                             "gid": chat_id if chat_id in self.memoria.grupos_activos else None # Inject Context
                         }, self.memoria.get_origen())
                         
-                        # Send Logic (Same as before but inside loop)
+                        # Send Logic (Soporta IP LAN y Onion WAN)
                         targets = []
                         if chat_id in self.memoria.grupos_activos:
                              g = self.memoria.grupos_activos[chat_id]
                              for uid, m in g['miembros'].items():
                                  if uid == self.memoria.mi_uid: continue
-                                 if m.get('ip'):
-                                     # Send to their Private Port (Transient)
+                                 ip = m.get('ip')
+                                 onion = m.get('onion')
+                                 target = onion if onion and (ip in ['127.0.0.1', 'localhost', None] or not ip) else ip or onion
+                                 if target:
                                      port = m.get('port_priv', 44494)
-                                     targets.append((m['ip'], port))
+                                     targets.append((target, port))
                         else:
                              peer = self.memoria.buscar_peer(chat_id)
                              if peer:
-                                 targets.append((peer['ip'], peer.get('port_priv', 44494)))
+                                 target = peer.get('onion') if peer.get('onion') and (peer.get('ip') in ['127.0.0.1', 'localhost', None] or not peer.get('ip')) else peer.get('ip') or peer.get('onion')
+                                 if target:
+                                     targets.append((target, peer.get('port_priv', 44494)))
                              else:
                                  if chat_id in self.memoria.contactos:
                                      c = self.memoria.contactos[chat_id]
-                                     targets.append((c['ip'], c.get('port_priv', 44494)))
+                                     target = c.get('onion') if c.get('onion') and (c.get('ip') in ['127.0.0.1', 'localhost', None] or not c.get('ip')) else c.get('ip') or c.get('onion')
+                                     if target:
+                                         targets.append((target, c.get('port_priv', 44494)))
                         
-                        for ip, port in targets:
-                            try: self.red.enviar_tcp_priv(ip, pkg, port=port)
+                        for dest_host, port in targets:
+                            try: self.red.enviar_tcp_priv(dest_host, pkg, port=port)
                             except: pass
                         
                         # Progress Update (Suppress if silent)
@@ -1087,23 +1179,26 @@ class Motor:
                  # Normalize to list
                  m_list = members.values() if isinstance(members, dict) else members
                  
-                 # Send to all peers
+                 # Send to all peers (LAN y WAN)
                  for m in m_list:
                      uid = m.get('uid')
                      if uid == self.memoria.mi_uid: continue
                      ip = m.get('ip')
-                     if not ip: continue
+                     onion = m.get('onion')
+                     target = onion if onion and (ip in ['127.0.0.1', 'localhost', None] or not ip) else ip or onion
+                     if not target: continue
                      
                      try:
-                         # Transient connection for message
-                         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                         s.settimeout(1.0) # Fast timeout
-                         # Dynamic Group Port
                          port_g = m.get('port_group', PORT_GROUP)
-                         s.connect((ip, port_g))
+                         if str(target).endswith(".onion"):
+                             s = self.red._conectar_socks5(target, port_g, timeout=10.0)
+                         else:
+                             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                             s.settimeout(1.0)
+                             s.connect((target, port_g))
                          s.sendall(pkg + b'\n')
                          s.close()
-                     except: pass 
+                     except: pass
                  
                  # Log outgoing group message
                  self.memoria.log_historial(chat_id, self.memoria.mi_nick, msg_content, es_propio=True)
@@ -1120,22 +1215,26 @@ class Motor:
                      except: pass
 
              else:
-                 target_ip = None
+                 target_host = None
                  target_port = 44494
                  
-                 peer = self.memoria.buscar_peer(chat_id)
-                 if peer:
-                     target_ip = peer['ip']
-                     target_port = peer.get('port_priv', 44494)
+                 if str(chat_id).endswith(".onion"):
+                     target_host = chat_id
                  else:
-                     # Fallback: Check persistent contacts (Offline/Sleeping Peer)
-                     if chat_id in self.memoria.contactos:
-                         target_ip = self.memoria.contactos[chat_id]['ip']
-                         target_port = self.memoria.contactos[chat_id].get('port_priv', 44494)
+                     peer = self.memoria.buscar_peer(chat_id)
+                     if peer:
+                         target_host = peer.get('onion') if peer.get('onion') and (peer.get('ip') in ['127.0.0.1', 'localhost', None] or not peer.get('ip')) else peer.get('ip') or peer.get('onion')
+                         target_port = peer.get('port_priv', 44494)
+                     else:
+                         # Fallback: Check persistent contacts (Offline/Sleeping Peer)
+                         if chat_id in self.memoria.contactos:
+                             c = self.memoria.contactos[chat_id]
+                             target_host = c.get('onion') if c.get('onion') and (c.get('ip') in ['127.0.0.1', 'localhost', None] or not c.get('ip')) else c.get('ip') or c.get('onion')
+                             target_port = c.get('port_priv', 44494)
                  
-                 if target_ip:
+                 if target_host:
                      pkg = empaquetar("MSG", {"text": msg_content}, self.memoria.get_origen())
-                     try: self.red.enviar_tcp_priv(target_ip, pkg, port=target_port)
+                     try: self.red.enviar_tcp_priv(target_host, pkg, port=target_port)
                      except: pass
                  
                  
@@ -1291,6 +1390,7 @@ class Motor:
                      "uid": uid,
                      "nick": origen['nick'],
                      "ip": addr[0],
+                     "onion": origen.get('onion'),
                      "last_seen": time.time(),
                      "status": "ONLINE"
                  })
@@ -1488,7 +1588,8 @@ class Motor:
                  status_msg=origen.get('status_msg'),
                  # FIX v2.160.5: Persist Dynamic Ports from Peer
                  port_priv=origen.get('port_priv'),
-                 port_group=origen.get('port_group')
+                 port_group=origen.get('port_group'),
+                 onion=origen.get('onion')
              )
 
         if tipo == "TYPING":
@@ -1933,11 +2034,14 @@ class Motor:
                     req_pkg = empaquetar("JOIN_REQ", {"gid": g_id, "password_hash": p_hash}, self.memoria.get_origen())
                     try:
                          from ghostwhisperchat.core.transporte import PORT_GROUP
-                         s_join = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                         
-                         # FIX v2.155: Connect to host dynamic group port
+                         dest_host = origen_data.get('onion') if origen_data.get('onion') and (origen_data.get('ip') in ['127.0.0.1', 'localhost', None] or not origen_data.get('ip')) else origen_data.get('ip') or origen_data.get('onion')
                          tgt_gp = origen_data.get('port_group') or PORT_GROUP
-                         s_join.connect((origen_data['ip'], tgt_gp))
+                         
+                         if str(dest_host).endswith(".onion"):
+                             s_join = self.red._conectar_socks5(dest_host, tgt_gp, timeout=10.0)
+                         else:
+                             s_join = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                             s_join.connect((dest_host, tgt_gp))
                          
                          s_join.sendall(req_pkg + b'\n')
                          s_join.setblocking(False) # <--- CRITICAL: Set non-blocking before select loop
@@ -1951,20 +2055,20 @@ class Motor:
 
 
         elif tipo == "CHAT_REQ":
+            dest_host = origen.get('onion') if origen.get('onion') and (origen.get('ip') in ['127.0.0.1', 'localhost', None] or not origen.get('ip')) else origen.get('ip') or origen.get('onion')
+            target_port = origen.get('port_priv', 44494)
+
             if self.memoria.no_molestar:
                 rej = empaquetar("CHAT_NO", {"reason": "Busy"}, self.memoria.get_origen())
-                # Use new connection to reply, as sender likely closed transient sock
-                self.red.enviar_tcp_priv(origen['ip'], rej)
+                self.red.enviar_tcp_priv(dest_host, rej, port=target_port)
                 return
 
             # Thread user prompt to avoid blocking Main Event Loop
             def _prompt_private():
                 acepta = preguntar_invitacion_chat(origen['nick'], origen['uid'])
                 if acepta:
-                    # FIX v2.155: Reply to correct dynamic port
-                    target_port = origen.get('port_priv')
                     ack = empaquetar("CHAT_ACK", {}, self.memoria.get_origen())
-                    self.red.enviar_tcp_priv(origen['ip'], ack, port=target_port)
+                    self.red.enviar_tcp_priv(dest_host, ack, port=target_port)
                     
                     # Launch UI
                     abrir_chat_ui(origen['uid'], nombre_legible=origen['nick'], es_grupo=False)
@@ -1972,7 +2076,7 @@ class Motor:
                     # 'acepta' can be False (No) or None (Timeout)
                     reason_code = "Rejected" if acepta is False else "Timeout"
                     rej = empaquetar("CHAT_NO", {"reason": reason_code}, self.memoria.get_origen())
-                    try: self.red.enviar_tcp_priv(origen['ip'], rej)
+                    try: self.red.enviar_tcp_priv(dest_host, rej, port=target_port)
                     except: pass
 
             threading.Thread(target=_prompt_private, daemon=True).start()

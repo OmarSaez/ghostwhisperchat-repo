@@ -78,9 +78,9 @@ class Colores:
     # Texto High Contrast para fondos claros
     BLACK_TXT = "\033[38;5;0m"
 
-# Versionado - Estable - Autocompletado,foto,colores,@todos,estados
-APP_VER_NUM = "2.161"
-APP_VER_TAG = "Estable - Group Creator Port y DMs"
+# Versionado - Estable - Tor Onion P2P WAN Global Edition
+APP_VER_NUM = "3.000"
+APP_VER_TAG = "Global Edition - Tor Onion P2P WAN"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 BANNER = r"""
@@ -104,8 +104,8 @@ AYUDA = f"""
 ========================================================================{Colores.RESET}
 
 {Colores.MAGENTA}{Colores.BOLD}>> GESTIÓN DE CHATS{Colores.RESET}
-  {Colores.GREEN}--dm <Nick/IP>{Colores.RESET} .............. Iniciar chat privado.
-        {Colores.GREY}[Alias: -d, --mensaje, --susurrar]{Colores.RESET}
+  {Colores.GREEN}--dm <Nick/IP/Onion>{Colores.RESET} ......... Iniciar chat privado (LAN o WAN Global).
+        {Colores.GREY}[Alias: -d, --mensaje, --susurrar, --priv]{Colores.RESET}
 
   {Colores.GREEN}--crearpublico <Nombre>{Colores.RESET} ...... Crear un grupo público (Sala).
         {Colores.GREY}[Alias: -o, --publico, --sala]{Colores.RESET}
@@ -116,7 +116,7 @@ AYUDA = f"""
   {Colores.GREEN}--unirse <Nombre>{Colores.RESET} ............ Unirse a un grupo existente.
         {Colores.GREY}[Alias: -u, --entrar, --join]{Colores.RESET}
 
-  {Colores.GREEN}--agregar <Nick>{Colores.RESET} ............. Invitar usuario al grupo actual.
+  {Colores.GREEN}--agregar <Nick/Onion>{Colores.RESET} ........ Invitar usuario al grupo actual.
         {Colores.GREY}[Alias: -a, --invitar, --meter]{Colores.RESET}
 
   {Colores.GREEN}--aceptar / --rechazar{Colores.RESET} ....... Responder a solicitudes pendientes.
@@ -125,6 +125,9 @@ AYUDA = f"""
         {Colores.GREY}[Alias: -x, --chau, --exit]{Colores.RESET}
 
 {Colores.MAGENTA}{Colores.BOLD}>> RED Y CONTACTOS{Colores.RESET}
+  {Colores.GREEN}--mi-id{Colores.RESET} ...................... Ver tu ID Global Onion para chatear por Internet.
+        {Colores.GREY}[Alias: --onion, --mi-onion, --id-global]{Colores.RESET}
+
   {Colores.GREEN}--enlinea{Colores.RESET} .................... Escanear red local (¿Quién está?).
         {Colores.GREY}[Alias: -s, --buscar, --radar]{Colores.RESET}
 
@@ -150,7 +153,7 @@ AYUDA = f"""
   {Colores.GREEN}--estado <Texto>{Colores.RESET} .............. Publicar mensaje de estado.
         {Colores.GREY}[Alias: -e, --mood]{Colores.RESET}
 
-  {Colores.GREEN}--info{Colores.RESET} ....................... Ver estado del sistema, IP y versión.
+  {Colores.GREEN}--info{Colores.RESET} ....................... Ver estado del sistema, IP, Onion y versión.
   {Colores.GREEN}--limpiar{Colores.RESET} .................... Limpiar pantalla.
 
 {Colores.MAGENTA}{Colores.BOLD}>> SISTEMA{Colores.RESET}
@@ -165,7 +168,7 @@ ABBREVIATIONS_DISPLAY = {
     "GESTIÓN DE CHATS": {
         "MENSAJE PRIVADO": {
             'aliases': ['--dm', '-d', '--mensaje', '--susurrar', '--priv'],
-            'desc': "Invitar a un chat privado a un usuario (Nick/IP)."
+            'desc': "Invitar a un chat privado a un usuario (Nick/IP/Onion)."
         },
         "CREAR SALA PÚBLICA": {
             'aliases': ['--crearpublico', '-o', '--publico', '--abrir', '--sala'],
@@ -181,7 +184,7 @@ ABBREVIATIONS_DISPLAY = {
         },
         "INVITAR AL GRUPO": {
             'aliases': ['--agregar', '-a', '--invitar', '--sumar', '--meter'],
-            'desc': "Sumar usuarios conectados al grupo actual."
+            'desc': "Sumar usuarios conectados (o por Onion) al grupo actual."
         },
         "ACEPTAR SOLICITUD": {
             'aliases': ['--aceptar'],
@@ -206,6 +209,10 @@ ABBREVIATIONS_DISPLAY = {
     },
 
     "RED Y CONTACTOS": {
+        "IDENTIDAD GLOBAL ONION": {
+            'aliases': ['--mi-id', '--onion', '--mi-onion', '--id-global', '--gwc-id'],
+            'desc': "Ver tu dirección .onion global para recibir chats desde Internet."
+        },
         "ESCANEAR RED": {
             'aliases': ['--enlinea', '-s', '--buscar', '--radar', '--quienes'],
             'desc': "Buscar usuarios activos en la red local."
@@ -243,7 +250,7 @@ ABBREVIATIONS_DISPLAY = {
         },
         "INFO DEL SISTEMA": {
             'aliases': ['--estados-globales', '-i', '--info', '--config', '--todo'],
-            'desc': "Ver IP, versión, configuración y logs."
+            'desc': "Ver IP, dirección Onion, versión y configuración."
         },
         "AYUDA GENERAL": {
             'aliases': ['--ayuda', '-?', '--help'],
@@ -282,6 +289,7 @@ COMMAND_MAP = {
     'MUTE_TOGGLE':  ['--silenciar', '-m', '--shh', '--nomolestar', '--mute'],
     'LS':           ['--ls', '-l', '--gente', '--lista', '--usuarios'],
     'EXIT':         ['--salir', '-x', '--chau', '--adios', '--exit'],
+    'MY_ID':            ['--mi-id', '--onion', '--mi-onion', '--id-global', '--gwc-id'],
     'SCAN':             ['--enlinea', '-s', '--buscar', '--radar', '--quienes', '--scan'],
     'SCAN_RESULTS':     ['--scan-results', '--resultados-scan'],
     'LIST_GROUPS':      ['--vergrupos', '-g', '--grupos', '--explorar', '--salas'],

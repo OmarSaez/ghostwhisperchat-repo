@@ -27,6 +27,7 @@ class MemoriaGlobal:
         self.mi_nick = os.getenv("USER", "Usuario") # Nick actual (Default: System User)
         self.sys_user = getpass.getuser() # Real System Username (Immutable)
         self.mi_ip = None        # IP local
+        self.mi_onion = None     # Dirección Tor Onion v3 (GWC-ID Global)
         self.mi_estado_msg = None # Mensaje de estado personalizado (max 34 chars)
         
         # Configuración Runtime
@@ -67,15 +68,6 @@ class MemoriaGlobal:
                 # Robust even against disk cloning (if MAC differs)
                 seed = f"{sys_user}@{machine_id}@{mac_addr}"
                 stable_uid = hashlib.sha256(seed.encode()).hexdigest()[:16]
-                
-                # Logic:
-                # If we already have a UID from config, should we overwrite it?
-                # Ideally YES, to enforce the stable identity. 
-                # BUT, if we overwrite, we lose history associated with the old random UID.
-                # Migration strategy:
-                # For now, let's ENFORCE stable UID for new installs or if valid.
-                # User specifically asked to fix the issue where changing Nick confused the system.
-                # A stable UID solves this permanently.
                 self.mi_uid = stable_uid
             else:
                 # Fallback to random if no machine-id
@@ -85,7 +77,6 @@ class MemoriaGlobal:
         except Exception as e:
             print(f"[!] Error generando UID estable: {e}", file=sys.stderr)
             if not self.mi_uid:
-                 # Last resort
                  self.mi_uid = hashlib.sha256(str(time.time()).encode()).hexdigest()[:16]
 
         self.guardar_configuracion() # Persist current Choice
@@ -94,9 +85,11 @@ class MemoriaGlobal:
         self.peers = {} 
         # Estructura PEERS: 
         # { 
-        #   "IP": { 
+        #   "UID": { 
         #       "uid": "...", 
         #       "nick": "...", 
+        #       "ip": "...",
+        #       "onion": "...",
         #       "status": "ONLINE", 
         #       "last_seen": timestamp 
         #   } 
@@ -104,24 +97,13 @@ class MemoriaGlobal:
 
         # Grupos
         self.grupos_activos = {}
-        # Estructura GRUPOS:
-        # {
-        #   "gid": {
-        #       "nombre": "...",
-        #       "es_publico": True,
-        #       "miembros": [ ...list of IPs... ],
-        #       "mensajes": [ ...list of msg dicts... ],
-        #       "clave_hash": "..." (opt)
-        #   }
-        # }
         
         # Buzón Privado (Mensajes pendients de leer o historial sesion actual)
         self.buzon_privado = [] 
-        # Lista de dicts {origen_nick, texto, ts, ...}
         
         # Estado de Chat Actual (UI Context)
         self.chat_actual_tipo = None # 'GRUPO' o 'PRIVADO' o None
-        self.chat_actual_id = None   # GID o IP del peer
+        self.chat_actual_id = None   # GID o IP/UID del peer
 
     def _cargar_configuracion(self):
         print(f"[ESTADO] Cargando config desde {CONFIG_FILE}...", file=sys.stderr)
@@ -131,6 +113,7 @@ class MemoriaGlobal:
                      data = json.load(f)
                      self.mi_uid = data.get("uid")
                      self.mi_nick = data.get("nick", "Usuario")
+                     self.mi_onion = data.get("onion")
                      # Opcional: Cargar settings
                      self.no_molestar = data.get("no_molestar", False)
                      self.invisible = data.get("invisible", False)
@@ -146,7 +129,7 @@ class MemoriaGlobal:
         data = {
             "uid": self.mi_uid,
             "nick": self.mi_nick,
-            "nick": self.mi_nick,
+            "onion": self.mi_onion,
             "no_molestar": self.no_molestar,
             "invisible": self.invisible,
             "estado_msg": self.mi_estado_msg
@@ -176,13 +159,15 @@ class MemoriaGlobal:
                 json.dump(self.contactos, f)
         except: pass
 
-    def registrar_contacto(self, uid, nick, ip):
+    def registrar_contacto(self, uid, nick, ip, onion=None):
         """Registra un contacto persistente (historial de interaccion)"""
         with self._lock:
-            # Timestamp update
+            contacto_previo = self.contactos.get(uid, {})
+            onion_final = onion if onion else contacto_previo.get("onion")
             self.contactos[uid] = {
                 "nick": nick,
                 "ip": ip,
+                "onion": onion_final,
                 "last_seen": time.time()
             }
         self.guardar_contactos()
@@ -245,18 +230,17 @@ class MemoriaGlobal:
         suggestions.sort(key=lambda x: x['ratio'], reverse=True)
         return suggestions
 
-    def set_identidad(self, uid, nick, ip, port_priv=None, port_group=None):
-        # Este metodo se suele llamar al inicio desde motor para setear IP y Puertos
-        # UID y Nick ya deberian estar cargados, pero por si acaso
+    def set_identidad(self, uid, nick, ip, port_priv=None, port_group=None, onion=None):
+        # Este metodo se suele llamar al inicio desde motor para setear IP, Onion y Puertos
         if uid: self.mi_uid = uid
         if nick: self.mi_nick = nick
         self.mi_ip = ip
+        if onion: self.mi_onion = onion
         if port_priv: self.mi_port_priv = port_priv
         if port_group: self.mi_port_group = port_group
 
-    def actualizar_peer(self, ip, uid, nick, status="ONLINE", port_priv=None, port_group=None, sys_user=None, status_msg=None):
+    def actualizar_peer(self, ip, uid, nick, status="ONLINE", port_priv=None, port_group=None, sys_user=None, status_msg=None, onion=None):
         with self._lock:
-            # Key is UID to allow multiple users per IP (Different Ports)
             if uid not in self.peers:
                 self.peers[uid] = {}
             
@@ -269,13 +253,14 @@ class MemoriaGlobal:
             }
             if sys_user: update_data['sys_user'] = sys_user
             if status_msg is not None: update_data['status_msg'] = status_msg
+            if onion: update_data['onion'] = onion
             
             self.peers[uid].update(update_data)
             if port_priv: self.peers[uid]['port_priv'] = port_priv
             if port_group: self.peers[uid]['port_group'] = port_group
             
             # Persistencia Automatica
-            self.registrar_contacto(uid, nick, ip)
+            self.registrar_contacto(uid, nick, ip, onion=onion)
 
     def obtener_peer(self, uid):
         return self.peers.get(uid)
@@ -302,6 +287,7 @@ class MemoriaGlobal:
                             "uid": self.mi_uid,
                             "nick": self.mi_nick,
                             "ip": self.mi_ip,
+                            "onion": self.mi_onion,
                             "sys_user": self.sys_user,
                             "status": "ONLINE",
                             "port_priv": getattr(self, 'mi_port_priv', 44494),
@@ -313,12 +299,12 @@ class MemoriaGlobal:
                 }
 
     def buscar_peer(self, query):
-        """Busca un peer por Nick (comienzo) o UID exacto. Retorna el mas reciente."""
+        """Busca un peer por Nick (comienzo), UID exacto o dirección .onion."""
         query = query.lower()
         candidates = []
         with self._lock:
             for uid, p in self.peers.items():
-                if p['nick'].lower() == query or uid == query:
+                if p.get('nick', '').lower() == query or uid == query or p.get('onion', '').lower() == query:
                     candidates.append(p)
         
         if not candidates:
@@ -336,6 +322,7 @@ class MemoriaGlobal:
             "sys_user": self.sys_user,
             "status_msg": self.mi_estado_msg,
             "ip": self.mi_ip,
+            "onion": self.mi_onion,
             "port_priv": getattr(self, 'mi_port_priv', 44494),
             "port_group": getattr(self, 'mi_port_group', 44496)
         }
