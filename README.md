@@ -37,10 +37,18 @@ sudo apt update
 ```
 
 
-## 🛠️ COMANDOS Y ABREVIACIONES
+## COMANDOS Y ABREVIACIONES
 
 **GhostWhisperChat** cuenta con múltiples comandos y alias (abreviaciones) para hacer tu experiencia más rápida. 
-*Nota: Los comandos marcados como **[Switch]** funcionan como un interruptor; al escribirlos cambian entre activado o desactivado.*
+
+⚠️ **IMPORTANTE: Cómo usar los comandos según dónde estés**
+* **Fuera de un chat (en tu terminal de Linux):** Debes anteponer `gwc` antes del comando para que el sistema lo reconozca. 
+  * *Ejemplo:* `gwc --enlinea o gwc --dm Kali114`
+* **Dentro de una sala de chat:** Escribe el comando directamente (empezando con los guiones `--` o `-`). Si escribes `gwc` dentro de un chat, ¡se enviará como un mensaje de texto normal en lugar de ejecutarse!
+  * *Ejemplo:* `--enlinea o --dm Kali114`
+
+*Nota: Los comandos marcados como **[Switch]** funcionan como un interruptor; al ejecutarlos cambian entre activado o desactivado.*
+
 
 ### 💬 Gestión de Chats
 | Comando Principal | Parámetros | Descripción | Alias Disponibles |
@@ -49,7 +57,7 @@ sudo apt update
 | `--crearpublico` | `<Nombre>` | Crear un grupo público visible para todos. | `-o`, `--publico`, `--abrir`, `--sala` |
 | `--crearprivado` | `<Nom> <Pwd>` | Crear un grupo privado protegido con contraseña. | `-p`, `--privado`, `--candado`, `--cerrado` |
 | `--unirse` | `<Nombre>` | Entrar a un grupo público o privado existente. | `-u`, `--entrar`, `--join` |
-| `--agregar` | `<Nick>` | Invitar a un usuario conectado al grupo actual. | `-a`, `--invitar`, `--sumar`, `--meter` |
+| `--agregar` | `<Nick/IP>` | Invitar a un usuario conectado al grupo actual. | `-a`, `--invitar`, `--sumar`, `--meter` |
 | `--aceptar` | | Confirmar una invitación entrante. | |
 | `--rechazar` | | Denegar una invitación entrante. | |
 | `--silenciar` | | **[Switch]** Activar/Desactivar notificaciones. | `-m`, `--shh`, `--nomolestar`, `--mute` |
@@ -68,7 +76,7 @@ sudo apt update
 | Comando Principal | Parámetros | Descripción | Alias Disponibles |
 | :--- | :--- | :--- | :--- |
 | `--archivo` | `<Ruta>` | Enviar un archivo (Soporta arrastrar y soltar). | `-f`, `--enviar`, `--mandar`, `--adjuntar`, `--file` |
-| `--imagen` | `<Ruta> [ancho]` | Mandar foto como Arte ASCII y original. | `-i`, `-P`, `--foto`, `--picture` |
+| `--imagen` | `<Ruta> [ancho]` | Mandar foto como Arte ASCII y original (Soporta arrastrar y soltar). | `-i`, `-P`, `--foto`, `--picture` |
 | `--cambiarnombre` | `<Nuevo>` | Cambiar tu Nick actual. | `-n`, `--nick`, `--apodo`, `--nombre` |
 | `--estado` | `<Texto>` | Publicar un mensaje de estado personal. | `-e`, `--situacion`, `--mood`, `--st` |
 | `--info` | | Ver estado del sistema, tu IP, versión y logs. | `--estados-globales`, `-i`, `--config`, `--todo` |
