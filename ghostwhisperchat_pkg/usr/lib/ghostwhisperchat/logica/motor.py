@@ -54,7 +54,11 @@ class Motor:
         
         # Typing Status Tracking: { chat_id: { uid: (timestamp, nick) } }
         self.typing_states = {}
-        self.chat_requests_status = {} 
+        self.chat_requests_status = {}
+        
+        # Keepalive de sesión: timestamp del último mensaje real por chat_id
+        # Si no hubo tráfico en X segundos, se envía un CHAT_KEEP silencioso
+        self.session_last_activity = {}  # { chat_id: timestamp } 
 
     def iniciar_ipc(self):
         if os.path.exists(IPC_SOCK_PATH):
@@ -101,6 +105,9 @@ class Motor:
                     self.red.set_socks_proxy(self.tor.socks_host, self.tor.socks_port)
                     self.memoria.guardar_configuracion()
                     print(f"[*] Tor Onion Activo: {self.tor.onion_address}", file=sys.stderr)
+                    # Iniciar watchdog de salud Tor y keepalive de sesiones
+                    threading.Thread(target=self._hilo_tor_watchdog, daemon=True).start()
+                    threading.Thread(target=self._hilo_keepalive_chat, daemon=True).start()
                 else:
                     print(f"[*] Tor no activo ({self.tor.status_message}). Modo LAN.", file=sys.stderr)
 
@@ -1346,6 +1353,8 @@ class Motor:
              
              # Reset notification counter on send
              self.last_activity[chat_id] = time.time()
+             # Vividor: actualizar timestamp de última actividad real
+             self.session_last_activity[chat_id] = time.time()
              
              if chat_id in self.memoria.grupos_activos:
                  g = self.memoria.grupos_activos[chat_id]
@@ -1990,6 +1999,13 @@ class Motor:
                  print(f"[MESH] Respondiendo SYNC_REQ con {len(sync_list)} miembros.", file=sys.stderr)
                  self.red.enviar_tcp(sock, sync_pkg)
 
+        elif tipo == "CHAT_KEEP":
+            # Keepalive silencioso: actualizar timestamp de actividad de la sesión sin mostrar nada
+            uid = origen.get('uid')
+            if uid:
+                self.session_last_activity[uid] = time.time()
+                print(f"[KEEP] Keepalive recibido de {origen.get('nick', '?')} (uid={uid[:8]})", file=sys.stderr)
+
         elif tipo == "CHAT_BYE":
              sender_uid = origen['uid']
              print(f"[PRIV] CHAT_BYE recibido de {origen['nick']}", file=sys.stderr)
@@ -2582,6 +2598,133 @@ class Motor:
                 try: self.red.enviar_udp_broadcast(pkg)
                 except: pass
             time.sleep(15)
+
+    def _hilo_tor_watchdog(self):
+        """
+        Watchdog de salud Tor: cada 60s verifica si el proxy SOCKS5 local responde.
+        Si no responde, intenta recuperar circuitos:
+          1. Solicita nuevos circuitos via NEWNYM (stem).
+          2. Si persiste, re-inicializa el TorManager completo.
+        También limpia sockets TCP muertos del pool de select() para evitar bloqueos.
+        """
+        import socket as _socket
+        CHECK_INTERVAL = 60  # segundos entre verificaciones
+        
+        while self.running:
+            time.sleep(CHECK_INTERVAL)
+            if not self.running: break
+            if not self.memoria.mi_onion: continue  # Tor no activo, nada que vigilar
+
+            # --- 1. Test rápido: ¿responde el SOCKS5? ---
+            socks_ok = False
+            try:
+                test_s = _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM)
+                test_s.settimeout(3.0)
+                test_s.connect((self.red.socks_host, self.red.socks_port))
+                test_s.close()
+                socks_ok = True
+            except Exception as e:
+                print(f"[TOR_WATCH] SOCKS5 no responde en {self.red.socks_host}:{self.red.socks_port} → {e}", file=sys.stderr)
+
+            if socks_ok:
+                # --- 2. SOCKS5 OK: solicitar nuevos circuitos via NEWNYM (previene circuitos viejos) ---
+                try:
+                    from stem import Signal
+                    if self.tor and self.tor.controller:
+                        self.tor.controller.signal(Signal.NEWNYM)
+                        print("[TOR_WATCH] Nuevos circuitos solicitados (NEWNYM).", file=sys.stderr)
+                except Exception as e:
+                    print(f"[TOR_WATCH] NEWNYM fallido (ignorado): {e}", file=sys.stderr)
+
+                # --- 3. Limpiar sockets TCP muertos del pool de select ---
+                dead = []
+                for s in list(self.red.tcp_connections):
+                    try:
+                        # Un socket muerto genera error inmediatamente con fileno() < 0 o getpeername()
+                        if s.fileno() < 0:
+                            dead.append(s)
+                            continue
+                        s.getpeername()
+                    except Exception:
+                        dead.append(s)
+                for s in dead:
+                    try: self.red.cerrar_tcp(s)
+                    except: pass
+                if dead:
+                    print(f"[TOR_WATCH] {len(dead)} socket(s) TCP muerto(s) limpiados.", file=sys.stderr)
+            else:
+                # --- 4. SOCKS5 CAÍDO: re-inicializar TorManager ---
+                print("[TOR_WATCH] Intentando re-inicializar Tor...", file=sys.stderr)
+                try:
+                    self.tor.detener()
+                    self.memoria.mi_onion = None
+                    time.sleep(2)
+                    if self.tor.iniciar():
+                        self.memoria.mi_onion = self.tor.onion_address
+                        self.red.set_socks_proxy(self.tor.socks_host, self.tor.socks_port)
+                        self.memoria.guardar_configuracion()
+                        print(f"[TOR_WATCH] Tor re-inicializado OK → {self.tor.onion_address}", file=sys.stderr)
+                    else:
+                        print(f"[TOR_WATCH] Re-inicialización fallida: {self.tor.status_message}", file=sys.stderr)
+                except Exception as e:
+                    print(f"[TOR_WATCH] Error en re-inicialización: {e}", file=sys.stderr)
+
+    def _hilo_keepalive_chat(self):
+        """
+        Vividor de chat: envia un paquete CHAT_KEEP silencioso a cada peer activo
+        si no hubo trafico real en los últimos IDLE_THRESHOLD segundos.
+        Esto mantiene vivos los circuitos Tor durante pausas de conversación.
+        Solo actua sobre sesiones que realmente tienen una UI abierta (chat activo).
+        """
+        IDLE_THRESHOLD = 45.0   # segundos sin trafico antes de enviar keepalive
+        CHECK_INTERVAL = 15.0   # frecuencia de revision del hilo
+        
+        while self.running:
+            time.sleep(CHECK_INTERVAL)
+            if not self.running: break
+            if not self.ui_sessions: continue  # Sin sesiones activas, nada que hacer
+
+            now = time.time()
+            keep_pkg = empaquetar("CHAT_KEEP", {}, self.memoria.get_origen())
+            
+            for chat_id in list(self.ui_sessions.keys()):
+                last = self.session_last_activity.get(chat_id, 0)
+                if now - last < IDLE_THRESHOLD:
+                    continue  # Hubo actividad reciente, no necesita keepalive
+                
+                # Determinar destinos de este chat (privado o grupo)
+                destinos = []  # lista de (host, port)
+                
+                if chat_id in self.memoria.grupos_activos:
+                    g = self.memoria.grupos_activos[chat_id]
+                    for m in g.get('miembros', {}).values():
+                        if m.get('uid') == self.memoria.mi_uid: continue
+                        host = self._resolver_host_objetivo(m)
+                        if host:
+                            destinos.append((host, m.get('port_priv', 44494)))
+                else:
+                    # Chat privado: buscar peer por uid (chat_id)
+                    p = self.memoria.peers.get(chat_id) or self.memoria.contactos.get(chat_id)
+                    if p:
+                        host = self._resolver_host_objetivo(p)
+                        if host:
+                            destinos.append((host, p.get('port_priv', 44494)))
+                
+                if not destinos:
+                    continue
+                
+                # Enviar CHAT_KEEP de forma async (no bloquear el hilo watchdog)
+                def _send_keep(targets, pkg=keep_pkg, cid=chat_id):
+                    for host, port in targets:
+                        try:
+                            ok = self.red.enviar_tcp_priv(host, pkg, port=port)
+                            if ok:
+                                self.session_last_activity[cid] = time.time()
+                                print(f"[KEEP] Keepalive enviado a {host}:{port} (chat={cid[:8]})", file=sys.stderr)
+                        except Exception as e:
+                            print(f"[KEEP_WARN] Error enviando keepalive a {host}:{port}: {e}", file=sys.stderr)
+                
+                threading.Thread(target=_send_keep, args=(destinos,), daemon=True).start()
 
     def tareas_mantenimiento(self):
         self.memoria.limpiar_peers_inactivos()

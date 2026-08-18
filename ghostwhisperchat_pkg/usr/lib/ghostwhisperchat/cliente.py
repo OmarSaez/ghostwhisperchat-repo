@@ -754,8 +754,22 @@ def main():
                 # 2. Bucle interactivo con animación compacta hasta recibir respuesta (ACK / REJECT / TIMEOUT)
                 from ghostwhisperchat.datos.recursos import Colores
                 dest_abbr = dest_target[:8] + "..." + dest_target[-6:] if len(dest_target) > 18 else dest_target
+                
+                # Detectar canal: onion directo, o buscar en peers/contactos si tiene onion registrado
                 is_onion = str(dest_target).endswith(".onion")
-                canal = "Tor" if is_onion else "LAN"
+                if not is_onion:
+                    try:
+                        st_peek = consultar_daemon_respuesta(f"--check-chat-status {dest_target}")
+                        # Si hay onion en peers/contactos lo detectará al enviar; aquí solo afinamos UX
+                        peers_raw = consultar_daemon_respuesta("--status-raw-peers")
+                        if dest_target.lower() in peers_raw.lower() and ".onion" in peers_raw:
+                            is_onion = True
+                    except Exception:
+                        pass
+                
+                canal = "Tor Global" if is_onion else "LAN"
+                # Timeout inteligente por canal
+                timeout_espera = 120.0 if is_onion else 10.0
                 
                 dots = [".  ", ".. ", "...", " ..", "  .", "   "]
                 gwc_badges = [
@@ -768,14 +782,23 @@ def main():
                 ]
                 
                 start_time = time.time()
-                timeout_espera = 45.0 if is_onion else 25.0
                 frame_idx = 0
                 
                 try:
                     while time.time() - start_time < timeout_espera:
+                        elapsed = time.time() - start_time
+                        remaining = int(timeout_espera - elapsed)
                         d = dots[frame_idx % len(dots)]
                         badge = gwc_badges[frame_idx % len(gwc_badges)]
-                        line_content = f"{Colores.YELLOW}[*] Esperando a {dest_abbr} ({canal}){d}{Colores.RESET} {badge}"
+                        
+                        if is_onion:
+                            # Cuenta regresiva visible para Tor (el usuario sabe que puede tardar)
+                            countdown_color = Colores.GREEN if remaining > 60 else (Colores.YELLOW if remaining > 20 else Colores.RED)
+                            countdown_str = f" {countdown_color}[{remaining:3d}s]{Colores.RESET}"
+                            line_content = f"{Colores.YELLOW}[*] Esperando a {dest_abbr} ({canal}){d}{Colores.RESET} {badge}{countdown_str}"
+                        else:
+                            line_content = f"{Colores.YELLOW}[*] Esperando a {dest_abbr} ({canal}){d}{Colores.RESET} {badge}"
+                        
                         sys.stdout.write(f"\r\033[K{line_content}")
                         sys.stdout.flush()
                         time.sleep(0.35)
@@ -801,14 +824,20 @@ def main():
                                     motivo = "Usuario en modo No Molestar"
                                 elif raw_reason == "Timeout":
                                     motivo = "Sin respuesta (Tiempo agotado en destino)"
+                                elif "Tor" in raw_reason or "conectar" in raw_reason.lower():
+                                    motivo = "No se pudo establecer circuito Tor (reintenta en unos segundos)"
                                 else:
                                     motivo = raw_reason
                                     
-                                sys.stdout.write(f"\r\033[K{Colores.RED}{Colores.BOLD}[X] Solicitud rechazada por {nick_resp}:{Colores.RESET} {Colores.RED}{motivo}.{Colores.RESET}\n")
+                                sys.stdout.write(f"\r\033[K{Colores.RED}{Colores.BOLD}[✘] Solicitud rechazada por {nick_resp}:{Colores.RESET} {Colores.RED}{motivo}.{Colores.RESET}\n")
                                 sys.stdout.flush()
                                 return
-                                
-                    sys.stdout.write(f"\r\033[K{Colores.YELLOW}[!] Tiempo de espera agotado sin respuesta.{Colores.RESET}\n")
+                    
+                    # Timeout local agotado
+                    if is_onion:
+                        sys.stdout.write(f"\r\033[K{Colores.YELLOW}[!] Sin respuesta en 2 minutos. El circuito Tor puede estar lento, reintenta con{Colores.RESET} {Colores.CYAN}gwc dm {dest_target}{Colores.RESET}\n")
+                    else:
+                        sys.stdout.write(f"\r\033[K{Colores.YELLOW}[!] Tiempo de espera agotado sin respuesta.{Colores.RESET}\n")
                     sys.stdout.flush()
                 except KeyboardInterrupt:
                     sys.stdout.write(f"\r\033[K{Colores.GREY}[-] Solicitud cancelada por el usuario.{Colores.RESET}\n")
