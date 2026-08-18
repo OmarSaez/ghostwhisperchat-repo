@@ -159,15 +159,20 @@ class MemoriaGlobal:
                 json.dump(self.contactos, f)
         except: pass
 
-    def registrar_contacto(self, uid, nick, ip, onion=None):
+    def registrar_contacto(self, uid, nick, ip, onion=None, sys_user=None, status_msg=None):
         """Registra un contacto persistente (historial de interaccion)"""
         with self._lock:
             contacto_previo = self.contactos.get(uid, {})
             onion_final = onion if onion else contacto_previo.get("onion")
+            sys_user_final = sys_user if sys_user else contacto_previo.get("sys_user", "?")
+            status_msg_final = status_msg if status_msg is not None else contacto_previo.get("status_msg", "")
             self.contactos[uid] = {
+                "uid": uid,
                 "nick": nick,
                 "ip": ip,
                 "onion": onion_final,
+                "sys_user": sys_user_final,
+                "status_msg": status_msg_final,
                 "last_seen": time.time()
             }
         self.guardar_contactos()
@@ -260,7 +265,7 @@ class MemoriaGlobal:
             if port_group: self.peers[uid]['port_group'] = port_group
             
             # Persistencia Automatica
-            self.registrar_contacto(uid, nick, ip, onion=onion)
+            self.registrar_contacto(uid, nick, ip, onion=onion, sys_user=sys_user, status_msg=status_msg)
 
     def obtener_peer(self, uid):
         return self.peers.get(uid)

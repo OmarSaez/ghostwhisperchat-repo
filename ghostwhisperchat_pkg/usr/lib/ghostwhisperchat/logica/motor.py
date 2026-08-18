@@ -762,7 +762,8 @@ class Motor:
                  return f"{Colores.RED}[CRASH] Error generando Dashboard:\n{traceback.format_exc()}{Colores.RESET}"
 
         elif cmd == "CONTACTS":
-             res = "--- CONTACTOS (Agenda) ---\n"
+             from ghostwhisperchat.datos.recursos import Colores
+             res = f"{Colores.BOLD}--- CONTACTOS (Agenda) ---{Colores.RESET}\n"
              try:
                  # 1. Merge sources
                  ct = self.memoria.contactos or {}
@@ -781,10 +782,8 @@ class Motor:
                       # Update with Active Peer data
                       if uid in peers_active:
                           data.update(peers_active[uid])
-                          # Force status from active peer
                           data['status'] = peers_active[uid].get('status', 'ONLINE')
                       else:
-                          # If not active, it's offline
                           data['status'] = 'OFFLINE'
                           
                       nick = data.get('nick', 'Desconocido')
@@ -792,11 +791,20 @@ class Motor:
                       s_user = data.get('sys_user', '?')
                       st = data.get('status', 'OFFLINE')
                       msg = data.get('status_msg', '')
+                      onion = data.get('onion')
+                      
+                      st_color = Colores.GREEN if st == 'ONLINE' else Colores.GREY
                       
                       # Formato Rico
-                      linea = f"- {nick} [{s_user}@{ip_addr}] [{st}"
+                      linea = f"- {Colores.BOLD}{nick}{Colores.RESET} [{s_user}@{ip_addr}] [{st_color}{st}{Colores.RESET}"
                       if msg: linea += f": \"{msg}\""
-                      linea += f"] ({uid})"
+                      linea += "]"
+                      
+                      # Badge Tor Global
+                      if onion:
+                          linea += f" {Colores.CYAN}[🌐 Tor Global]{Colores.RESET}"
+                          
+                      linea += f" ({Colores.GREY}{uid}{Colores.RESET})"
                       
                       res += linea + "\n"
              except Exception as e:
@@ -910,25 +918,58 @@ class Motor:
                   req = empaquetar("CHAT_REQ", {}, self.memoria.get_origen())
                   dest_host = self._resolver_host_objetivo(peer)
                   port_p = peer.get('port_priv', 44494)
-                  try:
-                      print(f"[CHAT_CMD] Conectando a {target} ({dest_host}:{port_p})", file=sys.stderr)
-                      ok = self.red.enviar_tcp_priv(dest_host, req, port=port_p)
-                      if ok:
-                          return f"[*] Contacto '{target}' encontrado en caché. Solicitud enviada."
-                  except: 
-                      pass
+                  if str(dest_host).endswith(".onion"):
+                      def _send_onion_peer():
+                          try:
+                              print(f"[CHAT_WAN] Conectando vía Tor a {target} ({dest_host}:{port_p})...", file=sys.stderr)
+                              ok = self.red.enviar_tcp_priv(dest_host, req, port=port_p)
+                              if ok:
+                                  print(f"[CHAT_WAN] Solicitud entregada exitosamente a {target}.", file=sys.stderr)
+                              else:
+                                  print(f"[CHAT_WAN] [X] No se pudo entregar solicitud a {target}.", file=sys.stderr)
+                                  self.chat_requests_status[target] = ('REJECTED', target, 'No se pudo conectar vía Tor')
+                          except Exception as e:
+                              print(f"[CHAT_WAN] [!] Error entregando a {target}: {e}", file=sys.stderr)
+                              self.chat_requests_status[target] = ('REJECTED', target, str(e))
+                      threading.Thread(target=_send_onion_peer, daemon=True).start()
+                      return f"[*] Solicitud enviada a '{target}' vía Tor Onion. Esperando respuesta..."
+                  else:
+                      try:
+                          print(f"[CHAT_CMD] Conectando a {target} ({dest_host}:{port_p})", file=sys.stderr)
+                          ok = self.red.enviar_tcp_priv(dest_host, req, port=port_p)
+                          if ok:
+                              return f"[*] Solicitud enviada a '{target}' en red local. Esperando respuesta..."
+                      except: 
+                          pass
 
-             # 4. Fallback: Agenda con dirección Onion
+             # 4. Fallback: Agenda con dirección Onion o IP
              for uid, c in self.memoria.contactos.items():
-                 if isinstance(c, dict) and c.get('nick', '').lower() == target.lower() and c.get('onion'):
+                 if isinstance(c, dict) and c.get('nick', '').lower() == target.lower():
+                     dest_host = self._resolver_host_objetivo(c)
+                     port_p = c.get('port_priv', 44494)
                      req = empaquetar("CHAT_REQ", {}, self.memoria.get_origen())
-                     try:
-                         print(f"[CHAT_CMD] Conectando vía Tor a contacto '{target}' ({c['onion']})...", file=sys.stderr)
-                         ok = self.red.enviar_tcp_priv(c['onion'], req, port=44494)
-                         if ok:
-                             return f"[*] Contacto '{target}' encontrado en agenda. Solicitud WAN enviada vía Tor."
-                     except:
-                         pass
+                     if str(dest_host).endswith(".onion"):
+                         def _send_onion_c(dh=dest_host, pp=port_p):
+                             try:
+                                 print(f"[CHAT_WAN] Conectando vía Tor a contacto de agenda '{target}' ({dh}:{pp})...", file=sys.stderr)
+                                 ok = self.red.enviar_tcp_priv(dh, req, port=pp)
+                                 if ok:
+                                     print(f"[CHAT_WAN] Solicitud entregada exitosamente a {target}.", file=sys.stderr)
+                                 else:
+                                     print(f"[CHAT_WAN] [X] No se pudo entregar solicitud a {target}.", file=sys.stderr)
+                                     self.chat_requests_status[target] = ('REJECTED', target, 'No se pudo conectar vía Tor')
+                             except Exception as e:
+                                 print(f"[CHAT_WAN] [!] Error entregando a {target}: {e}", file=sys.stderr)
+                                 self.chat_requests_status[target] = ('REJECTED', target, str(e))
+                         threading.Thread(target=_send_onion_c, daemon=True).start()
+                         return f"[*] Solicitud enviada a '{target}' vía Tor Onion (Agenda). Esperando respuesta..."
+                     else:
+                         try:
+                             ok = self.red.enviar_tcp_priv(dest_host, req, port=port_p)
+                             if ok:
+                                 return f"[*] Solicitud enviada a '{target}' en red local (Agenda). Esperando respuesta..."
+                         except:
+                             pass
 
              # 5. Fuzzy Suggestions (Contacts + Peers)
              sugs = self.memoria.buscar_contacto_fuzzy(target)
@@ -1401,12 +1442,18 @@ class Motor:
                     
                     else:
                         peer = self.memoria.buscar_peer(chat_id)
-                        if peer and 'ip' in peer:
+                        if not peer and chat_id in self.memoria.contactos:
+                            peer = self.memoria.contactos[chat_id]
+                        if peer:
                             bye_pkg = empaquetar("CHAT_BYE", {}, self.memoria.get_origen())
-                            p_port = peer.get('port_priv')
-                            print(f"[PRIV] Enviando CHAT_BYE a {peer.get('nick')} ({peer['ip']}:{p_port})", file=sys.stderr)
-                            try: self.red.enviar_tcp_priv(peer['ip'], bye_pkg, port=p_port)
-                            except: pass
+                            dest_host = self._resolver_host_objetivo(peer)
+                            p_port = peer.get('port_priv', 44494)
+                            print(f"[PRIV] Enviando CHAT_BYE a {peer.get('nick')} ({dest_host}:{p_port})", file=sys.stderr)
+                            def _send_bye_async(dh=dest_host, pp=p_port, pkg=bye_pkg):
+                                try: self.red.enviar_tcp_priv(dh, pkg, port=pp)
+                                except Exception as err:
+                                    print(f"[PRIV_WARN] Error enviando CHAT_BYE: {err}", file=sys.stderr)
+                            threading.Thread(target=_send_bye_async, daemon=True).start()
                 except Exception as e:
                     print(f"[X] Error en desconexion UI: {e}", file=sys.stderr)
                 
@@ -2200,19 +2247,19 @@ class Motor:
             
         elif tipo == "CHAT_BYE":
              # Notify termination
-             uid = origen['uid']
-             if uid in self.ui_sessions:
+             uid = origen.get('uid')
+             nick = origen.get('nick', 'Contacto')
+             if uid and uid in self.ui_sessions:
                  s = self.ui_sessions[uid]
-                 # YELLOW INDICATOR [-]
-                 s.sendall(f"\n[SISTEMA] [-] {origen['nick']} cerró la sesión.\n".encode('utf-8'))
+                 try:
+                     s.sendall(f"\n[SISTEMA] [-] {nick} cerró la sesión de chat privado.\n__CLOSE_UI__\n".encode('utf-8'))
+                 except: pass
+                 try: del self.ui_sessions[uid]
+                 except: pass
                  
-                 # Notificacion de Escritorio
-                 from ghostwhisperchat.core.utilidades import enviar_notificacion
-                 enviar_notificacion("GhostWhisperChat", f"{origen['nick']} dejó el chat privado.")
-
-                 # Instruct client to close after delay
-                 s.sendall(b"__CLOSE_UI__\n")
-                 # We keep our UI open so user can see history or exit manually.
+             # Notificacion de Escritorio
+             from ghostwhisperchat.core.utilidades import enviar_notificacion
+             enviar_notificacion("GhostWhisperChat", f"{nick} dejó el chat privado.")
 
         elif tipo == "MSG":
              text = payload.get("text")

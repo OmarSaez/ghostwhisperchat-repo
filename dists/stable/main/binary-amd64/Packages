@@ -1,20 +1,4 @@
 Package: ghostwhisperchat
-Version: 2.160.5
-Architecture: all
-Maintainer: Omar Saez <omarsaez@ghostwhisper.chat>
-Depends: python3, python3-cryptography, libnotify-bin, portaudio19-dev, python3-pyaudio, vorbis-tools, zenity, xterm, pulseaudio-utils
-Filename: pool/main/g/ghostwhisperchat/ghostwhisperchat_2.160.5_all.deb
-Size: 177896
-MD5sum: 77350dbb181f56d607959e95fcbf6c82
-SHA1: 8e91d2f057f825fbd04add58130b094986a3c8d2
-SHA256: 451df00c6de9ca1285ba1fd7fe91dfe8ebbd7ad3786242e2a325446b64983ccc
-Section: net
-Priority: optional
-Description: GhostWhisperChat - Chat P2P Local Seguro (Edición Hacker)
- Sistema de chat descentralizado con cifrado E2E, transferencia de archivos,
- llamadas de voz, y descubrimiento automático en LAN.
-
-Package: ghostwhisperchat
 Version: 3.000
 Architecture: all
 Maintainer: Omar Saez <omarsaez@ghostwhisper.chat>
@@ -41,6 +25,23 @@ Size: 221314
 MD5sum: 2ee485e46b7691c52ad524f2fbbbacef
 SHA1: 9bf16bc25dbefba562d58d304f8b0262de1d2423
 SHA256: dc1915483d9ddd37de12064fbbfdf1e6222f99337b7fc2e2a6727c1685c6f82e
+Section: net
+Priority: optional
+Description: GhostWhisperChat - Chat P2P Global Seguro (Edición WAN + LAN)
+ Sistema de chat descentralizado con cifrado E2E, transferencia de archivos,
+ soporte global sin servidores centrales mediante Tor Onion Services v3
+ y descubrimiento automático en LAN.
+
+Package: ghostwhisperchat
+Version: 3.002
+Architecture: all
+Maintainer: Omar Saez <omarsaez@ghostwhisper.chat>
+Depends: python3, python3-cryptography, libnotify-bin, portaudio19-dev, python3-pyaudio, vorbis-tools, zenity, xterm, pulseaudio-utils, tor, python3-stem
+Filename: pool/main/g/ghostwhisperchat/ghostwhisperchat_3.002_all.deb
+Size: 223164
+MD5sum: a2e2f233ce578ec519afb12b47c45907
+SHA1: e4e43a7b8517b05790b4023d007bb89ad48bc82f
+SHA256: 1651a226e9ec7a069a9f46a925e2ef26ff63bf12c190364a8707d3e7def3c269
 Section: net
 Priority: optional
 Description: GhostWhisperChat - Chat P2P Global Seguro (Edición WAN + LAN)

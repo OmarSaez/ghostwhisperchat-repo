@@ -540,6 +540,8 @@ def modo_ui_chat(target_id, es_grupo):
                     
                     # Check for special Close Trigger
                     if "__CLOSE_UI__" in line:
+                         helper.print_incoming(f"\n{C.YELLOW}[SISTEMA] [-] El usuario cerró la sesión de chat. Cerrando consola en 2s...{C.RESET}\n")
+                         time.sleep(1.8)
                          helper.running = False
                          break
                     
@@ -683,22 +685,23 @@ def main():
                 dbus = os.environ.get('DBUS_SESSION_BUS_ADDRESS')
                 if dbus: full_cmd += f" __ENV_DBUS__={dbus}"
                 
-                # 1. Enviar el comando al demonio
-                enviar_comando_transitorio(full_cmd)
+                # 1. Enviar el comando al demonio silenciosamente para no romper la primera línea de la terminal
+                consultar_daemon_respuesta(full_cmd)
                 
-                # 2. Bucle interactivo con animación hasta recibir respuesta (ACK / REJECT / TIMEOUT)
+                # 2. Bucle interactivo con animación compacta hasta recibir respuesta (ACK / REJECT / TIMEOUT)
                 from ghostwhisperchat.datos.recursos import Colores
-                onion_abbr = dest_target[:14] + "..." + dest_target[-10:] if len(dest_target) > 28 else dest_target
+                dest_abbr = dest_target[:8] + "..." + dest_target[-6:] if len(dest_target) > 18 else dest_target
                 is_onion = str(dest_target).endswith(".onion")
-                canal = "vía Tor Onion" if is_onion else "en red local"
+                canal = "Tor" if is_onion else "LAN"
                 
-                frames = [
-                    f"{Colores.YELLOW}[*] Conectando con {onion_abbr} {canal}. Esperando que el usuario acepte.   {Colores.CYAN}[ {Colores.GREEN}g  {Colores.CYAN} ]{Colores.RESET}",
-                    f"{Colores.YELLOW}[*] Conectando con {onion_abbr} {canal}. Esperando que el usuario acepte..  {Colores.CYAN}[ {Colores.GREEN}gw {Colores.CYAN} ]{Colores.RESET}",
-                    f"{Colores.YELLOW}[*] Conectando con {onion_abbr} {canal}. Esperando que el usuario acepte... {Colores.CYAN}[ {Colores.GREEN}gwc{Colores.CYAN} ]{Colores.RESET}",
-                    f"{Colores.YELLOW}[*] Conectando con {onion_abbr} {canal}. Esperando que el usuario acepte.   {Colores.CYAN}[ {Colores.BOLD}{Colores.GREEN}gwc{Colores.RESET}{Colores.CYAN} ]{Colores.RESET}",
-                    f"{Colores.YELLOW}[*] Conectando con {onion_abbr} {canal}. Esperando que el usuario acepte..  {Colores.CYAN}[ {Colores.GREEN}gw {Colores.CYAN} ]{Colores.RESET}",
-                    f"{Colores.YELLOW}[*] Conectando con {onion_abbr} {canal}. Esperando que el usuario acepte... {Colores.CYAN}[ {Colores.GREEN}g  {Colores.CYAN} ]{Colores.RESET}",
+                dots = [".  ", ".. ", "...", " ..", "  .", "   "]
+                gwc_badges = [
+                    f"{Colores.CYAN}[ {Colores.GREEN}g  {Colores.CYAN} ]{Colores.RESET}",
+                    f"{Colores.CYAN}[ {Colores.GREEN}gw {Colores.CYAN} ]{Colores.RESET}",
+                    f"{Colores.CYAN}[ {Colores.GREEN}gwc{Colores.CYAN} ]{Colores.RESET}",
+                    f"{Colores.CYAN}[ {Colores.BOLD}{Colores.GREEN}gwc{Colores.RESET}{Colores.CYAN} ]{Colores.RESET}",
+                    f"{Colores.CYAN}[ {Colores.GREEN} gw{Colores.CYAN} ]{Colores.RESET}",
+                    f"{Colores.CYAN}[ {Colores.GREEN}  g{Colores.CYAN} ]{Colores.RESET}",
                 ]
                 
                 start_time = time.time()
@@ -707,7 +710,10 @@ def main():
                 
                 try:
                     while time.time() - start_time < timeout_espera:
-                        sys.stdout.write(f"\r\033[K{frames[frame_idx % len(frames)]}")
+                        d = dots[frame_idx % len(dots)]
+                        badge = gwc_badges[frame_idx % len(gwc_badges)]
+                        line_content = f"{Colores.YELLOW}[*] Esperando a {dest_abbr} ({canal}){d}{Colores.RESET} {badge}"
+                        sys.stdout.write(f"\r\033[K{line_content}")
                         sys.stdout.flush()
                         time.sleep(0.35)
                         frame_idx += 1
@@ -718,7 +724,7 @@ def main():
                             if st.startswith("ACCEPTED:"):
                                 parts = st.split(":", 2)
                                 nick_resp = parts[1] if len(parts) > 1 else dest_target
-                                sys.stdout.write(f"\r\033[K{Colores.GREEN}[✔] ¡Solicitud aceptada con éxito por {nick_resp}! Iniciando consola para el chat...{Colores.RESET}\n")
+                                sys.stdout.write(f"\r\033[K{Colores.GREEN}[✔] ¡Solicitud aceptada por {nick_resp}! Iniciando chat...{Colores.RESET}\n")
                                 sys.stdout.flush()
                                 return
                             elif st.startswith("REJECTED:"):
@@ -729,7 +735,7 @@ def main():
                                 sys.stdout.flush()
                                 return
                                 
-                    sys.stdout.write(f"\r\033[K{Colores.YELLOW}[!] Tiempo de espera agotado sin respuesta del destinatario.{Colores.RESET}\n")
+                    sys.stdout.write(f"\r\033[K{Colores.YELLOW}[!] Tiempo de espera agotado sin respuesta.{Colores.RESET}\n")
                     sys.stdout.flush()
                 except KeyboardInterrupt:
                     sys.stdout.write(f"\r\033[K{Colores.GREY}[-] Solicitud cancelada por el usuario.{Colores.RESET}\n")
