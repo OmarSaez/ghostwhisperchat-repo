@@ -53,7 +53,8 @@ class Motor:
         self.mention_cooldowns = {}
         
         # Typing Status Tracking: { chat_id: { uid: (timestamp, nick) } }
-        self.typing_states = {} 
+        self.typing_states = {}
+        self.chat_requests_status = {} 
 
     def iniciar_ipc(self):
         if os.path.exists(IPC_SOCK_PATH):
@@ -203,6 +204,34 @@ class Motor:
              traceback.print_exc(file=sys.stderr)
         finally:
              self.running = False
+
+    def _resolver_host_objetivo(self, peer_o_origen):
+        """
+        Determina de forma inteligente si la ruta hacia un contacto es directa por IP LAN o vía Tor Onion (WAN).
+        Si dispone de ID Onion, se prioriza Onion salvo que se confirme que ambos nodos están en la misma subred local activa.
+        """
+        if not isinstance(peer_o_origen, dict):
+            return str(peer_o_origen) if peer_o_origen else None
+
+        onion = peer_o_origen.get('onion')
+        ip = peer_o_origen.get('ip')
+
+        if onion:
+            if not ip or ip in ['127.0.0.1', 'localhost', '0.0.0.0', None]:
+                return onion
+
+            from ghostwhisperchat.core.utilidades import get_local_ip
+            mi_ip = get_local_ip()
+            if mi_ip and mi_ip != '127.0.0.1' and ip != '127.0.0.1':
+                sub_mi = '.'.join(mi_ip.split('.')[:3])
+                sub_peer = '.'.join(str(ip).split('.')[:3])
+                uid = peer_o_origen.get('uid')
+                if sub_mi == sub_peer and uid and uid in self.memoria.peers:
+                    return ip
+
+            return onion
+
+        return ip or '127.0.0.1'
 
     def _resolver_objetivo_smart(self, target_raw):
         """
@@ -501,6 +530,24 @@ class Motor:
              print(f"[GROUP_DEBUG] Enviando SEARCH UDP para '{nombre}'...", file=sys.stderr)
              return f"[*] Buscando grupo '{nombre}' en la red..."
 
+        elif cmd == "CHECK_CHAT_STATUS":
+            if not args: return "NONE"
+            target = args[0]
+            st = self.chat_requests_status.get(target)
+            if not st:
+                for k, v in list(self.chat_requests_status.items()):
+                    if target in k or k in target:
+                        st = v
+                        break
+            if not st:
+                return "WAITING"
+            code = st[0]
+            if code == "ACCEPTED":
+                return f"ACCEPTED:{st[1]}:{st[2]}"
+            elif code == "REJECTED":
+                return f"REJECTED:{st[1]}:{st[2]}"
+            return "WAITING"
+
         elif cmd == "CREATE_PUB":
              if not args: return "[X] Uso: --crearpublico <Nombre>"
              nombre = args[0]
@@ -606,7 +653,7 @@ class Motor:
                  return f"{msg_extra}[*] Lanzando invitación asíncrona a '{target_nick}'..."
 
              # Send INVITE packet
-             dest_host = target_peer.get('onion') if target_peer.get('onion') and (target_peer.get('ip') in ['127.0.0.1', 'localhost', None] or not target_peer.get('ip')) else target_peer.get('ip') or target_peer.get('onion')
+             dest_host = self._resolver_host_objetivo(target_peer)
              port_p = target_peer.get('port_priv', 44494)
              print(f"[GROUP] Invitando a {target_nick} ({dest_host}:{port_p or 'DEF'})...", file=sys.stderr)
              try:
@@ -826,6 +873,7 @@ class Motor:
         elif cmd == "CHAT":
              if not args: return "[X] Uso: --dm <NICK_O_IP_O_ONION>"
              target = args[0]
+             self.chat_requests_status[target] = ('WAITING', None, None)
              
              # 1. Dirección Onion Directa
              if str(target).endswith(".onion"):
@@ -838,8 +886,10 @@ class Motor:
                               print(f"[CHAT_WAN] Solicitud entregada exitosamente a {target}.", file=sys.stderr)
                           else:
                               print(f"[CHAT_WAN] [X] No se pudo entregar solicitud a {target}.", file=sys.stderr)
+                              self.chat_requests_status[target] = ('REJECTED', target, 'No se pudo conectar vía Tor')
                       except Exception as e:
                           print(f"[CHAT_WAN] [!] Error entregando a {target}: {e}", file=sys.stderr)
+                          self.chat_requests_status[target] = ('REJECTED', target, str(e))
                   threading.Thread(target=_send_onion_chat, daemon=True).start()
                   return f"[*] Solicitud enviada a {target} vía Tor Onion. Esperando respuesta..."
 
@@ -858,7 +908,7 @@ class Motor:
              peer = self.memoria.buscar_peer(target)
              if peer:
                   req = empaquetar("CHAT_REQ", {}, self.memoria.get_origen())
-                  dest_host = peer.get('onion') if peer.get('onion') and (peer.get('ip') in ['127.0.0.1', 'localhost', None] or not peer.get('ip')) else peer.get('ip') or peer.get('onion')
+                  dest_host = self._resolver_host_objetivo(peer)
                   port_p = peer.get('port_priv', 44494)
                   try:
                       print(f"[CHAT_CMD] Conectando a {target} ({dest_host}:{port_p})", file=sys.stderr)
@@ -1042,7 +1092,7 @@ class Motor:
                                  if uid == self.memoria.mi_uid: continue
                                  ip = m.get('ip')
                                  onion = m.get('onion')
-                                 target = onion if onion and (ip in ['127.0.0.1', 'localhost', None] or not ip) else ip or onion
+                                 target = self._resolver_host_objetivo(m)
                                  if target:
                                      port = m.get('port_priv', 44494)
                                      targets.append((target, port))
@@ -1189,7 +1239,7 @@ class Motor:
                      if uid == self.memoria.mi_uid: continue
                      ip = m.get('ip')
                      onion = m.get('onion')
-                     target = onion if onion and (ip in ['127.0.0.1', 'localhost', None] or not ip) else ip or onion
+                     target = self._resolver_host_objetivo(m)
                      if not target: continue
                      
                      try:
@@ -1227,13 +1277,13 @@ class Motor:
                  else:
                      peer = self.memoria.buscar_peer(chat_id)
                      if peer:
-                         target_host = peer.get('onion') if peer.get('onion') and (peer.get('ip') in ['127.0.0.1', 'localhost', None] or not peer.get('ip')) else peer.get('ip') or peer.get('onion')
+                         target_host = self._resolver_host_objetivo(peer)
                          target_port = peer.get('port_priv', 44494)
                      else:
                          # Fallback: Check persistent contacts (Offline/Sleeping Peer)
                          if chat_id in self.memoria.contactos:
                              c = self.memoria.contactos[chat_id]
-                             target_host = c.get('onion') if c.get('onion') and (c.get('ip') in ['127.0.0.1', 'localhost', None] or not c.get('ip')) else c.get('ip') or c.get('onion')
+                             target_host = self._resolver_host_objetivo(c)
                              target_port = c.get('port_priv', 44494)
                  
                  if target_host:
@@ -2038,7 +2088,7 @@ class Motor:
                     req_pkg = empaquetar("JOIN_REQ", {"gid": g_id, "password_hash": p_hash}, self.memoria.get_origen())
                     try:
                          from ghostwhisperchat.core.transporte import PORT_GROUP
-                         dest_host = origen_data.get('onion') if origen_data.get('onion') and (origen_data.get('ip') in ['127.0.0.1', 'localhost', None] or not origen_data.get('ip')) else origen_data.get('ip') or origen_data.get('onion')
+                         dest_host = self._resolver_host_objetivo(origen_data)
                          tgt_gp = origen_data.get('port_group') or PORT_GROUP
                          
                          if str(dest_host).endswith(".onion"):
@@ -2059,8 +2109,20 @@ class Motor:
 
 
         elif tipo == "CHAT_REQ":
-            dest_host = origen.get('onion') if origen.get('onion') and (origen.get('ip') in ['127.0.0.1', 'localhost', None] or not origen.get('ip')) else origen.get('ip') or origen.get('onion')
+            dest_host = self._resolver_host_objetivo(origen)
             target_port = origen.get('port_priv', 44494)
+
+            # Persistir datos del contacto para asegurar enrutamiento de retorno
+            self.memoria.actualizar_peer(
+                origen.get('ip'), 
+                origen.get('uid'), 
+                origen.get('nick'),
+                sys_user=origen.get('sys_user'),
+                status_msg=origen.get('status_msg'),
+                port_priv=origen.get('port_priv'),
+                port_group=origen.get('port_group'),
+                onion=origen.get('onion')
+            )
 
             if self.memoria.no_molestar:
                 rej = empaquetar("CHAT_NO", {"reason": "Busy"}, self.memoria.get_origen())
@@ -2086,21 +2148,52 @@ class Motor:
             threading.Thread(target=_prompt_private, daemon=True).start()
 
         elif tipo == "CHAT_ACK":
-            abrir_chat_ui(origen['uid'], nombre_legible=origen['nick'], es_grupo=False)
-            enviar_notificacion("GhostWhisperChat", f"{origen['nick']} aceptó tu solicitud.")
+            uid = origen.get('uid', 'UNK')
+            nick = origen.get('nick', 'Contacto')
+            onion = origen.get('onion')
+
+            self.chat_requests_status[uid] = ('ACCEPTED', nick, uid)
+            if onion:
+                self.chat_requests_status[onion] = ('ACCEPTED', nick, uid)
+            if nick:
+                self.chat_requests_status[nick.lower()] = ('ACCEPTED', nick, uid)
+
+            self.memoria.actualizar_peer(
+                origen.get('ip'), 
+                origen.get('uid'), 
+                origen.get('nick'),
+                sys_user=origen.get('sys_user'),
+                status_msg=origen.get('status_msg'),
+                port_priv=origen.get('port_priv'),
+                port_group=origen.get('port_group'),
+                onion=origen.get('onion')
+            )
+
+            abrir_chat_ui(uid, nombre_legible=nick, es_grupo=False)
+            enviar_notificacion("GhostWhisperChat", f"{nick} aceptó tu solicitud.")
 
         elif tipo == "CHAT_NO":
             razon = payload.get("reason", "Sin razón")
+            uid = origen.get('uid', 'UNK')
+            nick = origen.get('nick', 'Contacto')
+            onion = origen.get('onion')
+
+            self.chat_requests_status[uid] = ('REJECTED', nick, razon)
+            if onion:
+                self.chat_requests_status[onion] = ('REJECTED', nick, razon)
+            if nick:
+                self.chat_requests_status[nick.lower()] = ('REJECTED', nick, razon)
+
             noti_title = "Solicitud rechazada"
-            noti_body = f"{origen['nick']} ha rechazado tu invitación."
+            noti_body = f"{nick} ha rechazado tu invitación."
             
             if razon == "Busy" or razon == "Busy/DND":
                  noti_title = "Usuario Ocupado"
-                 noti_body = f"{origen['nick']} está en modo 'No Molestar'."
+                 noti_body = f"{nick} está en modo 'No Molestar'."
             
             elif razon == "Timeout":
                  noti_title = "Ausente"
-                 noti_body = f"{origen['nick']} no ha respondido la solicitud."
+                 noti_body = f"{nick} no ha respondido la solicitud."
             
             from ghostwhisperchat.core.utilidades import enviar_notificacion
             enviar_notificacion(noti_title, noti_body)

@@ -454,6 +454,25 @@ def enviar_comando_transitorio(cmd_str):
     except Exception as e:
         print(f"{C.RED}[X] Error comunicando con daemon: {e}{C.RESET}")
 
+def consultar_daemon_respuesta(cmd_str):
+    """Envía un comando al daemon y retorna su respuesta como string."""
+    if not os.path.exists(IPC_SOCK_PATH):
+        return ""
+    try:
+        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        s.connect(IPC_SOCK_PATH)
+        s.sendall(cmd_str.encode('utf-8'))
+        s.settimeout(2.0)
+        try:
+            resp = s.recv(4096)
+            s.close()
+            return resp.decode('utf-8').strip() if resp else ""
+        except:
+            s.close()
+            return ""
+    except:
+        return ""
+
 def get_local_ip():
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -652,13 +671,11 @@ def main():
             enviar_comando_transitorio("--scan-results")
             return
 
-        # 3. Lógica Especial para Chat WAN Onion (Animación UX)
+        # 3. Lógica Especial para Chat Privado (Animación interactiva y Espera de Handshake)
         if args_raw[0] in COMMAND_MAP.get('CHAT', []):
             dest_target = args_raw[1] if len(args_raw) > 1 else ""
-            if str(dest_target).endswith(".onion"):
-                from ghostwhisperchat.datos.recursos import mostrar_animacion_espera
-                onion_abbr = dest_target[:14] + "..." + dest_target[-10:] if len(dest_target) > 28 else dest_target
-                # Preparar inyección de entorno
+            if dest_target:
+                # Inyección de entorno
                 disp = os.environ.get('DISPLAY')
                 if disp: full_cmd += f" __ENV_DISPLAY__={disp}"
                 way = os.environ.get('WAYLAND_DISPLAY')
@@ -666,8 +683,57 @@ def main():
                 dbus = os.environ.get('DBUS_SESSION_BUS_ADDRESS')
                 if dbus: full_cmd += f" __ENV_DBUS__={dbus}"
                 
+                # 1. Enviar el comando al demonio
                 enviar_comando_transitorio(full_cmd)
-                mostrar_animacion_espera(f"Solicitud enviada a {onion_abbr} vía Tor Onion. Esperando respuesta", segundos=2.4, mostrar_done=True)
+                
+                # 2. Bucle interactivo con animación hasta recibir respuesta (ACK / REJECT / TIMEOUT)
+                from ghostwhisperchat.datos.recursos import Colores
+                onion_abbr = dest_target[:14] + "..." + dest_target[-10:] if len(dest_target) > 28 else dest_target
+                is_onion = str(dest_target).endswith(".onion")
+                canal = "vía Tor Onion" if is_onion else "en red local"
+                
+                frames = [
+                    f"{Colores.YELLOW}[*] Conectando con {onion_abbr} {canal}. Esperando que el usuario acepte.   {Colores.CYAN}[ {Colores.GREEN}g  {Colores.CYAN} ]{Colores.RESET}",
+                    f"{Colores.YELLOW}[*] Conectando con {onion_abbr} {canal}. Esperando que el usuario acepte..  {Colores.CYAN}[ {Colores.GREEN}gw {Colores.CYAN} ]{Colores.RESET}",
+                    f"{Colores.YELLOW}[*] Conectando con {onion_abbr} {canal}. Esperando que el usuario acepte... {Colores.CYAN}[ {Colores.GREEN}gwc{Colores.CYAN} ]{Colores.RESET}",
+                    f"{Colores.YELLOW}[*] Conectando con {onion_abbr} {canal}. Esperando que el usuario acepte.   {Colores.CYAN}[ {Colores.BOLD}{Colores.GREEN}gwc{Colores.RESET}{Colores.CYAN} ]{Colores.RESET}",
+                    f"{Colores.YELLOW}[*] Conectando con {onion_abbr} {canal}. Esperando que el usuario acepte..  {Colores.CYAN}[ {Colores.GREEN}gw {Colores.CYAN} ]{Colores.RESET}",
+                    f"{Colores.YELLOW}[*] Conectando con {onion_abbr} {canal}. Esperando que el usuario acepte... {Colores.CYAN}[ {Colores.GREEN}g  {Colores.CYAN} ]{Colores.RESET}",
+                ]
+                
+                start_time = time.time()
+                timeout_espera = 45.0 if is_onion else 25.0
+                frame_idx = 0
+                
+                try:
+                    while time.time() - start_time < timeout_espera:
+                        sys.stdout.write(f"\r\033[K{frames[frame_idx % len(frames)]}")
+                        sys.stdout.flush()
+                        time.sleep(0.35)
+                        frame_idx += 1
+                        
+                        # Consultar estado al demonio cada ~1 seg
+                        if frame_idx % 3 == 0:
+                            st = consultar_daemon_respuesta(f"--check-chat-status {dest_target}")
+                            if st.startswith("ACCEPTED:"):
+                                parts = st.split(":", 2)
+                                nick_resp = parts[1] if len(parts) > 1 else dest_target
+                                sys.stdout.write(f"\r\033[K{Colores.GREEN}[✔] ¡Solicitud aceptada con éxito por {nick_resp}! Iniciando consola para el chat...{Colores.RESET}\n")
+                                sys.stdout.flush()
+                                return
+                            elif st.startswith("REJECTED:"):
+                                parts = st.split(":", 2)
+                                nick_resp = parts[1] if len(parts) > 1 else dest_target
+                                reason = parts[2] if len(parts) > 2 else "Rechazado"
+                                sys.stdout.write(f"\r\033[K{Colores.RED}[X] Solicitud rechazada por {nick_resp} ({reason}).{Colores.RESET}\n")
+                                sys.stdout.flush()
+                                return
+                                
+                    sys.stdout.write(f"\r\033[K{Colores.YELLOW}[!] Tiempo de espera agotado sin respuesta del destinatario.{Colores.RESET}\n")
+                    sys.stdout.flush()
+                except KeyboardInterrupt:
+                    sys.stdout.write(f"\r\033[K{Colores.GREY}[-] Solicitud cancelada por el usuario.{Colores.RESET}\n")
+                    sys.stdout.flush()
                 return
 
         # 3. Comando Normal

@@ -79,7 +79,7 @@ class Colores:
     BLACK_TXT = "\033[38;5;0m"
 
 # Versionado - Estable - Tor Onion P2P WAN Global Edition
-APP_VER_NUM = "3.000"
+APP_VER_NUM = "3.001"
 APP_VER_TAG = "Global Edition - Tor Onion P2P WAN"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
@@ -305,7 +305,8 @@ COMMAND_MAP = {
     'CLEAR':        ['--limpiar', '-k', '--borrar', '--cls', '--vaciar', '--clear'],
     'LOG_TOGGLE':   ['--log', '-r', '--guardar', '--registro', '--grabar'],
     'DL_TOGGLE':    ['--descarga', '-b', '--bajar', '--autobajar', '--dl'],
-    'PHOTO_BG':     ['--foto-bg'] # Comando interno silencioso
+    'PHOTO_BG':     ['--foto-bg'], # Comando interno silencioso
+    'CHECK_CHAT_STATUS': ['--check-chat-status'] # Comando interno para polling de solicitudes
 }
 
 import time
