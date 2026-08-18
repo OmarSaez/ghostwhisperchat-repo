@@ -1494,33 +1494,31 @@ class Motor:
                     # 1. Is it a Group?
                     if chat_id in self.memoria.grupos_activos:
                          g = self.memoria.grupos_activos[chat_id]
-                         print(f"[MESH] Enviando LEAVE a grupo {g['nombre']}", file=sys.stderr)
+                         print(f"[MESH] Enviando LEAVE a grupo {g.get('nombre', chat_id)}", file=sys.stderr)
                          
-                         # Send LEAVE to all members
+                         # Send LEAVE to all members asynchronously (handling both LAN and Tor Onion)
                          leave_pkg = empaquetar("LEAVE", {"gid": chat_id}, self.memoria.get_origen())
                          from ghostwhisperchat.core.transporte import PORT_GROUP
                          
                          members = g.get('miembros', {})
-                         m_list = members.values() if isinstance(members, dict) else members
+                         m_list = list(members.values()) if isinstance(members, dict) else list(members)
                          
-                         for m in m_list:
-                             if not isinstance(m, dict): continue
-                             
-                             uid = m.get('uid')
-                             if uid == self.memoria.mi_uid: continue
-                             
-                             ip = m.get('ip')
-                             if not ip: continue
-                             
+                         def _send_leave_async(m_data, pkg=leave_pkg):
                              try:
-                                 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                                 s.settimeout(0.5)
-                                 tgt_pg = m.get('port_group') or PORT_GROUP
-                                 s.connect((ip, tgt_pg))
-                                 s.sendall(leave_pkg + b'\n')
-                                 s.close()
+                                 if not isinstance(m_data, dict): return
+                                 uid = m_data.get('uid')
+                                 if uid == self.memoria.mi_uid: return
+                                 
+                                 dest_host = self._resolver_host_objetivo(m_data)
+                                 if not dest_host: return
+                                 tgt_pg = m_data.get('port_group') or PORT_GROUP
+                                 print(f"[MESH] Enviando LEAVE a {m_data.get('nick')} ({dest_host}:{tgt_pg})", file=sys.stderr)
+                                 self.red.enviar_tcp_priv(dest_host, pkg, port=tgt_pg)
                              except Exception as e:
-                                 pass
+                                 print(f"[MESH_WARN] Error enviando LEAVE a {m_data.get('nick', '?')}: {e}", file=sys.stderr)
+
+                         for m in m_list:
+                             threading.Thread(target=_send_leave_async, args=(m,), daemon=True).start()
                          
                          # FULL EXIT: Remove group from memory
                          del self.memoria.grupos_activos[chat_id]
@@ -2128,6 +2126,7 @@ class Motor:
                      
                      from ghostwhisperchat.core.utilidades import enviar_notificacion
                      enviar_notificacion(f"Grupo {g['nombre']}", f"{origen['nick']} abandonó el grupo.")
+                     self._sincronizar_ui_usuarios(gid)
         
         elif tipo == "FILE_CHUNK":
              filename = payload.get("filename")
