@@ -29,7 +29,7 @@ class GestorRed:
         self.socks_host = host
         self.socks_port = port
 
-    def _conectar_socks5(self, host, port, timeout=15.0):
+    def _conectar_socks5(self, host, port, timeout=40.0):
         """
         Establece una conexión TCP hacia un host .onion a través del proxy SOCKS5 local de Tor.
         Implementación estándar en Python socket puro (sin dependencias externas).
@@ -144,7 +144,7 @@ class GestorRed:
         """
         try:
             if str(host).endswith(".onion"):
-                s = self._conectar_socks5(host, puerto, timeout=15.0)
+                s = self._conectar_socks5(host, puerto, timeout=40.0)
             else:
                 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 s.settimeout(2.0) # Timeout corto para LAN
@@ -220,7 +220,7 @@ class GestorRed:
         try:
             is_onion = str(ip_o_host).endswith(".onion")
             if is_onion:
-                s = self._conectar_socks5(ip_o_host, port, timeout=15.0)
+                s = self._conectar_socks5(ip_o_host, port, timeout=40.0)
             else:
                 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 s.settimeout(15.0) # More time for large files

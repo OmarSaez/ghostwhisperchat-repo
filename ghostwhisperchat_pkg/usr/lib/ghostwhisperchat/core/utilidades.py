@@ -124,9 +124,18 @@ def preguntar_invitacion_chat(remitente_nick, remitente_id, grupo_nombre=None):
     ]
     
     try:
+        # Preparar entorno gráfico para servicios de usuario
+        env = os.environ.copy()
+        uid = os.getuid()
+        if 'DISPLAY' not in env or not env['DISPLAY']:
+            env['DISPLAY'] = ':0'
+        if 'XDG_RUNTIME_DIR' not in env:
+            env['XDG_RUNTIME_DIR'] = f"/run/user/{uid}"
+        if 'DBUS_SESSION_BUS_ADDRESS' not in env and os.path.exists(f"/run/user/{uid}/bus"):
+            env['DBUS_SESSION_BUS_ADDRESS'] = f"unix:path=/run/user/{uid}/bus"
+
         # Zenity return codes: 0=OK, 1=Cancel, 5=Timeout
-        # Zenity return codes: 0=OK, 1=Cancel, 5=Timeout
-        ret = subprocess.call(cmd)
+        ret = subprocess.call(cmd, env=env)
         
         if ret == 0: return True
         if ret == 1: return False # Rechazo

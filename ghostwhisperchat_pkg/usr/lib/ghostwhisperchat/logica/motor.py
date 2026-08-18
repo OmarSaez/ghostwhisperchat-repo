@@ -830,14 +830,18 @@ class Motor:
              # 1. Dirección Onion Directa
              if str(target).endswith(".onion"):
                   req = empaquetar("CHAT_REQ", {}, self.memoria.get_origen())
-                  try:
-                      ok = self.red.enviar_tcp_priv(target, req, port=44494)
-                      if ok:
-                          return f"[*] Solicitud WAN (Tor) enviada a {target}"
-                      else:
-                          return f"[X] No se pudo conectar con {target} a través de la red Tor."
-                  except Exception as e:
-                      return f"[X] Excepción conectando con {target}: {e}"
+                  def _send_onion_chat():
+                      try:
+                          print(f"[CHAT_WAN] Conectando vía Tor a {target}:44494...", file=sys.stderr)
+                          ok = self.red.enviar_tcp_priv(target, req, port=44494)
+                          if ok:
+                              print(f"[CHAT_WAN] Solicitud entregada exitosamente a {target}.", file=sys.stderr)
+                          else:
+                              print(f"[CHAT_WAN] [X] No se pudo entregar solicitud a {target}.", file=sys.stderr)
+                      except Exception as e:
+                          print(f"[CHAT_WAN] [!] Error entregando a {target}: {e}", file=sys.stderr)
+                  threading.Thread(target=_send_onion_chat, daemon=True).start()
+                  return f"[*] Solicitud enviada a {target} vía Tor Onion. Esperando respuesta..."
 
              # 2. IP Directa
              import re
@@ -1191,7 +1195,7 @@ class Motor:
                      try:
                          port_g = m.get('port_group', PORT_GROUP)
                          if str(target).endswith(".onion"):
-                             s = self.red._conectar_socks5(target, port_g, timeout=10.0)
+                             s = self.red._conectar_socks5(target, port_g, timeout=40.0)
                          else:
                              s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                              s.settimeout(1.0)
@@ -2038,7 +2042,7 @@ class Motor:
                          tgt_gp = origen_data.get('port_group') or PORT_GROUP
                          
                          if str(dest_host).endswith(".onion"):
-                             s_join = self.red._conectar_socks5(dest_host, tgt_gp, timeout=10.0)
+                             s_join = self.red._conectar_socks5(dest_host, tgt_gp, timeout=40.0)
                          else:
                              s_join = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                              s_join.connect((dest_host, tgt_gp))

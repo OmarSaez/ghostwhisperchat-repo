@@ -441,8 +441,8 @@ def enviar_comando_transitorio(cmd_str):
         s.connect(IPC_SOCK_PATH)
         s.sendall(cmd_str.encode('utf-8'))
         
-        # Esperar ACK o Respuesta breve (Timeout corto)
-        s.settimeout(2.0)
+        # Esperar ACK o Respuesta breve (Timeout adecuado)
+        s.settimeout(5.0)
         try:
             resp = s.recv(4096)
             if resp:
@@ -651,6 +651,24 @@ def main():
             # El daemon ya habrá poblado self.memoria.peers
             enviar_comando_transitorio("--scan-results")
             return
+
+        # 3. Lógica Especial para Chat WAN Onion (Animación UX)
+        if args_raw[0] in COMMAND_MAP.get('CHAT', []):
+            dest_target = args_raw[1] if len(args_raw) > 1 else ""
+            if str(dest_target).endswith(".onion"):
+                from ghostwhisperchat.datos.recursos import mostrar_animacion_espera
+                onion_abbr = dest_target[:14] + "..." + dest_target[-10:] if len(dest_target) > 28 else dest_target
+                # Preparar inyección de entorno
+                disp = os.environ.get('DISPLAY')
+                if disp: full_cmd += f" __ENV_DISPLAY__={disp}"
+                way = os.environ.get('WAYLAND_DISPLAY')
+                if way: full_cmd += f" __ENV_WAYLAND__={way}"
+                dbus = os.environ.get('DBUS_SESSION_BUS_ADDRESS')
+                if dbus: full_cmd += f" __ENV_DBUS__={dbus}"
+                
+                enviar_comando_transitorio(full_cmd)
+                mostrar_animacion_espera(f"Solicitud enviada a {onion_abbr} vía Tor Onion. Esperando respuesta", segundos=2.4, mostrar_done=True)
+                return
 
         # 3. Comando Normal
         # Inject Universal Environment Context

@@ -311,31 +311,33 @@ COMMAND_MAP = {
 import time
 import sys
 
-def mostrar_animacion_espera(mensaje="Procesando", segundos=1.2):
+def mostrar_animacion_espera(mensaje="Procesando", segundos=1.8, mostrar_done=True):
     """
-    Muestra una animación 'g w c' personalizada con efecto de onda.
+    Muestra una animación dinámica con puntos suspensivos y el logo 'gwc' personalizado.
+    Ej: [*] Mensaje.   [ g   ]
+        [*] Mensaje..  [ gw  ]
+        [*] Mensaje... [ gwc ]
     """
     frames = [
-        f"{Colores.YELLOW}[*] {mensaje} {Colores.GREEN}   {Colores.RESET}",
-        f"{Colores.YELLOW}[*] {mensaje} {Colores.GREEN}g   {Colores.RESET}",
-        f"{Colores.YELLOW}[*] {mensaje} {Colores.GREEN}gw  {Colores.RESET}",
-        f"{Colores.YELLOW}[*] {mensaje} {Colores.GREEN}gwc {Colores.RESET}",
-        f"{Colores.YELLOW}[*] {mensaje} {Colores.GREEN}   {Colores.RESET}",
-        f"{Colores.YELLOW}[*] {mensaje} {Colores.GREEN}gwc {Colores.RESET}",
+        f"{Colores.YELLOW}[*] {mensaje}.   {Colores.CYAN}[ {Colores.GREEN}g  {Colores.CYAN} ]{Colores.RESET}",
+        f"{Colores.YELLOW}[*] {mensaje}..  {Colores.CYAN}[ {Colores.GREEN}gw {Colores.CYAN} ]{Colores.RESET}",
+        f"{Colores.YELLOW}[*] {mensaje}... {Colores.CYAN}[ {Colores.GREEN}gwc{Colores.CYAN} ]{Colores.RESET}",
+        f"{Colores.YELLOW}[*] {mensaje}.   {Colores.CYAN}[ {Colores.BOLD}{Colores.GREEN}gwc{Colores.RESET}{Colores.CYAN} ]{Colores.RESET}",
+        f"{Colores.YELLOW}[*] {mensaje}..  {Colores.CYAN}[ {Colores.GREEN}gw {Colores.CYAN} ]{Colores.RESET}",
+        f"{Colores.YELLOW}[*] {mensaje}... {Colores.CYAN}[ {Colores.GREEN}g  {Colores.CYAN} ]{Colores.RESET}",
     ]
     
-    # Calcular delay para que cícle al menos 2 veces o dure 'segundos'
-    cycle_time = 0.4 # segs por frame
-    total_frames = int(segundos / cycle_time)
-    if total_frames < 3: total_frames = 6 # Minimo 2 ciclos
+    cycle_time = 0.35 # segs por frame
+    total_frames = max(6, int(segundos / cycle_time))
     
     for i in range(total_frames):
         frame = frames[i % len(frames)]
-        sys.stdout.write(f"\r{frame}") # \r vuelve al inicio
+        sys.stdout.write(f"\r\033[K{frame}")
         sys.stdout.flush()
         time.sleep(cycle_time)
     
-    # Limpiar linea al final o dejarla? 
-    # Mejor dejar el mensaje base limpio
-    sys.stdout.write(f"\r{Colores.YELLOW}[*] {mensaje} {Colores.GREEN}Done!{Colores.RESET}\n")
+    if mostrar_done:
+        sys.stdout.write(f"\r\033[K{Colores.YELLOW}[*] {mensaje}... {Colores.GREEN}[ Done! ]{Colores.RESET}\n")
+    else:
+        sys.stdout.write(f"\r\033[K{Colores.YELLOW}[*] {mensaje}... {Colores.GREEN}[ gwc ]{Colores.RESET}\n")
     sys.stdout.flush()
