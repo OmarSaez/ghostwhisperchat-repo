@@ -506,6 +506,19 @@ class Motor:
         if cmd == "HELP":
             return obtener_ayuda_comando(args[0] if args else None)
 
+        elif cmd == "SCAN_PEEK":
+            import json
+            items = []
+            with self.memoria._lock:
+                for item in self.scan_buffer:
+                    ip_val = item.get('ip', '')
+                    if ip_val != self.memoria.mi_ip:
+                        items.append(item)
+                tor_contacts = [c for c in self.memoria.contactos.values() if isinstance(c, dict) and c.get('onion')]
+                tor_total = len(tor_contacts)
+                has_tor = bool(self.memoria.mi_onion and tor_total > 0)
+            return json.dumps({"count": len(items), "has_tor_contacts": has_tor, "tor_total": tor_total})
+
         elif cmd == "SCAN_RESULTS":
             from ghostwhisperchat.datos.recursos import Colores
             if not self.scan_buffer:
@@ -705,7 +718,7 @@ class Motor:
                          import socket
                          s = socks.socksocket(socket.AF_INET, socket.SOCK_STREAM)
                          s.set_proxy(socks.SOCKS5, "127.0.0.1", 9050)
-                         s.settimeout(3.5)
+                         s.settimeout(28.0)
                          s.connect((onion_addr, c_info.get('port_priv', 44494)))
                          
                          ping_pkg = empaquetar("DISCOVER", {"filter": "PEERS"}, self.memoria.get_origen())
