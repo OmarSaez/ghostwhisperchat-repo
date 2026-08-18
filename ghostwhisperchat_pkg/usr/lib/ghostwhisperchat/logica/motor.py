@@ -56,6 +56,10 @@ class Motor:
         self.typing_states = {}
         self.chat_requests_status = {}
         
+        # Handshake 3 vías: guarda si llegó CHAT_READY del emisor { uid: True }
+        # El receptor espera este evento antes de abrir su UI de chat
+        self.chat_ready_events = {}  # { uid_emisor: threading.Event }
+        
         # Keepalive de sesión: timestamp del último mensaje real por chat_id
         # Si no hubo tráfico en X segundos, se envía un CHAT_KEEP silencioso
         self.session_last_activity = {}  # { chat_id: timestamp } 
@@ -2337,14 +2341,40 @@ class Motor:
                 return
 
             # Thread user prompt to avoid blocking Main Event Loop
-            def _prompt_private(dh=dest_host, tp=target_port, orig=origen):
+            def _prompt_private(dh=dest_host, tp=target_port, orig=origen, canal_in=canal_entrada):
                 acepta = preguntar_invitacion_chat(orig['nick'], orig['uid'])
                 if acepta:
                     ack = empaquetar("CHAT_ACK", {}, self.memoria.get_origen())
                     print(f"[CHAT_ACK] Enviando ACK a {dh}:{tp}", file=sys.stderr)
-                    self.red.enviar_tcp_priv(dh, ack, port=tp)
+                    ok_ack = self.red.enviar_tcp_priv(dh, ack, port=tp)
                     
-                    # Launch UI
+                    if not ok_ack:
+                        print(f"[CHAT_ACK] No se pudo enviar ACK a {dh}. Abortando.", file=sys.stderr)
+                        return
+                    
+                    # --- Handshake paso 3: Esperar CHAT_READY del emisor ---
+                    # El emisor lo enviará al confirmar que recibió nuestro ACK.
+                    # Timeout inteligente: LAN es rápido, Tor puede tardar otro circuito.
+                    uid_emisor = orig['uid']
+                    ready_event = threading.Event()
+                    self.chat_ready_events[uid_emisor] = ready_event
+                    
+                    ready_timeout = 90.0 if canal_in == "TOR" else 8.0
+                    print(f"[CHAT_READY] Esperando confirmacion del emisor ({ready_timeout}s timeout)...", file=sys.stderr)
+                    
+                    got_ready = ready_event.wait(timeout=ready_timeout)
+                    
+                    if uid_emisor in self.chat_ready_events:
+                        del self.chat_ready_events[uid_emisor]
+                    
+                    if got_ready:
+                        print(f"[CHAT_READY] Confirmado! Ambos lados conectados. Abriendo chat.", file=sys.stderr)
+                    else:
+                        # Timeout: el READY nunca llegó, pero abrimos igual como fallback
+                        # (puede que el circuito Tor tardó pero el ACK llegó bien)
+                        print(f"[CHAT_READY] Timeout esperando READY. Abriendo chat en modo fallback.", file=sys.stderr)
+                    
+                    # Abrir UI (ya sea que llegó READY o por fallback)
                     abrir_chat_ui(orig['uid'], nombre_legible=orig['nick'], es_grupo=False)
                 else:
                     reason_code = "Rejected" if acepta is False else "Timeout"
@@ -2376,8 +2406,31 @@ class Motor:
                 onion=origen.get('onion')
             )
 
+            # --- Handshake paso 3: Emisor envia CHAT_READY al receptor ---
+            # Esto confirma que el ACK llegó y que el circuito es bidireccional.
+            # El emisor abre su UI inmediatamente (ya sabe que el circuito funciona).
+            dest_host_ready = self._resolver_host_objetivo(origen)
+            target_port_ready = origen.get('port_priv', 44494)
+            ready_pkg = empaquetar("CHAT_READY", {}, self.memoria.get_origen())
+            
+            def _send_ready(dh=dest_host_ready, tp=target_port_ready, pkg=ready_pkg):
+                try:
+                    print(f"[CHAT_READY] Enviando READY a {dh}:{tp}", file=sys.stderr)
+                    self.red.enviar_tcp_priv(dh, pkg, port=tp)
+                except Exception as e:
+                    print(f"[CHAT_READY] Fallo enviando READY: {e}", file=sys.stderr)
+            threading.Thread(target=_send_ready, daemon=True).start()
+            
             abrir_chat_ui(uid, nombre_legible=nick, es_grupo=False)
             enviar_notificacion("GhostWhisperChat", f"{nick} aceptó tu solicitud.")
+
+        elif tipo == "CHAT_READY":
+            # El emisor confirma que recibió nuestro ACK y que el circuito es bidireccional.
+            # Desbloquear el evento que está esperando _prompt_private para abrir la UI.
+            uid_emisor = origen.get('uid')
+            print(f"[CHAT_READY] Recibido CHAT_READY de {origen.get('nick', '?')} (uid={uid_emisor[:8] if uid_emisor else '?'})", file=sys.stderr)
+            if uid_emisor and uid_emisor in self.chat_ready_events:
+                self.chat_ready_events[uid_emisor].set()
 
         elif tipo == "DISCOVER":
             filt = payload.get("filter", "ALL")
