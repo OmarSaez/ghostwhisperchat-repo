@@ -748,27 +748,25 @@ def main():
                 dbus = os.environ.get('DBUS_SESSION_BUS_ADDRESS')
                 if dbus: full_cmd += f" __ENV_DBUS__={dbus}"
                 
-                # 1. Enviar el comando al demonio silenciosamente para no romper la primera línea de la terminal
-                consultar_daemon_respuesta(full_cmd)
+                # 1. Enviar el comando al demonio y capturar su respuesta para saber el canal real
+                resp_daemon = consultar_daemon_respuesta(full_cmd)
                 
                 # 2. Bucle interactivo con animación compacta hasta recibir respuesta (ACK / REJECT / TIMEOUT)
                 from ghostwhisperchat.datos.recursos import Colores
                 dest_abbr = dest_target[:8] + "..." + dest_target[-6:] if len(dest_target) > 18 else dest_target
                 
-                # Detectar canal: onion directo, o buscar en peers/contactos si tiene onion registrado
-                is_onion = str(dest_target).endswith(".onion")
-                if not is_onion:
-                    try:
-                        st_peek = consultar_daemon_respuesta(f"--check-chat-status {dest_target}")
-                        # Si hay onion en peers/contactos lo detectará al enviar; aquí solo afinamos UX
-                        peers_raw = consultar_daemon_respuesta("--status-raw-peers")
-                        if dest_target.lower() in peers_raw.lower() and ".onion" in peers_raw:
-                            is_onion = True
-                    except Exception:
-                        pass
+                # Detectar canal REAL según la respuesta del demonio.
+                # El motor dice "vía Tor Onion" cuando enruta por Tor, "en red local" cuando es LAN.
+                # Este es el único dato confiable: el demonio ya resolvió _resolver_host_objetivo.
+                is_onion = (
+                    str(dest_target).endswith(".onion") or
+                    "tor onion" in resp_daemon.lower() or
+                    "tor global" in resp_daemon.lower() or
+                    "onion" in resp_daemon.lower()
+                )
                 
                 canal = "Tor Global" if is_onion else "LAN"
-                # Timeout inteligente por canal
+                # Timeout inteligente basado en el canal real detectado
                 timeout_espera = 120.0 if is_onion else 10.0
                 
                 dots = [".  ", ".. ", "...", " ..", "  .", "   "]
