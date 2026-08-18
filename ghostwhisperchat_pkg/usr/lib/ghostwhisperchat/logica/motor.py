@@ -1549,8 +1549,7 @@ class Motor:
         origen = data.get("origen")
 
         if origen:
-             # FIX v2.155: Multicount Support - Register Dynamic Ports in RAM
-             # We update 'peers' (RAM) but avoid 'actualizar_peer' to prevent polluting persistent agenda
+             # Registro dinámico exclusivo en RAM (Volátil para escaneos y radar)
              uid = origen['uid']
              port_p = origen.get('port_priv')
              
@@ -1558,7 +1557,7 @@ class Motor:
                  if uid not in self.memoria.peers:
                      self.memoria.peers[uid] = {}
                  
-                 # Update routing info efficiently
+                 # Update routing info in RAM only
                  print(f"[PEER_UPD] Actualizando RAM para {origen.get('nick')} -> Port: {port_p or 'DEFAULT'}", file=sys.stderr)
                  self.memoria.peers[uid].update({
                      "uid": uid,
@@ -1664,7 +1663,10 @@ class Motor:
                          origen['uid'], 
                          responder_nick, 
                          sys_user=origen.get('sys_user'),
-                         status_msg=origen.get('status_msg')
+                         status_msg=origen.get('status_msg'),
+                         port_priv=origen.get('port_priv'),
+                         port_group=origen.get('port_group'),
+                         onion=origen.get('onion')
                      )
                      # Notify global UI? Usually user is in transient console, 
                      # but we can't easily print to it unless it polled.
@@ -1754,17 +1756,36 @@ class Motor:
         # print(f"[TCP_DEBUG] Recibido {tipo} de {origen.get('nick', 'UNK')}", file=sys.stderr)
         
         if origen:
-             self.memoria.actualizar_peer(
-                 origen['ip'], 
-                 origen['uid'], 
-                 origen['nick'],
-                 sys_user=origen.get('sys_user'),
-                 status_msg=origen.get('status_msg'),
-                 # FIX v2.160.5: Persist Dynamic Ports from Peer
-                 port_priv=origen.get('port_priv'),
-                 port_group=origen.get('port_group'),
-                 onion=origen.get('onion')
-             )
+             uid = origen.get('uid')
+             if uid:
+                 with self.memoria._lock:
+                     if uid not in self.memoria.peers:
+                         self.memoria.peers[uid] = {}
+                     self.memoria.peers[uid].update({
+                         "uid": uid,
+                         "nick": origen.get('nick', 'Desconocido'),
+                         "ip": origen.get('ip', '?.?.?.?'),
+                         "onion": origen.get('onion'),
+                         "last_seen": time.time(),
+                         "status": "ONLINE"
+                     })
+                     if origen.get('sys_user'): self.memoria.peers[uid]['sys_user'] = origen.get('sys_user')
+                     if origen.get('status_msg') is not None: self.memoria.peers[uid]['status_msg'] = origen.get('status_msg')
+                     if origen.get('port_priv'): self.memoria.peers[uid]['port_priv'] = origen.get('port_priv')
+                     if origen.get('port_group'): self.memoria.peers[uid]['port_group'] = origen.get('port_group')
+
+             # Solo persistir en la agenda (contacts.json) si es interacción real de chat/grupo/archivo (no escaneo pasivo)
+             if tipo not in ["DISCOVER", "FOUND", "SEARCH"]:
+                 self.memoria.actualizar_peer(
+                     origen['ip'], 
+                     origen['uid'], 
+                     origen['nick'],
+                     sys_user=origen.get('sys_user'),
+                     status_msg=origen.get('status_msg'),
+                     port_priv=origen.get('port_priv'),
+                     port_group=origen.get('port_group'),
+                     onion=origen.get('onion')
+                 )
 
         if tipo == "TYPING":
              status = payload.get("status")
@@ -1873,9 +1894,21 @@ class Motor:
                         'status': status,
                         'sys_user': s_user,
                         'port_group': origen.get('port_group'),
-                        'port_priv': origen.get('port_priv')
+                        'port_priv': origen.get('port_priv'),
+                        'onion': origen.get('onion')
                     }
                     print(f"[GROUP] Agregado nuevo miembro: {origen['nick']} <{s_user}> ({origen['ip']})", file=sys.stderr)
+                    # Persistir contacto con Onion para futura reconexión
+                    self.memoria.actualizar_peer(
+                        origen['ip'],
+                        origen['uid'],
+                        origen['nick'],
+                        sys_user=s_user,
+                        status_msg=origen.get('status_msg'),
+                        port_priv=origen.get('port_priv'),
+                        port_group=origen.get('port_group'),
+                        onion=origen.get('onion')
+                    )
                 
                 # 2. Send WELCOME
                 welcome = empaquetar("WELCOME", {"gid": gid, "name": g['nombre']}, self.memoria.get_origen())
@@ -1887,8 +1920,6 @@ class Motor:
              gid = payload.get("gid")
              name = payload.get("name")
              
-             # Register group
-             self.memoria.agregar_grupo_activo(gid, name)
              # Register group
              self.memoria.agregar_grupo_activo(gid, name)
              print(f"[MESH] WELCOME recibido de {name}. Procesando...", file=sys.stderr)
@@ -1919,7 +1950,7 @@ class Motor:
              # Red Console Error
              print(f"{Colores.RED}[X] Error al unirse a '{gname}': {reason}{Colores.RESET}", file=sys.stderr)
              
-                     # Notificacion visual
+             # Notificacion visual
              enviar_notificacion(f"Error: {gname}", f"No se pudo unir: {reason}")
              
         elif tipo == "SYNC_REQ":
@@ -1931,30 +1962,21 @@ class Motor:
                  # ENRICHMENT: Ensure 'status_msg' is up to date from global peers cache before sending
                  sync_list = []
                  for uid, mdata in members.items():
-                     # Copy to not mutate original
                      m_copy = mdata.copy()
-                     # Try to fetch fresh Status Msg from Global Peer Cache if missing or stale
                      p = self.memoria.peers.get(uid)
                      if p:
                          if 'status_msg' in p: m_copy['status_msg'] = p['status_msg']
                          if 'status' in p: m_copy['status'] = p['status']
-                     
-                     if p:
-                         if 'status_msg' in p: m_copy['status_msg'] = p['status_msg']
-                         if 'status' in p: m_copy['status'] = p['status']
+                         if 'onion' in p and not m_copy.get('onion'): m_copy['onion'] = p['onion']
                      
                      sync_list.append(m_copy)
                  
-                 
-                 # FEATURE FIX: Ensure HOST (Me) is in the list with FULL details (including status_msg)
-                 # Sometime 'miembros' dict already has me.
-                 # If so, does it have my 'status_msg'? 
-                 # 'miembros' usually stores static snapshot. My status changes dynamically.
-                 # We must refresh MY entry in the sync_list.
+                 # FEATURE FIX: Ensure HOST (Me) is in the list with FULL details
                  for m in sync_list:
                      if m['uid'] == self.memoria.mi_uid:
                          m['status_msg'] = self.memoria.mi_estado_msg
-                         m['status'] = 'ONLINE' # Force online
+                         m['status'] = 'ONLINE'
+                         m['onion'] = self.memoria.mi_onion
                          break
 
                  sync_pkg = empaquetar("SYNC", {"gid": gid, "members": sync_list}, self.memoria.get_origen())
@@ -1968,7 +1990,6 @@ class Motor:
              if sender_uid in self.ui_sessions:
                  try:
                      self.ui_sessions[sender_uid].sendall(b"\n[SISTEMA] [-] El usuario ha cerrado el chat. Cerrando en 3s...\n")
-                     # User Requested: Auto-close UI to keep history/state consistent.
                      time.sleep(3) 
                      try: self.ui_sessions[sender_uid].shutdown(socket.SHUT_RDWR)
                      except: pass
@@ -1999,23 +2020,36 @@ class Motor:
                      # Update local memory
                      g['miembros'][uid] = m
                      
-                     target_ip = m.get('ip')
-                     if not target_ip: continue
+                     # Persistir contacto con Onion en la agenda
+                     self.memoria.actualizar_peer(
+                         m.get('ip'),
+                         uid,
+                         m.get('nick', 'Desconocido'),
+                         sys_user=m.get('sys_user', '?'),
+                         status_msg=m.get('status_msg', ''),
+                         port_priv=m.get('port_priv'),
+                         port_group=m.get('port_group'),
+                         onion=m.get('onion')
+                     )
                      
-                     print(f"[DEBUG] SYNC: Conectando a {m.get('nick')} ({target_ip})...", file=sys.stderr)
+                     target_host = self._resolver_host_objetivo(m)
+                     if not target_host: continue
+                     
+                     print(f"[DEBUG] SYNC: Conectando a {m.get('nick')} ({target_host})...", file=sys.stderr)
                      try:
-                         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                         s.settimeout(2.0)
-                         # FIX v2.160.4: Connect to Dynamic Group Port (Mesh Fix)
                          tgt_gp = m.get('port_group') or PORT_GROUP
-                         s.connect((target_ip, tgt_gp))
-                         # s.setblocking(False) # Blocking for announce is safer
+                         if str(target_host).endswith(".onion"):
+                             s = self.red._conectar_socks5(target_host, tgt_gp, timeout=40.0)
+                         else:
+                             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                             s.settimeout(2.0)
+                             s.connect((target_host, tgt_gp))
                          
                          self.red.enviar_tcp(s, ann_pkg)
                          self.red.registrar_socket_tcp(s, f"GRP_PEER_{gid}_{uid}")
                          print(f"[MESH] Conectado y anunciado a {m.get('nick')}", file=sys.stderr)
                      except Exception as e:
-                         print(f"[MESH] Fallo conexion mesh a {target_ip}: {e}", file=sys.stderr)
+                         print(f"[MESH] Fallo conexion mesh a {target_host}: {e}", file=sys.stderr)
                  
                  # Feature v2.153: Actualizar UI tras recibir SYNC
                  self._sincronizar_ui_usuarios(gid)
@@ -2033,14 +2067,16 @@ class Motor:
                      # Add/Update Member
                      g['miembros'][new_user['uid']] = new_user
                      
-                     # Also update Global Peer Cache
-                     # This ensures that future --ls or calls have the data
+                     # Also update Global Peer Cache y Agenda con Onion
                      self.memoria.actualizar_peer(
                          new_user['ip'],
                          new_user['uid'],
                          new_user['nick'],
                          sys_user=new_user.get('sys_user'),
-                         status_msg=new_user.get('status_msg')
+                         status_msg=new_user.get('status_msg'),
+                         port_priv=new_user.get('port_priv'),
+                         port_group=new_user.get('port_group'),
+                         onion=new_user.get('onion')
                      )
                      
                      print(f"[GROUP] Miembro anunciado: {new_user['nick']}", file=sys.stderr)
