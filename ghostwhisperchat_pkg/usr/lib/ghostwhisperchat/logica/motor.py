@@ -2277,19 +2277,46 @@ class Motor:
 
 
         elif tipo == "CHAT_REQ":
-            dest_host = self._resolver_host_objetivo(origen)
             target_port = origen.get('port_priv', 44494)
+            onion_origen = origen.get('onion')
+            ip_origen = origen.get('ip')
+
+            # Detectar si el paquete llegó por Tor o por LAN inspeccionando el socket entrante.
+            # Los paquetes que llegan vía Tor son relay desde 127.0.0.1 (SOCKS5 local).
+            # Si es así, debemos responder obligatoriamente por Tor Onion.
+            canal_entrada = "LAN"
+            try:
+                peer_addr = sock.getpeername()
+                if peer_addr and str(peer_addr[0]) in ("127.0.0.1", "::1", "localhost"):
+                    canal_entrada = "TOR"
+                    print(f"[CHAT_REQ] Paquete recibido desde 127.0.0.1 → canal Tor detectado.", file=sys.stderr)
+                else:
+                    print(f"[CHAT_REQ] Paquete recibido desde {peer_addr[0]} → canal LAN detectado.", file=sys.stderr)
+            except Exception:
+                pass
+
+            # Determinar dest_host basándose estrictamente en el canal detectado
+            if canal_entrada == "TOR" and onion_origen:
+                dest_host = onion_origen
+                print(f"[CHAT_REQ] Respuesta forzada por Tor Onion: {dest_host}", file=sys.stderr)
+            elif canal_entrada == "LAN" and ip_origen and ip_origen not in ('WAN', '127.0.0.1', 'localhost', None):
+                dest_host = ip_origen
+                print(f"[CHAT_REQ] Respuesta por LAN: {dest_host}", file=sys.stderr)
+            else:
+                # Fallback inteligente si no hay datos suficientes
+                dest_host = self._resolver_host_objetivo(origen)
+                print(f"[CHAT_REQ] Respuesta por fallback smart: {dest_host}", file=sys.stderr)
 
             # Persistir datos del contacto para asegurar enrutamiento de retorno
             self.memoria.actualizar_peer(
-                origen.get('ip'), 
+                ip_origen, 
                 origen.get('uid'), 
                 origen.get('nick'),
                 sys_user=origen.get('sys_user'),
                 status_msg=origen.get('status_msg'),
-                port_priv=origen.get('port_priv'),
+                port_priv=target_port,
                 port_group=origen.get('port_group'),
-                onion=origen.get('onion')
+                onion=onion_origen
             )
 
             if self.memoria.no_molestar:
@@ -2298,19 +2325,19 @@ class Motor:
                 return
 
             # Thread user prompt to avoid blocking Main Event Loop
-            def _prompt_private():
-                acepta = preguntar_invitacion_chat(origen['nick'], origen['uid'])
+            def _prompt_private(dh=dest_host, tp=target_port, orig=origen):
+                acepta = preguntar_invitacion_chat(orig['nick'], orig['uid'])
                 if acepta:
                     ack = empaquetar("CHAT_ACK", {}, self.memoria.get_origen())
-                    self.red.enviar_tcp_priv(dest_host, ack, port=target_port)
+                    print(f"[CHAT_ACK] Enviando ACK a {dh}:{tp}", file=sys.stderr)
+                    self.red.enviar_tcp_priv(dh, ack, port=tp)
                     
                     # Launch UI
-                    abrir_chat_ui(origen['uid'], nombre_legible=origen['nick'], es_grupo=False)
+                    abrir_chat_ui(orig['uid'], nombre_legible=orig['nick'], es_grupo=False)
                 else:
-                    # 'acepta' can be False (No) or None (Timeout)
                     reason_code = "Rejected" if acepta is False else "Timeout"
                     rej = empaquetar("CHAT_NO", {"reason": reason_code}, self.memoria.get_origen())
-                    try: self.red.enviar_tcp_priv(dest_host, rej, port=target_port)
+                    try: self.red.enviar_tcp_priv(dh, rej, port=tp)
                     except: pass
 
             threading.Thread(target=_prompt_private, daemon=True).start()
