@@ -713,18 +713,23 @@ class Motor:
                  def _probe_tor_contact(uid_c, c_info):
                      onion_addr = c_info.get('onion')
                      if not onion_addr: return
+                     target_port = c_info.get('port_priv', 44494)
                      try:
-                         import socks
-                         import socket
-                         s = socks.socksocket(socket.AF_INET, socket.SOCK_STREAM)
-                         s.set_proxy(socks.SOCKS5, "127.0.0.1", 9050)
-                         s.settimeout(28.0)
-                         s.connect((onion_addr, c_info.get('port_priv', 44494)))
+                         # Usar _conectar_socks5 del transporte (respeta socks_port dinámico de GWC)
+                         print(f"[SCAN_TOR] Sondeando {c_info.get('nick', '?')} ({onion_addr}:{target_port}) via SOCKS {self.red.socks_host}:{self.red.socks_port}", file=sys.stderr)
+                         s = self.red._conectar_socks5(onion_addr, target_port, timeout=28.0)
                          
                          ping_pkg = empaquetar("DISCOVER", {"filter": "PEERS"}, self.memoria.get_origen())
                          s.sendall(ping_pkg + b'\n')
+                         # Esperar brevemente respuesta FOUND del otro lado
+                         s.settimeout(5.0)
+                         try:
+                             s.recv(4096)  # confirmar que el socket estuvo vivo
+                         except Exception:
+                             pass
                          s.close()
                          
+                         print(f"[SCAN_TOR] {c_info.get('nick', '?')} ONLINE via Tor.", file=sys.stderr)
                          with self.memoria._lock:
                              if not any(x.get('onion') == onion_addr or x.get('uid') == uid_c for x in self.scan_buffer):
                                  self.scan_buffer.append({
@@ -738,17 +743,8 @@ class Motor:
                                  })
                              if uid_c in self.memoria.peers:
                                  self.memoria.peers[uid_c]['status'] = 'ONLINE'
-                             else:
-                                 self.memoria.actualizar_peer(
-                                     c_info.get('ip', '127.0.0.1'),
-                                     uid_c,
-                                     c_info.get('nick', 'Desconocido'),
-                                     onion=onion_addr,
-                                     sys_user=c_info.get('sys_user', '?'),
-                                     status_msg=c_info.get('status_msg', '')
-                                 )
-                     except Exception:
-                         pass
+                     except Exception as e:
+                         print(f"[SCAN_TOR] {c_info.get('nick', '?')} no respondio: {e}", file=sys.stderr)
                  
                  for uid_c, c_info in list(self.memoria.contactos.items()):
                      if isinstance(c_info, dict) and c_info.get('onion'):
@@ -2677,8 +2673,10 @@ class Motor:
                  
                  for uid, m in members.items():
                      if uid == self.memoria.mi_uid: continue
-                     if m.get('ip'):
-                         targets.append((m['ip'], 44494))
+                     dest = self._resolver_host_objetivo(m)
+                     if dest:
+                         port = m.get('port_priv', 44494)
+                         targets.append((dest, port))
 
             # Caso 2: Privado (Solo si no era grupo)
             else:
@@ -2686,19 +2684,27 @@ class Motor:
                  if not p and target_id in self.memoria.contactos:
                      p = self.memoria.contactos[target_id]
                  
-                 if p and p.get('ip'):
+                 if p:
                      pkg = empaquetar("TYPING", payload, self.memoria.get_origen())
-                     targets.append((p['ip'], 44494))
+                     dest = self._resolver_host_objetivo(p)
+                     if dest:
+                         targets.append((dest, p.get('port_priv', 44494)))
             
-            # Sending Loop
-            for ip, port in targets:
-                try:
-                    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                    s.settimeout(0.5) # Fast timeout
-                    s.connect((ip, port))
-                    s.sendall(pkg + b'\n')
-                    s.close()
-                except: pass
+            # Sending Loop (Tor Onion o LAN segun dest)
+            def _send_typing_async(targets_list, pkt):
+                for dest, port in targets_list:
+                    try:
+                        if str(dest).endswith('.onion'):
+                            s = self.red._conectar_socks5(dest, port, timeout=5.0)
+                        else:
+                            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                            s.settimeout(0.5)
+                            s.connect((dest, port))
+                        s.sendall(pkt + b'\n')
+                        s.close()
+                    except: pass
+            if targets:
+                threading.Thread(target=_send_typing_async, args=(targets, pkg), daemon=True).start()
         except: pass
 
 if __name__ == "__main__":
