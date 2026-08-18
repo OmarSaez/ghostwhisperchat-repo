@@ -660,13 +660,13 @@ def main():
         # 2. Lógica Especial para Escaneo (UX)
         # Check all aliases for SCAN and LIST_GROUPS
         if args_raw[0] in COMMAND_MAP['SCAN'] or args_raw[0] in COMMAND_MAP['LIST_GROUPS']:
-            # Paso A: Disparar el Scan UDP (ya sea --scan o --vergrupos)
+            # Paso A: Disparar el Scan UDP y sondeo Tor
             enviar_comando_transitorio(full_cmd) # enviamos el comando original
             
-            # Paso B: Animación de Espera (1.2s)
+            # Paso B: Animación de Espera (3.2s para permitir circuitos Tor y UDP)
             from ghostwhisperchat.datos.recursos import mostrar_animacion_espera
-            msg_anim = "Escaneando red" if args_raw[0] in COMMAND_MAP['SCAN'] else "Buscando grupos"
-            mostrar_animacion_espera(msg_anim, 1.2)
+            msg_anim = "Escaneando red local y nodos Tor" if args_raw[0] in COMMAND_MAP['SCAN'] else "Buscando grupos"
+            mostrar_animacion_espera(msg_anim, 3.2)
             
             # Paso C: Pedir resultados
             # El daemon ya habrá poblado self.memoria.peers
@@ -724,14 +724,24 @@ def main():
                             if st.startswith("ACCEPTED:"):
                                 parts = st.split(":", 2)
                                 nick_resp = parts[1] if len(parts) > 1 else dest_target
-                                sys.stdout.write(f"\r\033[K{Colores.GREEN}[✔] ¡Solicitud aceptada por {nick_resp}! Iniciando chat...{Colores.RESET}\n")
+                                sys.stdout.write(f"\r\033[K{Colores.GREEN}{Colores.BOLD}[✔] ¡Solicitud aceptada por {nick_resp}!{Colores.RESET} {Colores.GREEN}Iniciando chat...{Colores.RESET}\n")
                                 sys.stdout.flush()
                                 return
                             elif st.startswith("REJECTED:"):
                                 parts = st.split(":", 2)
                                 nick_resp = parts[1] if len(parts) > 1 else dest_target
-                                reason = parts[2] if len(parts) > 2 else "Rechazado"
-                                sys.stdout.write(f"\r\033[K{Colores.RED}[X] Solicitud rechazada por {nick_resp} ({reason}).{Colores.RESET}\n")
+                                raw_reason = parts[2] if len(parts) > 2 else "Rechazado"
+                                
+                                if raw_reason in ["Rejected", "Rechazado", "Sin razón"]:
+                                    motivo = "Invitación rechazada por el usuario"
+                                elif raw_reason in ["Busy", "Busy/DND"]:
+                                    motivo = "Usuario en modo No Molestar"
+                                elif raw_reason == "Timeout":
+                                    motivo = "Sin respuesta (Tiempo agotado en destino)"
+                                else:
+                                    motivo = raw_reason
+                                    
+                                sys.stdout.write(f"\r\033[K{Colores.RED}{Colores.BOLD}[X] Solicitud rechazada por {nick_resp}:{Colores.RESET} {Colores.RED}{motivo}.{Colores.RESET}\n")
                                 sys.stdout.flush()
                                 return
                                 

@@ -208,16 +208,18 @@ class Motor:
     def _resolver_host_objetivo(self, peer_o_origen):
         """
         Determina de forma inteligente si la ruta hacia un contacto es directa por IP LAN o vía Tor Onion (WAN).
-        Si dispone de ID Onion, se prioriza Onion salvo que se confirme que ambos nodos están en la misma subred local activa.
+        Si dispone de ID Onion y la IP coincide con el pool local (ej: 192.168.1.x), realiza un test de socket ultrarrápido (150ms)
+        para confirmar si el nodo está físicamente en la misma red LAN. Si no responde en LAN, conmuta automáticamente a Tor Onion.
         """
         if not isinstance(peer_o_origen, dict):
             return str(peer_o_origen) if peer_o_origen else None
 
         onion = peer_o_origen.get('onion')
         ip = peer_o_origen.get('ip')
+        port_priv = peer_o_origen.get('port_priv', 44494)
 
         if onion:
-            if not ip or ip in ['127.0.0.1', 'localhost', '0.0.0.0', None]:
+            if not ip or ip in ['127.0.0.1', 'localhost', '0.0.0.0', 'WAN', '?.?.?.?', None]:
                 return onion
 
             from ghostwhisperchat.core.utilidades import get_local_ip
@@ -225,9 +227,19 @@ class Motor:
             if mi_ip and mi_ip != '127.0.0.1' and ip != '127.0.0.1':
                 sub_mi = '.'.join(mi_ip.split('.')[:3])
                 sub_peer = '.'.join(str(ip).split('.')[:3])
-                uid = peer_o_origen.get('uid')
-                if sub_mi == sub_peer and uid and uid in self.memoria.peers:
-                    return ip
+                
+                # Coincidencia de subred (ej: 192.168.1.X)
+                if sub_mi == sub_peer:
+                    # Test activo ultrarrápido (150ms): ¿Está físicamente en esta misma red local?
+                    try:
+                        import socket
+                        test_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                        test_sock.settimeout(0.15)
+                        test_sock.connect((ip, port_priv))
+                        test_sock.close()
+                        return ip # ¡Confirmado en la misma red física local!
+                    except Exception:
+                        pass # No está en la misma red física o no responde -> Usar Onion
 
             return onion
 
@@ -495,17 +507,31 @@ class Motor:
             return obtener_ayuda_comando(args[0] if args else None)
 
         elif cmd == "SCAN_RESULTS":
+            from ghostwhisperchat.datos.recursos import Colores
             if not self.scan_buffer:
-                return "[*] No se encontraron resultados."
+                return f"{Colores.YELLOW}[*] No se encontraron usuarios ni salas en línea.{Colores.RESET}"
             
-            res = "--- RESULTADOS DEL ESCANEO ---\n"
+            res = f"{Colores.BOLD}--- USUARIOS Y SALAS EN LÍNEA ---{Colores.RESET}\n"
             for item in self.scan_buffer:
-                 # Check type of item (User or Group)
                  if item.get("type") == "GROUP":
-                      res += f"[SALA] {item['name']} (Enbajador: {item['ip']})\n"
+                      res += f"{Colores.CYAN}[SALA]{Colores.RESET} {Colores.BOLD}{item['name']}{Colores.RESET} (Embajador: {item['ip']})\n"
                  else:
-                      suffix = " [Tu]" if item.get('ip') == self.memoria.mi_ip else ""
-                      res += f"[*] {item.get('nick')} ({item.get('ip')}){suffix}\n"
+                      nick = item.get('nick', 'Desconocido')
+                      ip_val = item.get('ip', '?.?.?.?')
+                      onion_val = item.get('onion')
+                      channel = item.get('channel')
+                      suffix = f" {Colores.GREY}[Tu]{Colores.RESET}" if ip_val == self.memoria.mi_ip else ""
+                      
+                      linea = f"[*] {Colores.BOLD}{nick}{Colores.RESET}"
+                      if onion_val or channel == "Tor Global":
+                          linea += f" {Colores.CYAN}[🌐 Tor Global]{Colores.RESET}"
+                          if onion_val:
+                              linea += f" ({Colores.GREY}{onion_val[:12]}...{Colores.RESET})"
+                      else:
+                          linea += f" ({ip_val})"
+                      
+                      linea += f" [{Colores.GREEN}ONLINE{Colores.RESET}]{suffix}\n"
+                      res += linea
                       
             self.scan_buffer = [] # Clear after reading
             return res
@@ -665,9 +691,56 @@ class Motor:
         elif cmd == "SCAN":
              # 1. Limpiar buffer
              self.scan_buffer = []
-             # 2. Enviar Broadcast (Solo PEERS)
+             # 2. Enviar Broadcast UDP (Red Local)
              pkg = empaquetar("DISCOVER", {"filter": "PEERS"}, "ALL")
              self.red.enviar_udp_broadcast(pkg)
+             
+             # 3. Sondeo asíncrono de contactos Tor conocidos en Agenda
+             if self.memoria.mi_onion and self.memoria.contactos:
+                 def _probe_tor_contact(uid_c, c_info):
+                     onion_addr = c_info.get('onion')
+                     if not onion_addr: return
+                     try:
+                         import socks
+                         import socket
+                         s = socks.socksocket(socket.AF_INET, socket.SOCK_STREAM)
+                         s.set_proxy(socks.SOCKS5, "127.0.0.1", 9050)
+                         s.settimeout(3.5)
+                         s.connect((onion_addr, c_info.get('port_priv', 44494)))
+                         
+                         ping_pkg = empaquetar("DISCOVER", {"filter": "PEERS"}, self.memoria.get_origen())
+                         s.sendall(ping_pkg + b'\n')
+                         s.close()
+                         
+                         with self.memoria._lock:
+                             if not any(x.get('onion') == onion_addr or x.get('uid') == uid_c for x in self.scan_buffer):
+                                 self.scan_buffer.append({
+                                     "type": "PEER",
+                                     "nick": c_info.get('nick', 'Desconocido'),
+                                     "ip": "WAN",
+                                     "onion": onion_addr,
+                                     "channel": "Tor Global",
+                                     "status": "ONLINE",
+                                     "uid": uid_c
+                                 })
+                             if uid_c in self.memoria.peers:
+                                 self.memoria.peers[uid_c]['status'] = 'ONLINE'
+                             else:
+                                 self.memoria.actualizar_peer(
+                                     c_info.get('ip', '127.0.0.1'),
+                                     uid_c,
+                                     c_info.get('nick', 'Desconocido'),
+                                     onion=onion_addr,
+                                     sys_user=c_info.get('sys_user', '?'),
+                                     status_msg=c_info.get('status_msg', '')
+                                 )
+                     except Exception:
+                         pass
+                 
+                 for uid_c, c_info in list(self.memoria.contactos.items()):
+                     if isinstance(c_info, dict) and c_info.get('onion'):
+                         threading.Thread(target=_probe_tor_contact, args=(uid_c, c_info), daemon=True).start()
+             
              return "[*] Búsqueda lanzada."
 
         elif cmd == "GLOBAL_STATUS":
@@ -1140,13 +1213,13 @@ class Motor:
                         else:
                              peer = self.memoria.buscar_peer(chat_id)
                              if peer:
-                                 target = peer.get('onion') if peer.get('onion') and (peer.get('ip') in ['127.0.0.1', 'localhost', None] or not peer.get('ip')) else peer.get('ip') or peer.get('onion')
+                                 target = self._resolver_host_objetivo(peer)
                                  if target:
                                      targets.append((target, peer.get('port_priv', 44494)))
                              else:
                                  if chat_id in self.memoria.contactos:
                                      c = self.memoria.contactos[chat_id]
-                                     target = c.get('onion') if c.get('onion') and (c.get('ip') in ['127.0.0.1', 'localhost', None] or not c.get('ip')) else c.get('ip') or c.get('onion')
+                                     target = self._resolver_host_objetivo(c)
                                      if target:
                                          targets.append((target, c.get('port_priv', 44494)))
                         
@@ -2219,8 +2292,30 @@ class Motor:
             abrir_chat_ui(uid, nombre_legible=nick, es_grupo=False)
             enviar_notificacion("GhostWhisperChat", f"{nick} aceptó tu solicitud.")
 
+        elif tipo == "DISCOVER":
+            filt = payload.get("filter", "ALL")
+            if not self.memoria.invisible:
+                resp = empaquetar("FOUND", {"type": "PEER", "status": "ONLINE"}, self.memoria.get_origen())
+                try: sock.sendall(resp + b'\n')
+                except: pass
+
+        elif tipo == "FOUND":
+            ftype = payload.get("type")
+            if ftype == "PEER":
+                peer_data = {
+                    "type": "PEER",
+                    "nick": origen.get('nick', 'Desconocido'),
+                    "ip": origen.get('ip', 'WAN'),
+                    "onion": origen.get('onion'),
+                    "channel": "Tor Global" if origen.get('onion') else "LAN",
+                    "status": payload.get("status", "ONLINE"),
+                    "uid": origen.get('uid')
+                }
+                if not any(x.get('uid') == origen.get('uid') or (origen.get('onion') and x.get('onion') == origen.get('onion')) for x in self.scan_buffer):
+                    self.scan_buffer.append(peer_data)
+
         elif tipo == "CHAT_NO":
-            razon = payload.get("reason", "Sin razón")
+            razon = payload.get("reason", "Rejected")
             uid = origen.get('uid', 'UNK')
             nick = origen.get('nick', 'Contacto')
             onion = origen.get('onion')
@@ -2229,6 +2324,7 @@ class Motor:
             if onion:
                 self.chat_requests_status[onion] = ('REJECTED', nick, razon)
             if nick:
+                self.chat_requests_status[nick] = ('REJECTED', nick, razon)
                 self.chat_requests_status[nick.lower()] = ('REJECTED', nick, razon)
 
             noti_title = "Solicitud rechazada"
