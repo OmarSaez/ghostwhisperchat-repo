@@ -767,7 +767,9 @@ def main():
                 
                 canal = "Tor Global" if is_onion else "LAN"
                 # Timeout inteligente basado en el canal real detectado
-                timeout_espera = 120.0 if is_onion else 10.0
+                # LAN: 40s (dar tiempo al usuario a ver la notificacion y aceptar)
+                # Tor: 120s (circuito puede tardar 20-40s de ida + 20-40s de vuelta)
+                timeout_espera = 120.0 if is_onion else 40.0
                 
                 dots = [".  ", ".. ", "...", " ..", "  .", "   "]
                 gwc_badges = [

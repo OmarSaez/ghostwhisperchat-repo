@@ -282,20 +282,26 @@ class GestorRed:
             try: s.close()
             except: pass
 
-    def enviar_tcp_priv(self, ip_o_host, data_bytes, port=PORT_PRIVATE):
+    def enviar_tcp_priv(self, ip_o_host, data_bytes, port=PORT_PRIVATE, force_new=False):
         """
         Envía un mensaje TCP al puerto Privado (LAN o WAN Tor).
         Para destinos .onion usa un pool de conexiones persistentes para evitar
         el overhead de circuit setup en cada mensaje (principal causa de latencia alta).
         Patrón LAN: Connect -> Send -> Close (LAN es rápido, sin overhead).
         Patrón Tor: Pool -> Send (reutiliza circuito existente; solo el primer msg paga el costo).
+        force_new=True: siempre crea conexion fresca (usar para CHAT_REQ, no para MSG).
         """
         try:
             is_onion = str(ip_o_host).endswith(".onion")
             
             if is_onion:
-                # --- Intentar reutilizar conexión del pool ---
-                s = self._pool_get(ip_o_host, port)
+                # --- Intentar reutilizar conexión del pool (excepto si force_new) ---
+                s = None if force_new else self._pool_get(ip_o_host, port)
+                
+                if s and force_new:
+                    # CHAT_REQ: cerrar viejo primero, queremos circuito fresco
+                    self.pool_close(ip_o_host, port)
+                    s = None
                 
                 if s:
                     # Tenemos conexión viva: enviar directamente

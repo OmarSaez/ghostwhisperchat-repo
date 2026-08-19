@@ -247,16 +247,17 @@ class Motor:
                 
                 # Coincidencia de subred (ej: 192.168.1.X)
                 if sub_mi == sub_peer:
-                    # Test activo ultrarrápido (150ms): ¿Está físicamente en esta misma red local?
+                    # Test activo (500ms): confirmar si esta fisicamente en la misma red LAN.
+                    # 150ms era muy corto para redes con algo de carga o latencia.
                     try:
                         import socket
                         test_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                        test_sock.settimeout(0.15)
+                        test_sock.settimeout(0.50)
                         test_sock.connect((ip, port_priv))
                         test_sock.close()
-                        return ip # ¡Confirmado en la misma red física local!
+                        return ip # Confirmado en la misma red fisica local!
                     except Exception:
-                        pass # No está en la misma red física o no responde -> Usar Onion
+                        pass # No esta en la misma red fisica o no responde -> Usar Onion
 
             return onion
 
@@ -997,7 +998,7 @@ class Motor:
                   def _send_onion_chat():
                       try:
                           print(f"[CHAT_WAN] Conectando vía Tor a {target}:44494...", file=sys.stderr)
-                          ok = self.red.enviar_tcp_priv(target, req, port=44494)
+                          ok = self.red.enviar_tcp_priv(target, req, port=44494, force_new=True)
                           if ok:
                               print(f"[CHAT_WAN] Solicitud entregada exitosamente a {target}.", file=sys.stderr)
                           else:
@@ -1030,7 +1031,7 @@ class Motor:
                       def _send_onion_peer():
                           try:
                               print(f"[CHAT_WAN] Conectando vía Tor a {target} ({dest_host}:{port_p})...", file=sys.stderr)
-                              ok = self.red.enviar_tcp_priv(dest_host, req, port=port_p)
+                              ok = self.red.enviar_tcp_priv(dest_host, req, port=port_p, force_new=True)
                               if ok:
                                   print(f"[CHAT_WAN] Solicitud entregada exitosamente a {target}.", file=sys.stderr)
                               else:
@@ -1044,7 +1045,7 @@ class Motor:
                   else:
                       try:
                           print(f"[CHAT_CMD] Conectando a {target} ({dest_host}:{port_p})", file=sys.stderr)
-                          ok = self.red.enviar_tcp_priv(dest_host, req, port=port_p)
+                          ok = self.red.enviar_tcp_priv(dest_host, req, port=port_p, force_new=True)
                           if ok:
                               return f"[*] Solicitud enviada a '{target}' en red local. Esperando respuesta..."
                       except: 
@@ -1060,7 +1061,7 @@ class Motor:
                          def _send_onion_c(dh=dest_host, pp=port_p):
                              try:
                                  print(f"[CHAT_WAN] Conectando vía Tor a contacto de agenda '{target}' ({dh}:{pp})...", file=sys.stderr)
-                                 ok = self.red.enviar_tcp_priv(dh, req, port=pp)
+                                 ok = self.red.enviar_tcp_priv(dh, req, port=pp, force_new=True)
                                  if ok:
                                      print(f"[CHAT_WAN] Solicitud entregada exitosamente a {target}.", file=sys.stderr)
                                  else:
@@ -1073,7 +1074,7 @@ class Motor:
                          return f"[*] Solicitud enviada a '{target}' vía Tor Onion (Agenda). Esperando respuesta..."
                      else:
                          try:
-                             ok = self.red.enviar_tcp_priv(dest_host, req, port=port_p)
+                             ok = self.red.enviar_tcp_priv(dest_host, req, port=port_p, force_new=True)
                              if ok:
                                  return f"[*] Solicitud enviada a '{target}' en red local (Agenda). Esperando respuesta..."
                          except:
