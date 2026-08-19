@@ -6,7 +6,7 @@ import os
 import shutil
 import time
 
-CONTACTS_FILE = os.path.expanduser("~/.ghostwhisperchat/contactos.json")
+CONTACTS_FILE = os.path.expanduser("~/.ghostwhisperchat/contacts.json")
 
 def cargar_contactos():
     if not os.path.exists(CONTACTS_FILE):

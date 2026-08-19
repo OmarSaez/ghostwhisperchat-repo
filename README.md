@@ -1,7 +1,7 @@
 
 # GhostWhisperChat – Global & LAN P2P Chat
 
-GhostWhisperChat (GWC) es un sistema de mensajería y transferencia descentralizado P2P con cifrado E2E, transferencia de archivos. Funciona tanto en **red local (LAN)** mediante descubrimiento automático como de forma **global (WAN)** a través de **Tor Onion Services v3** sin depender de servidores centrales.
+GhostWhisperChat (GWC) es un sistema de mensajería y transferencia descentralizado P2P, transferencia de archivos. Funciona tanto en **red local (LAN)** mediante descubrimiento automático como de forma **global (WAN)** a través de **Tor Onion Services v3** sin depender de servidores centrales.
 
 ## INSTALADOR
 
@@ -68,6 +68,7 @@ sudo apt update
 | Comando Principal | Parámetros | Descripción | Alias Disponibles |
 | :--- | :--- | :--- | :--- |
 | `--mi-id` | | Consultar tu ID Global (.onion) para recibir mensajes de cualquier red. | `--onion`, `--id-global`, `--my-id` |
+| `--cambiarnombre` | `<Nuevo>` | Cambiar tu Nick actual. | `-n`, `--nick`, `--apodo`, `--nombre` |
 | `--enlinea` | | Escanear la red local buscando usuarios activos. | `-s`, `--buscar`, `--radar`, `--quienes`, `--scan` |
 | `--vergrupos` | | Listar los grupos y salas públicas disponibles. | `-g`, `--grupos`, `--explorar`, `--salas` |
 | `--contactos` | | Ver el historial de usuarios (LAN y WAN) con los que hablaste. | `-c`, `--amigos`, `--agenda`, `--historial`, `--contacts` |
@@ -80,7 +81,6 @@ sudo apt update
 | :--- | :--- | :--- | :--- |
 | `--archivo` | `<Ruta>` | Enviar un archivo (Soporta arrastrar y soltar). | `-f`, `--enviar`, `--mandar`, `--adjuntar`, `--file` |
 | `--imagen` | `<Ruta> [ancho]` | Mandar foto como Arte ASCII y original (Soporta arrastrar y soltar). | `-i`, `-P`, `--foto`, `--picture` |
-| `--cambiarnombre` | `<Nuevo>` | Cambiar tu Nick actual. | `-n`, `--nick`, `--apodo`, `--nombre` |
 | `--estado` | `<Texto>` | Publicar un mensaje de estado personal. | `-e`, `--situacion`, `--mood`, `--st` |
 | `--info` | | Ver estado del sistema, tu IP, ID Onion global, versión y logs. | `--estados-globales`, `-i`, `--config`, `--todo` |
 | `--limpiar` | | Limpiar el texto de la consola. | `-k`, `--borrar`, `--cls`, `--vaciar`, `--clear` |
