@@ -62,7 +62,11 @@ class Motor:
         
         # Keepalive de sesión: timestamp del último mensaje real por chat_id
         # Si no hubo tráfico en X segundos, se envía un CHAT_KEEP silencioso
-        self.session_last_activity = {}  # { chat_id: timestamp } 
+        self.session_last_activity = {}  # { chat_id: timestamp }
+        
+        # Delivery Receipts: { mid: (chat_id, time_sent) }
+        # Se limpia cuando llega MSG_ACK o pasado el timeout de confirmación.
+        self.pending_ack = {} 
 
     def iniciar_ipc(self):
         if os.path.exists(IPC_SOCK_PATH):
@@ -116,6 +120,8 @@ class Motor:
                     print(f"[*] Tor no activo ({self.tor.status_message}). Modo LAN.", file=sys.stderr)
 
             threading.Thread(target=_iniciar_tor_async, daemon=True).start()
+            # Hilo de timeout de ACK: opera independiente de Tor (también cubre LAN)
+            threading.Thread(target=self._hilo_ack_timeout, daemon=True).start()
         except Exception as e:
             print(f"[!] No se pudo cargar TorManager: {e}", file=sys.stderr)
 
@@ -1373,21 +1379,15 @@ class Motor:
                  for m in m_list:
                      uid = m.get('uid')
                      if uid == self.memoria.mi_uid: continue
-                     ip = m.get('ip')
-                     onion = m.get('onion')
+                     
                      target = self._resolver_host_objetivo(m)
                      if not target: continue
                      
                      try:
                          port_g = m.get('port_group', PORT_GROUP)
-                         if str(target).endswith(".onion"):
-                             s = self.red._conectar_socks5(target, port_g, timeout=40.0)
-                         else:
-                             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                             s.settimeout(1.0)
-                             s.connect((target, port_g))
-                         s.sendall(pkg + b'\n')
-                         s.close()
+                         # Usar enviar_tcp_priv que gestiona el pool Tor internamente.
+                         # Antes usaba _conectar_socks5 directo (nueva conexion por cada msg).
+                         self.red.enviar_tcp_priv(target, pkg, port=port_g)
                      except: pass
                  
                  # Log outgoing group message
@@ -1423,9 +1423,21 @@ class Motor:
                              target_port = c.get('port_priv', 44494)
                  
                  if target_host:
-                     pkg = empaquetar("MSG", {"text": msg_content}, self.memoria.get_origen())
-                     try: self.red.enviar_tcp_priv(target_host, pkg, port=target_port)
-                     except: pass
+                    import hashlib, time as _t
+                    mid = hashlib.sha1(f"{_t.time()}{self.memoria.mi_uid}{msg_content}".encode()).hexdigest()[:10]
+                    pkg = empaquetar("MSG", {"text": msg_content, "mid": mid}, self.memoria.get_origen())
+                    ok = self.red.enviar_tcp_priv(target_host, pkg, port=target_port)
+                    if ok:
+                        # Registrar pendiente: si no llega ACK en 60s se notificara al usuario
+                        preview = msg_content[:45] + "..." if len(msg_content) > 45 else msg_content
+                        self.pending_ack[mid] = (chat_id, time.time(), preview)
+                    else:
+                        # Fallo inmediato de envio (sin conexion): notificar directamente
+                        if chat_id in self.ui_sessions:
+                            try: self.ui_sessions[chat_id].sendall(
+                                "[!] No se pudo enviar el mensaje. Verifica la conexion.\n".encode('utf-8')
+                            )
+                            except: pass
                  
                  
                  # Log outgoing private message
@@ -1546,6 +1558,9 @@ class Motor:
                                 try: self.red.enviar_tcp_priv(dh, pkg, port=pp)
                                 except Exception as err:
                                     print(f"[PRIV_WARN] Error enviando CHAT_BYE: {err}", file=sys.stderr)
+                                # Cerrar conexión poolada al terminar el chat
+                                if dh:
+                                    self.red.pool_close(dh, pp)
                             threading.Thread(target=_send_bye_async, daemon=True).start()
                 except Exception as e:
                     print(f"[X] Error en desconexion UI: {e}", file=sys.stderr)
@@ -2144,6 +2159,14 @@ class Motor:
                      enviar_notificacion(f"Grupo {g['nombre']}", f"{origen['nick']} abandonó el grupo.")
                      self._sincronizar_ui_usuarios(gid)
         
+        elif tipo == "MSG_ACK":
+            mid = payload.get("mid")
+            print(f"[ACK] MSG_ACK recibido (mid={mid[:6] if mid else '?'})", file=sys.stderr)
+            # Descarte silencioso: el chat que fluye normal ya es la confirmacion visual.
+            # Solo se actua si el mid existe (evita ACKs duplicados o fantasmas).
+            if mid:
+                self.pending_ack.pop(mid, None)
+
         elif tipo == "FILE_CHUNK":
              filename = payload.get("filename")
              chunk_id = payload.get("chunk_id", 1)
@@ -2413,16 +2436,21 @@ class Motor:
             target_port_ready = origen.get('port_priv', 44494)
             ready_pkg = empaquetar("CHAT_READY", {}, self.memoria.get_origen())
             
-            def _send_ready(dh=dest_host_ready, tp=target_port_ready, pkg=ready_pkg):
+            def _abrir_emisor_ui(uid_e=uid, nick_e=nick, dh=dest_host_ready, tp=target_port_ready, pkg=ready_pkg):
+                # IMPORTANTE: Esta función corre en hilo async para NO bloquear el bucle principal.
+                # Si corriera en el handler directo, el select() quedaría congelado y el cliente
+                # no podría consultar --check-chat-status para detectar ACCEPTED y liberar su terminal.
                 try:
                     print(f"[CHAT_READY] Enviando READY a {dh}:{tp}", file=sys.stderr)
                     self.red.enviar_tcp_priv(dh, pkg, port=tp)
                 except Exception as e:
                     print(f"[CHAT_READY] Fallo enviando READY: {e}", file=sys.stderr)
-            threading.Thread(target=_send_ready, daemon=True).start()
+                # Abrir chat UI del emisor DESPUÉS de enviar READY
+                # (el status ACCEPTED ya fue seteado arriba, el cliente lo detecta inmediatamente)
+                abrir_chat_ui(uid_e, nombre_legible=nick_e, es_grupo=False)
+                enviar_notificacion("GhostWhisperChat", f"{nick_e} aceptó tu solicitud.")
             
-            abrir_chat_ui(uid, nombre_legible=nick, es_grupo=False)
-            enviar_notificacion("GhostWhisperChat", f"{nick} aceptó tu solicitud.")
+            threading.Thread(target=_abrir_emisor_ui, daemon=True).start()
 
         elif tipo == "CHAT_READY":
             # El emisor confirma que recibió nuestro ACK y que el circuito es bidireccional.
@@ -2635,6 +2663,40 @@ class Motor:
                  try:
                      self.ui_sessions[target_id].sendall((formatted + "\n").encode('utf-8'))
                  except: pass
+                 
+                 # 4. Delivery Receipt: enviar MSG_ACK al emisor (solo chats privados, no grupos)
+                 # El ACK corre en daemon thread para no bloquear la UI del receptor.
+                 # Semaforo (max 2 vuelos simultaneos) evita saturar threads Tor si el
+                 # emisor manda muchos mensajes rapido antes de que el pool inverso este listo.
+                 mid = payload.get("mid")
+                 if mid and not gid:  # Solo privados (grupos no tienen ACK individual)
+                     sender_uid = origen.get('uid')
+                     if not hasattr(self, '_ack_semaphore'):
+                         self._ack_semaphore = threading.Semaphore(2)
+                     def _send_ack(uid=sender_uid, m=mid):
+                         if not self._ack_semaphore.acquire(blocking=False):
+                             # Pool ocupado: ACK se descarta. El emisor ya tiene 2 en vuelo.
+                             # Sus otros ACKs llegaran cuando el circuito este libre.
+                             print(f"[ACK] Semaforo lleno, descartando ACK mid={m[:6]}", file=sys.stderr)
+                             return
+                         try:
+                             peer_src = self.memoria.peers.get(uid) or self.memoria.contactos.get(uid)
+                             if peer_src:
+                                 ack_dest = self._resolver_host_objetivo(peer_src)
+                                 ack_port = peer_src.get('port_priv', 44494)
+                             else:
+                                 # Fallback: usar origen del paquete
+                                 ack_dest = origen.get('onion') or origen.get('ip')
+                                 ack_port = origen.get('port_priv', 44494)
+                             if ack_dest:
+                                 ack_pkg = empaquetar("MSG_ACK", {"mid": m}, self.memoria.get_origen())
+                                 self.red.enviar_tcp_priv(ack_dest, ack_pkg, port=ack_port)
+                                 print(f"[ACK] MSG_ACK enviado (mid={m[:6]}) a {ack_dest}", file=sys.stderr)
+                         except Exception as e:
+                             print(f"[ACK_WARN] No se pudo enviar MSG_ACK: {e}", file=sys.stderr)
+                         finally:
+                             self._ack_semaphore.release()
+                     threading.Thread(target=_send_ack, daemon=True).start()
                       
                  # Smart Notification even if UI Open (AFK Check)
                  if (now - last_act) > 180:
@@ -2721,6 +2783,38 @@ class Motor:
                         print(f"[TOR_WATCH] Re-inicialización fallida: {self.tor.status_message}", file=sys.stderr)
                 except Exception as e:
                     print(f"[TOR_WATCH] Error en re-inicialización: {e}", file=sys.stderr)
+
+    def _hilo_ack_timeout(self):
+        """
+        Vigila los mensajes pendientes de confirmacion (pending_ack).
+        Si un mensaje no recibe MSG_ACK en 60s, muestra un aviso en la UI del emisor.
+        Solo se activa cuando algo sale mal; el flujo normal no genera ningun mensaje extra.
+        """
+        ACK_TIMEOUT = 60.0   # 60s: ida Tor (~15-30s) + ACK de vuelta (~15-30s) + margen
+        CHECK_INTERVAL = 10.0
+        
+        while self.running:
+            time.sleep(CHECK_INTERVAL)
+            if not self.running: break
+            if not self.pending_ack: continue
+            
+            now = time.time()
+            expired = [
+                (mid, chat_id, preview)
+                for mid, (chat_id, sent_at, preview) in list(self.pending_ack.items())
+                if now - sent_at > ACK_TIMEOUT
+            ]
+            
+            for mid, chat_id, preview in expired:
+                self.pending_ack.pop(mid, None)
+                if chat_id in self.ui_sessions:
+                    try:
+                        from ghostwhisperchat.datos.recursos import Colores
+                        self.ui_sessions[chat_id].sendall(
+                            f"{Colores.YELLOW}[!] No se pudo confirmar si llego el mensaje: '{preview}'.{Colores.RESET}\n".encode('utf-8')
+                        )
+                    except: pass
+                print(f"[ACK_TIMEOUT] Sin ACK para mid={mid[:6]} en chat={chat_id[:8]}", file=sys.stderr)
 
     def _hilo_keepalive_chat(self):
         """

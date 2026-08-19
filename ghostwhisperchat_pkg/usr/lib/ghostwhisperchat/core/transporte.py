@@ -12,6 +12,8 @@ PORT_PRIVATE = 44494   # TCP P2P
 PORT_DISCOVERY = 44495 # UDP Broadcast
 PORT_GROUP = 44496     # TCP Mesh
 
+import threading
+
 class GestorRed:
     def __init__(self):
         self.sock_udp = None       # 44495
@@ -23,6 +25,13 @@ class GestorRed:
         
         self.tcp_connections = []  # Lista de sockets TCP activos (conectados o aceptados)
         self.inputs = []           # Lista para select()
+        
+        # --- Pool de conexiones Tor persistentes ---
+        # Clave: (host_onion, port) | Valor: socket vivo
+        # Evita crear un circuito nuevo por cada mensaje (el mayor costo de latencia Tor).
+        # Thread-safe via _pool_lock.
+        self._onion_pool = {}          # { (host, port): socket }
+        self._pool_lock = threading.Lock()
 
     def set_socks_proxy(self, host="127.0.0.1", port=9050):
         """Configura los parámetros del proxy SOCKS5 local para Tor"""
@@ -212,30 +221,127 @@ class GestorRed:
         except OSError:
             return None, None
 
+    def _pool_get(self, host, port):
+        """
+        Devuelve un socket vivo del pool para (host, port), o None si no hay / está muerto.
+        Remueve sockets muertos automáticamente.
+        """
+        key = (host, port)
+        with self._pool_lock:
+            s = self._onion_pool.get(key)
+        if s is None:
+            return None
+        # Verificar que el socket sigue vivo
+        try:
+            if s.fileno() < 0:
+                raise OSError("fileno<0")
+            # select no bloqueante: si hay error, está muerto
+            r, _, e = select.select([s], [], [s], 0)
+            if e:
+                raise OSError("socket error flag")
+            if r:
+                # Hay datos pendientes: podría ser EOF del otro lado
+                peek = s.recv(1, socket.MSG_PEEK)
+                if not peek:
+                    raise OSError("EOF detectado")
+        except Exception as dead_err:
+            print(f"[POOL] Socket muerto para {host}:{port} ({dead_err}), removiendo.", file=sys.stderr)
+            with self._pool_lock:
+                self._onion_pool.pop(key, None)
+            try: s.close()
+            except: pass
+            return None
+        return s
+
+    def _pool_set(self, host, port, sock):
+        """Registra un socket en el pool de forma thread-safe."""
+        with self._pool_lock:
+            # Si había uno viejo, cerrarlo
+            old = self._onion_pool.get((host, port))
+            if old and old is not sock:
+                try: old.close()
+                except: pass
+            self._onion_pool[(host, port)] = sock
+
+    def pool_close(self, host, port):
+        """Cierra y elimina la conexión poolada para (host, port). Llamar al cerrar un chat."""
+        key = (host, port)
+        with self._pool_lock:
+            s = self._onion_pool.pop(key, None)
+        if s:
+            try: s.close()
+            except: pass
+            print(f"[POOL] Conexión cerrada y removida: {host}:{port}", file=sys.stderr)
+
+    def pool_close_all(self):
+        """Cierra todas las conexiones del pool (al apagar el motor)."""
+        with self._pool_lock:
+            items = list(self._onion_pool.items())
+            self._onion_pool.clear()
+        for (h, p), s in items:
+            try: s.close()
+            except: pass
+
     def enviar_tcp_priv(self, ip_o_host, data_bytes, port=PORT_PRIVATE):
         """
-        Envía un mensaje TCP transitorio al puerto Privado (LAN o WAN Tor).
-        Patrón: Connect -> Send -> Close. Ideal para Handshakes (REQ/ACK/NO)
+        Envía un mensaje TCP al puerto Privado (LAN o WAN Tor).
+        Para destinos .onion usa un pool de conexiones persistentes para evitar
+        el overhead de circuit setup en cada mensaje (principal causa de latencia alta).
+        Patrón LAN: Connect -> Send -> Close (LAN es rápido, sin overhead).
+        Patrón Tor: Pool -> Send (reutiliza circuito existente; solo el primer msg paga el costo).
         """
         try:
             is_onion = str(ip_o_host).endswith(".onion")
+            
             if is_onion:
-                s = self._conectar_socks5(ip_o_host, port, timeout=40.0)
+                # --- Intentar reutilizar conexión del pool ---
+                s = self._pool_get(ip_o_host, port)
+                
+                if s:
+                    # Tenemos conexión viva: enviar directamente
+                    try:
+                        s.sendall(data_bytes + b'\n')
+                        if len(data_bytes) > 2000:
+                            print(f"[OUT_TCP_POOL] -> {ip_o_host}:{port}: (Large) {len(data_bytes)}b", file=sys.stderr)
+                        else:
+                            print(f"[OUT_TCP_POOL] -> {ip_o_host}:{port}: {data_bytes.strip()}", file=sys.stderr)
+                        return True
+                    except Exception as send_err:
+                        # Conexión rota en envío: limpiar pool y reconectar
+                        print(f"[POOL] Envío falló en socket poolado ({send_err}), reconectando...", file=sys.stderr)
+                        self.pool_close(ip_o_host, port)
+                        s = None
+                
+                # --- Sin conexión en pool (o recién limpiada): crear nueva ---
+                print(f"[POOL] Creando nueva conexión Tor a {ip_o_host}:{port}...", file=sys.stderr)
+                s = self._conectar_socks5(ip_o_host, port, timeout=60.0)
+                # Mantener el socket en modo bloqueante para envíos síncronos
+                s.settimeout(30.0)
+                s.sendall(data_bytes + b'\n')
+                # Registrar en pool para reusar en mensajes futuros
+                self._pool_set(ip_o_host, port, s)
+                
+                if len(data_bytes) > 2000:
+                    print(f"[OUT_TCP_PRIV_NEW] -> {ip_o_host}:{port}: (Large) {len(data_bytes)}b", file=sys.stderr)
+                else:
+                    print(f"[OUT_TCP_PRIV_NEW] -> {ip_o_host}:{port}: {data_bytes.strip()}", file=sys.stderr)
+                return True
+
             else:
+                # LAN: conexión transitoria (sin pool, LAN no tiene overhead)
                 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                s.settimeout(15.0) # More time for large files
+                s.settimeout(15.0)
                 s.connect((ip_o_host, port))
-            
-            if len(data_bytes) > 2000:
-                print(f"[OUT_TCP_PRIV] -> {ip_o_host}:{port}: (Large Payload) {len(data_bytes)} bytes", file=sys.stderr)
-            else:
-                print(f"[OUT_TCP_PRIV] -> {ip_o_host}:{port}: {data_bytes.strip()}", file=sys.stderr)
-            
-            s.sendall(data_bytes + b'\n')
-            s.close()
-            return True
+                if len(data_bytes) > 2000:
+                    print(f"[OUT_TCP_PRIV] -> {ip_o_host}:{port}: (Large) {len(data_bytes)}b", file=sys.stderr)
+                else:
+                    print(f"[OUT_TCP_PRIV] -> {ip_o_host}:{port}: {data_bytes.strip()}", file=sys.stderr)
+                s.sendall(data_bytes + b'\n')
+                s.close()
+                return True
+
         except Exception as e:
-            print(f"[X] Error TCP Priv Transient a {ip_o_host}:{port}: {e}", file=sys.stderr)
+            print(f"[X] Error TCP Priv a {ip_o_host}:{port}: {e}", file=sys.stderr)
             return False
 
     def registrar_socket_tcp(self, sock, label=None):
