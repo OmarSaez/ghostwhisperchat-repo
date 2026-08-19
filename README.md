@@ -1,7 +1,7 @@
 
 # GhostWhisperChat – Global & LAN P2P Chat
 
-GhostWhisperChat (GWC) es un sistema de mensajería y transferencia descentralizado P2P con cifrado E2E, llamadas de voz y transferencia de archivos. Funciona tanto en **red local (LAN)** mediante descubrimiento automático como de forma **global (WAN)** a través de **Tor Onion Services v3** sin depender de servidores centrales.
+GhostWhisperChat (GWC) es un sistema de mensajería y transferencia descentralizado P2P con cifrado E2E, transferencia de archivos. Funciona tanto en **red local (LAN)** mediante descubrimiento automático como de forma **global (WAN)** a través de **Tor Onion Services v3** sin depender de servidores centrales.
 
 ## INSTALADOR
 

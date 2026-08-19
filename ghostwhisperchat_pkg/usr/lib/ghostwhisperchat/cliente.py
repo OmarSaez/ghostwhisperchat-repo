@@ -802,8 +802,12 @@ def main():
                         time.sleep(0.35)
                         frame_idx += 1
                         
-                        # Consultar estado al demonio cada ~1 seg
-                        if frame_idx % 3 == 0:
+                        # Consultar estado al demonio: cada 2 frames en Tor (~0.7s), cada 3 en LAN (~1s)
+                        poll_interval = 2 if is_onion else 3
+                        if frame_idx % poll_interval == 0:
+                            # dest_target puede ser nick (ej: "PC-CASA") o onion.
+                            # El motor lo guarda en minusculas, tambien por uid y onion.
+                            # Pasamos tal cual — el handler ya hace busqueda case-insensitive.
                             st = consultar_daemon_respuesta(f"--check-chat-status {dest_target}")
                             if st.startswith("ACCEPTED:"):
                                 parts = st.split(":", 2)

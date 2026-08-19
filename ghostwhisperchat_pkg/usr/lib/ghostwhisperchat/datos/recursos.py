@@ -79,7 +79,7 @@ class Colores:
     BLACK_TXT = "\033[38;5;0m"
 
 # Versionado - Estable - Tor Onion P2P WAN Global Edition
-APP_VER_NUM = "3.021"
+APP_VER_NUM = "3.022"
 APP_VER_TAG = "Global Edition - Tor Onion P2P WAN"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
@@ -95,7 +95,7 @@ Inicializando...
   ░   ░   ▒ ░ ░    ░  ▒   
 ░ ░   ░   ░   ░  ░        
       ░     ░    ░ ░      
-                 ░     2.0   
+                 ░     3.0   
 """
 
 AYUDA = f"""

@@ -589,12 +589,21 @@ class Motor:
         elif cmd == "CHECK_CHAT_STATUS":
             if not args: return "NONE"
             target = args[0]
+            target_lower = target.lower()
+            
+            # Busqueda 1: exacta (uid o onion)
             st = self.chat_requests_status.get(target)
+            # Busqueda 2: lowercase (nick almacenado en minusculas)
+            if not st:
+                st = self.chat_requests_status.get(target_lower)
+            # Busqueda 3: fallback flexible (substring bidireccional, case-insensitive)
             if not st:
                 for k, v in list(self.chat_requests_status.items()):
-                    if target in k or k in target:
+                    k_lower = k.lower()
+                    if target_lower == k_lower or target_lower in k_lower or k_lower in target_lower:
                         st = v
                         break
+            
             if not st:
                 return "WAITING"
             code = st[0]
@@ -1375,20 +1384,20 @@ class Motor:
                  # Normalize to list
                  m_list = members.values() if isinstance(members, dict) else members
                  
-                 # Send to all peers (LAN y WAN)
+                 # Envio paralelo a todos los miembros: fire-and-forget en hilos daemon.
+                 # Sin paralelismo, miembro-5 esperaria que terminen 1..4 (efecto cascada Tor).
+                 # Con pool activo, solo el 1er mensaje a cada miembro paga el circuit setup;
+                 # los siguientes usan el circuito cacheado (~0.1s).
                  for m in m_list:
                      uid = m.get('uid')
                      if uid == self.memoria.mi_uid: continue
-                     
                      target = self._resolver_host_objetivo(m)
                      if not target: continue
-                     
-                     try:
-                         port_g = m.get('port_group', PORT_GROUP)
-                         # Usar enviar_tcp_priv que gestiona el pool Tor internamente.
-                         # Antes usaba _conectar_socks5 directo (nueva conexion por cada msg).
-                         self.red.enviar_tcp_priv(target, pkg, port=port_g)
-                     except: pass
+                     port_g = m.get('port_group', PORT_GROUP)
+                     def _send_to_member(t=target, p=port_g, pk=pkg):
+                         try: self.red.enviar_tcp_priv(t, pk, port=p)
+                         except: pass
+                     threading.Thread(target=_send_to_member, daemon=True).start()
                  
                  # Log outgoing group message
                  self.memoria.log_historial(chat_id, self.memoria.mi_nick, msg_content, es_propio=True)
