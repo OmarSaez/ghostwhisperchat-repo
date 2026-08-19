@@ -921,6 +921,35 @@ class Motor:
                  
              return res
 
+        elif cmd == "DEL_CONTACT":
+            from ghostwhisperchat.datos.recursos import Colores
+            from ghostwhisperchat.datos.contactos import eliminar_contacto
+            if not args:
+                return f"{Colores.YELLOW}[X] Uso: --eliminar <Nick o UID>{Colores.RESET}"
+            target = " ".join(args)
+            nick_borrado = eliminar_contacto(target)
+            if nick_borrado:
+                uid_ram = next((uid for uid, d in self.memoria.contactos.items()
+                                if isinstance(d, dict) and d.get('nick', '').lower() == target.lower()), None)
+                if uid_ram:
+                    self.memoria.contactos.pop(uid_ram, None)
+                return (f"{Colores.GREEN}[\u2714] Contacto '{nick_borrado}' eliminado de la agenda.{Colores.RESET}\n"
+                        f"     {Colores.GREY}(Si estaba activo en la sesion actual, desaparecera al reconectarse.){Colores.RESET}")
+            else:
+                return f"{Colores.RED}[\u2718] Contacto '{target}' no encontrado en la agenda.{Colores.RESET}"
+
+        elif cmd == "DEL_ALL_CONTACTS":
+            from ghostwhisperchat.datos.recursos import Colores
+            from ghostwhisperchat.datos.contactos import eliminar_todos_contactos
+            if not args or args[0].upper() != "CONFIRMAR":
+                return (f"{Colores.YELLOW}[!] Esto eliminara TODOS tus contactos guardados.\n"
+                        f"    Para confirmar ejecuta: {Colores.BOLD}--eliminar-todos CONFIRMAR{Colores.RESET}\n"
+                        f"    {Colores.GREY}(Los usuarios activos en tu red actual volveren al conectarse){Colores.RESET}")
+            total = eliminar_todos_contactos()
+            self.memoria.contactos.clear()
+            return (f"{Colores.GREEN}[\u2714] Se eliminaron {total} contacto(s) de la agenda.{Colores.RESET}\n"
+                    f"     {Colores.GREY}La agenda quedo vacia. Quienes te contacten volveren a guardarse.{Colores.RESET}")
+
         elif cmd == "SHORTCUTS":
              res = "ABREVIACIONES:\n"
              # Import locally to avoid circular dep if needed, or assume global import

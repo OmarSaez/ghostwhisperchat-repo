@@ -71,6 +71,8 @@ sudo apt update
 | `--enlinea` | | Escanear la red local buscando usuarios activos. | `-s`, `--buscar`, `--radar`, `--quienes`, `--scan` |
 | `--vergrupos` | | Listar los grupos y salas públicas disponibles. | `-g`, `--grupos`, `--explorar`, `--salas` |
 | `--contactos` | | Ver el historial de usuarios (LAN y WAN) con los que hablaste. | `-c`, `--amigos`, `--agenda`, `--historial`, `--contacts` |
+| `--eliminar` | `<Nick>` | Eliminar un contacto específico de la agenda. | `-q`, `--quitar`, `--quitar-contacto`, `--eliminar-contacto`, `--remover`, `--del` |
+| `--eliminar-todos` | `[CONFIRMAR]` | Vaciar toda la agenda de contactos (solicita confirmación). | `-qt`, `--quitar-todos`, `--resetear-agenda`, `--vaciar-agenda` |
 | `--invisible` | | **[Switch]** Ocultarte de los escaneos de otros en la red. | `-v`, `--fantasma`, `--oculto`, `--visibilidad` |
 
 ### 📁 Utilidades y Archivos

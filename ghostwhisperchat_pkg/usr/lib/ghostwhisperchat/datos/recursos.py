@@ -79,7 +79,7 @@ class Colores:
     BLACK_TXT = "\033[38;5;0m"
 
 # Versionado - Estable - Tor Onion P2P WAN Global Edition
-APP_VER_NUM = "3.024"
+APP_VER_NUM = "3.025"
 APP_VER_TAG = "Global Edition - Tor Onion P2P WAN"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
@@ -137,8 +137,11 @@ AYUDA = f"""
   {Colores.GREEN}--contactos{Colores.RESET} .................. Ver historial persistente de amigos.
         {Colores.GREY}[Alias: -c, --amigos]{Colores.RESET}
 
-  {Colores.GREEN}--invisible{Colores.RESET} .................. {Colores.YELLOW}[Switch]{Colores.RESET} Ocultarse del radar.
-        {Colores.GREY}[Alias: -v, --fantasma]{Colores.RESET}
+  {Colores.GREEN}--eliminar <Nick>{Colores.RESET} ............. Eliminar un contacto de la agenda.
+        {Colores.GREY}[Alias: -q, --quitar, --quitar-contacto, --eliminar-contacto, --remover]{Colores.RESET}
+
+  {Colores.GREEN}--eliminar-todos{Colores.RESET} .............. Vaciar toda la agenda de contactos.
+        {Colores.GREY}[Alias: -qt, --quitar-todos, --resetear-agenda, --vaciar-agenda]{Colores.RESET}
 
 {Colores.MAGENTA}{Colores.BOLD}>> UTILIDADES{Colores.RESET}
   {Colores.GREEN}--archivo <Ruta>{Colores.RESET} ............. Enviar archivo (Soporta Drag & Drop).
@@ -225,6 +228,14 @@ ABBREVIATIONS_DISPLAY = {
             'aliases': ['--contactos', '-c', '--amigos', '--agenda', '--historial'],
             'desc': "Ver listado de usuarios con los que hablaste."
         },
+        "ELIMINAR CONTACTO": {
+            'aliases': ['--eliminar', '-q', '--quitar', '--quitar-contacto', '--eliminar-contacto', '--remover'],
+            'desc': "Eliminar un contacto especifico de la agenda. Uso: --eliminar <Nick>"
+        },
+        "VACIAR AGENDA": {
+            'aliases': ['--eliminar-todos', '-qt', '--quitar-todos', '--resetear-agenda', '--vaciar-agenda'],
+            'desc': "Eliminar TODOS los contactos de la agenda (pide confirmacion)."
+        },
         "VISIBILIDAD EN RED": {
             'aliases': ['--invisible', '-v', '--fantasma', '--oculto', '--visibilidad'],
             'desc': "[Switch] Ocultarte o mostrarte en los escaneos de otros."
@@ -294,6 +305,8 @@ COMMAND_MAP = {
     'SCAN_RESULTS':     ['--scan-results', '--resultados-scan'],
     'LIST_GROUPS':      ['--vergrupos', '-g', '--grupos', '--explorar', '--salas'],
     'CONTACTS':         ['--contactos', '-c', '--amigos', '--agenda', '--historial', '--contacts'],
+    'DEL_CONTACT':      ['--eliminar', '-q', '--quitar', '--quitar-contacto', '--eliminar-contacto', '--remover', '--del'],
+    'DEL_ALL_CONTACTS': ['--eliminar-todos', '-qt', '--quitar-todos', '--resetear-agenda', '--vaciar-agenda'],
     'VISIBILITY_TOGGLE':['--invisible', '-v', '--fantasma', '--oculto', '--visibilidad'],
     'FILE':         ['--archivo', '-f', '--enviar', '--mandar', '--adjuntar', '--file'],
     'IMAGE':        ['--imagen', '-i', '--foto', '--picture', '-P'],

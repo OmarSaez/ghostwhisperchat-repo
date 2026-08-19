@@ -73,3 +73,40 @@ def buscar_contacto_por_onion(onion_addr):
             return uid, data
     return None, None
 
+def eliminar_contacto(nick_o_uid):
+    """
+    Elimina un contacto de la agenda buscando por nick (case-insensitive) o por uid exacto.
+    Retorna el nick eliminado si tuvo éxito, o None si no se encontró.
+    """
+    agenda = cargar_contactos()
+    uid_a_borrar = None
+    nick_encontrado = None
+
+    # Buscar primero por uid exacto
+    if nick_o_uid in agenda:
+        uid_a_borrar = nick_o_uid
+        nick_encontrado = agenda[nick_o_uid].get("nick", nick_o_uid)
+    else:
+        # Buscar por nick (case-insensitive)
+        for uid, data in agenda.items():
+            if isinstance(data, dict) and data.get("nick", "").lower() == nick_o_uid.lower():
+                uid_a_borrar = uid
+                nick_encontrado = data.get("nick", nick_o_uid)
+                break
+
+    if uid_a_borrar:
+        del agenda[uid_a_borrar]
+        guardar_contactos(agenda)
+        return nick_encontrado
+
+    return None
+
+def eliminar_todos_contactos():
+    """
+    Elimina toda la agenda de contactos.
+    Retorna el número de contactos eliminados.
+    """
+    agenda = cargar_contactos()
+    total = len(agenda)
+    guardar_contactos({})
+    return total
