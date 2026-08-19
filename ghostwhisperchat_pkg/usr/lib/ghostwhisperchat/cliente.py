@@ -672,20 +672,26 @@ def main():
             
             # Si es búsqueda de usuarios (no salas grupales)
             if args_raw[0] in COMMAND_MAP['SCAN']:
-                # Paso C: Consultar si ya se encontró a otros usuarios en LAN o Tor temprano
+                # Paso C: Consultar estado inicial + cuantos contactos Tor hay en agenda
                 peek_raw = consultar_daemon_respuesta("--scan-peek")
-                peek_count = 0
                 has_tor = False
+                tor_total = 0
+                lan_count = 0
                 try:
                     pdata = json.loads(peek_raw)
-                    peek_count = pdata.get("count", 0)
+                    lan_count = pdata.get("count", 0)
                     has_tor = pdata.get("has_tor_contacts", False)
+                    tor_total = pdata.get("tor_total", 0)
                 except Exception:
                     pass
                 
-                # Paso D: Si no se encontró a nadie en red local y tenemos contactos Tor en agenda, iniciar Fase 2 con cuenta regresiva completa
-                if peek_count == 0 and has_tor:
-                    sys.stdout.write(f"\n{Colores.YELLOW}[!] No se encontraron usuarios en la red local. Consultando contactos Tor...{Colores.RESET}\n")
+                # Paso D: Si hay contactos Tor en agenda, SIEMPRE esperar fase Tor
+                # (independientemente de si ya hay resultados LAN — pueden llegar más respuestas)
+                if has_tor and tor_total > 0:
+                    if lan_count == 0:
+                        sys.stdout.write(f"\n{Colores.YELLOW}[!] No se encontraron usuarios en la red local. Consultando contactos Tor...{Colores.RESET}\n")
+                    else:
+                        sys.stdout.write(f"\n{Colores.YELLOW}[!] Encontrados en LAN. Consultando también contactos Tor globales...{Colores.RESET}\n")
                     sys.stdout.flush()
                     
                     gwc_badges = [
@@ -700,13 +706,7 @@ def main():
                     t_start = time.time()
                     tor_wait_total = 28.0
                     f_idx = 0
-                    
-                    tor_total = 1
-                    try:
-                        pdata = json.loads(peek_raw)
-                        tor_total = pdata.get("tor_total", 1)
-                    except Exception:
-                        pass
+                    tor_respondidos = 0
                     
                     while (time.time() - t_start) < tor_wait_total:
                         elapsed = time.time() - t_start
@@ -716,15 +716,17 @@ def main():
                         
                         sys.stdout.write(f"\r\033[K{Colores.YELLOW}[*] Esperando respuestas Tor... {badge} ({remaining}s restantes){Colores.RESET}")
                         sys.stdout.flush()
-                        
                         time.sleep(0.5)
                         
-                        # Solo cortar si el 100% de los contactos Tor conocidos ya respondieron
+                        # Contar cuantos Tor han respondido (total - LAN base)
                         p_check = consultar_daemon_respuesta("--scan-peek")
                         try:
                             pd = json.loads(p_check)
-                            curr_count = pd.get("count", 0)
-                            if tor_total > 0 and curr_count >= tor_total:
+                            total_now = pd.get("count", 0)
+                            # Tor respondidos = total actual - LAN que habia al inicio
+                            tor_respondidos = max(0, total_now - lan_count)
+                            # Salir anticipado solo si TODOS los contactos Tor respondieron
+                            if tor_total > 0 and tor_respondidos >= tor_total:
                                 break
                         except Exception:
                             pass
