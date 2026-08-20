@@ -857,7 +857,7 @@ class Motor:
                          has_onion = bool(v_data.get('onion') or ponion)
                          
                          badges = ""
-                         if has_ip: badges += f" {Colores.GREEN}[Local]{Colores.RESET}"
+                         if has_ip: badges += f" {Colores.YELLOW}[Local]{Colores.RESET}"
                          if has_onion: badges += f" {Colores.CYAN}[Global]{Colores.RESET}"
                          
                          res += f"   • {pcol}{pn:<15}{Colores.RESET}{badges}\n"
@@ -922,7 +922,7 @@ class Motor:
                       # - <Nick> [<Nick_Original_PC>] [<En línea/Offline>] [<Estado>] [Local] [Global]
                       linea = f"- {Colores.BOLD}{nick}{Colores.RESET} [{s_user}] [{st_color}{st}{Colores.RESET}]"
                       if msg: linea += f" [{msg}]"
-                      if has_ip: linea += f" {Colores.GREEN}[Local]{Colores.RESET}"
+                      if has_ip: linea += f" {Colores.YELLOW}[Local]{Colores.RESET}"
                       if has_onion: linea += f" {Colores.CYAN}[Global]{Colores.RESET}"
                       
                       res += linea + "\n"
@@ -1250,7 +1250,7 @@ class Motor:
                          st_display = f"[{status}: {Colores.C_GOLD}\"{status_msg}\"{Colores.RESET}]"
                      
                      badges = ""
-                     if has_ip: badges += f" {Colores.GREEN}[Local]{Colores.RESET}"
+                     if has_ip: badges += f" {Colores.YELLOW}[Local]{Colores.RESET}"
                      if has_onion: badges += f" {Colores.CYAN}[Global]{Colores.RESET}"
                      
                      res += f" - {Colores.C_GREEN_NEON}{nick}{Colores.RESET} [{Colores.GREY}{sys_user}{Colores.RESET}] {st_display}{tag}{badges}\n"

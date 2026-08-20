@@ -87,7 +87,7 @@ def validar_schema(data):
     if not isinstance(origen, dict):
          return False, "Field 'origen' must be dict"
          
-    if "uid" not in origen or "nick" not in origen or "ip" not in origen:
+    if "uid" not in origen or "nick" not in origen:
         return False, "Incomplete 'origen' struct"
         
     return True, None
