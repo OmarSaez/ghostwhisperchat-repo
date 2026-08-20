@@ -165,7 +165,7 @@ class MemoriaGlobal:
                 json.dump(self.contactos, f)
         except: pass
 
-    def registrar_contacto(self, uid, nick, ip, onion=None, sys_user=None, status_msg=None):
+    def registrar_contacto(self, uid, nick, ip, onion=None, sys_user=None, status_msg=None, remote_privacy="AMBOS"):
         """Registra un contacto persistente (historial de interaccion) sin guardar IP/Onion en JSON"""
         if self.privacy_policy == "NADA":
             return # No guardar nada si la politica es NADA (efimero)
@@ -188,8 +188,15 @@ class MemoriaGlobal:
                 "last_seen": time.time()
             }
             
-            # Store private data in vault
-            update_vault_entry(uid, ip=ip, onion=onion)
+            # Store private data in vault respetando la privacidad del otro
+            save_ip = ip if remote_privacy in ["AMBOS", "IP", "SOLO-LOCAL"] else None
+            save_onion = onion if remote_privacy in ["AMBOS", "TOR", "SOLO-GLOBAL"] else None
+            
+            if save_ip or save_onion:
+                update_vault_entry(uid, ip=save_ip, onion=save_onion)
+            else:
+                from ghostwhisperchat.core.cripto_vault import delete_vault_entry
+                delete_vault_entry(uid)
 
         self.guardar_contactos()
         
@@ -260,7 +267,7 @@ class MemoriaGlobal:
         if port_priv: self.mi_port_priv = port_priv
         if port_group: self.mi_port_group = port_group
 
-    def actualizar_peer(self, ip, uid, nick, status="ONLINE", port_priv=None, port_group=None, sys_user=None, status_msg=None, onion=None):
+    def actualizar_peer(self, ip, uid, nick, status="ONLINE", port_priv=None, port_group=None, sys_user=None, status_msg=None, onion=None, remote_privacy="AMBOS"):
         with self._lock:
             if uid not in self.peers:
                 self.peers[uid] = {}
@@ -281,7 +288,7 @@ class MemoriaGlobal:
             if port_group: self.peers[uid]['port_group'] = port_group
             
             # Persistencia Automatica
-            self.registrar_contacto(uid, nick, ip, onion=onion, sys_user=sys_user, status_msg=status_msg)
+            self.registrar_contacto(uid, nick, ip, onion=onion, sys_user=sys_user, status_msg=status_msg, remote_privacy=remote_privacy)
 
     def obtener_peer(self, uid):
         return self.peers.get(uid)
@@ -336,20 +343,19 @@ class MemoriaGlobal:
         return candidates[0]
         
     def get_origen(self):
-        """Devuelve el dict estándar 'origen' para paquetes respetando la politica de privacidad"""
+        """Devuelve el dict estándar 'origen' para paquetes. Siempre incluimos IP/Onion para el ruteo de red, pero añadimos nuestra politica de privacidad para que el receptor sepa qué guardar permanentemente."""
         origen = {
             "nick": self.mi_nick,
             "uid": self.mi_uid,
             "sys_user": self.sys_user,
             "status_msg": self.mi_estado_msg,
             "port_priv": getattr(self, 'mi_port_priv', 44494),
-            "port_group": getattr(self, 'mi_port_group', 44496)
+            "port_group": getattr(self, 'mi_port_group', 44496),
+            "ip": self.mi_ip,
+            "privacy_policy": getattr(self, 'privacy_policy', "AMBOS")
         }
         
-        # Compartir IP y/o Onion según la política de privacidad
-        if self.privacy_policy in ["AMBOS", "IP"]:
-            origen["ip"] = self.mi_ip
-        if self.privacy_policy in ["AMBOS", "TOR"]:
+        if self.mi_onion:
             origen["onion"] = self.mi_onion
             
         return origen

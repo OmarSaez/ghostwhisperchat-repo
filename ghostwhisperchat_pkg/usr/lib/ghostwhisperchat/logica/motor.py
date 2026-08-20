@@ -1807,7 +1807,8 @@ class Motor:
                          status_msg=origen.get('status_msg'),
                          port_priv=origen.get('port_priv'),
                          port_group=origen.get('port_group'),
-                         onion=origen.get('onion')
+                         onion=origen.get('onion'),
+                         remote_privacy=origen.get('privacy_policy', 'AMBOS')
                      )
                      # Notify global UI? Usually user is in transient console, 
                      # but we can't easily print to it unless it polled.
@@ -1925,7 +1926,8 @@ class Motor:
                      status_msg=origen.get('status_msg'),
                      port_priv=origen.get('port_priv'),
                      port_group=origen.get('port_group'),
-                     onion=origen.get('onion')
+                     onion=origen.get('onion'),
+                     remote_privacy=origen.get('privacy_policy', 'AMBOS')
                  )
 
         if tipo == "TYPING":
@@ -2048,7 +2050,8 @@ class Motor:
                         status_msg=origen.get('status_msg'),
                         port_priv=origen.get('port_priv'),
                         port_group=origen.get('port_group'),
-                        onion=origen.get('onion')
+                        onion=origen.get('onion'),
+                        remote_privacy=origen.get('privacy_policy', 'AMBOS')
                     )
                 
                 # 2. Send WELCOME
@@ -2177,7 +2180,8 @@ class Motor:
                          status_msg=m.get('status_msg', ''),
                          port_priv=m.get('port_priv'),
                          port_group=m.get('port_group'),
-                         onion=m.get('onion')
+                         onion=m.get('onion'),
+                         remote_privacy=m.get('privacy_policy', 'AMBOS')
                      )
                      
                      target_host = self._resolver_host_objetivo(m)
@@ -2224,7 +2228,8 @@ class Motor:
                          status_msg=new_user.get('status_msg'),
                          port_priv=new_user.get('port_priv'),
                          port_group=new_user.get('port_group'),
-                         onion=new_user.get('onion')
+                         onion=new_user.get('onion'),
+                         remote_privacy=new_user.get('privacy_policy', 'AMBOS')
                      )
                      
                      print(f"[GROUP] Miembro anunciado: {new_user['nick']}", file=sys.stderr)
@@ -2461,7 +2466,8 @@ class Motor:
                 status_msg=origen.get('status_msg'),
                 port_priv=target_port,
                 port_group=origen.get('port_group'),
-                onion=onion_origen
+                onion=onion_origen,
+                remote_privacy=origen.get('privacy_policy', 'AMBOS')
             )
 
             if self.memoria.no_molestar:
@@ -2532,7 +2538,8 @@ class Motor:
                 status_msg=origen.get('status_msg'),
                 port_priv=origen.get('port_priv'),
                 port_group=origen.get('port_group'),
-                onion=origen.get('onion')
+                onion=origen.get('onion'),
+                remote_privacy=origen.get('privacy_policy', 'AMBOS')
             )
 
             # --- Handshake paso 3: Emisor envia CHAT_READY al receptor ---
