@@ -99,6 +99,9 @@ class MemoriaGlobal:
         # Grupos
         self.grupos_activos = {}
         
+        # Ignorados temporales (para que al eliminar un contacto no vuelva a aparecer al instante por un ping)
+        self.contactos_ignorados = set()
+        
         # Buzón Privado (Mensajes pendients de leer o historial sesion actual)
         self.buzon_privado = [] 
         
@@ -166,6 +169,9 @@ class MemoriaGlobal:
         """Registra un contacto persistente (historial de interaccion) sin guardar IP/Onion en JSON"""
         if self.privacy_policy == "NADA":
             return # No guardar nada si la politica es NADA (efimero)
+            
+        if hasattr(self, 'contactos_ignorados') and uid in self.contactos_ignorados:
+            return # Ignorar auto-registro si fue eliminado en esta sesion
 
         from ghostwhisperchat.core.cripto_vault import update_vault_entry
         with self._lock:

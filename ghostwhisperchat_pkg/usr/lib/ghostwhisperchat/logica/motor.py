@@ -950,6 +950,9 @@ class Motor:
             if uid_a_borrar:
                 # 1. Eliminar de RAM
                 self.memoria.contactos.pop(uid_a_borrar, None)
+                self.memoria.peers.pop(uid_a_borrar, None) # Tambien de peers activos para que desaparezca YA
+                if hasattr(self.memoria, 'contactos_ignorados'):
+                    self.memoria.contactos_ignorados.add(uid_a_borrar)
                 # 2. Persistir a disco (contacts.json) mediante el helper de memoria
                 self.memoria.guardar_contactos()
                 # 3. Eliminar de bóveda encriptada
@@ -968,8 +971,11 @@ class Motor:
                         f"    Para confirmar ejecuta: {Colores.BOLD}--eliminar-todos CONFIRMAR{Colores.RESET}\n"
                         f"    {Colores.GREY}(Los usuarios activos en tu red actual volveren al conectarse){Colores.RESET}")
             total = len(self.memoria.contactos)
+            if hasattr(self.memoria, 'contactos_ignorados'):
+                self.memoria.contactos_ignorados.update(self.memoria.contactos.keys())
             # Limpiar RAM y persistir a disco
             self.memoria.contactos.clear()
+            self.memoria.peers.clear() # Tambien limpiar peers activos
             self.memoria.guardar_contactos()
             
             # Limpiar boveda

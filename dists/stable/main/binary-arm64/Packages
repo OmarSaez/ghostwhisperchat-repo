@@ -1,21 +1,4 @@
 Package: ghostwhisperchat
-Version: 3.028
-Architecture: all
-Maintainer: Omar Saez <omarsaez@ghostwhisper.chat>
-Depends: python3, python3-cryptography, libnotify-bin, portaudio19-dev, python3-pyaudio, vorbis-tools, zenity, xterm, pulseaudio-utils, tor, python3-stem
-Filename: pool/main/g/ghostwhisperchat/ghostwhisperchat_3.028_all.deb
-Size: 250270
-MD5sum: 2efc37e9c49e20a744e5bab411a7e2c7
-SHA1: 6731fa14ad091042ed089c655ebed7db6db62bba
-SHA256: b654c270d22fa472249e611208645e93257c321bade5540d0b4a3ce9dd96ac02
-Section: net
-Priority: optional
-Description: GhostWhisperChat - Chat P2P Global Seguro (Edición WAN + LAN)
- Sistema de chat descentralizado con cifrado E2E, transferencia de archivos,
- soporte global sin servidores centrales mediante Tor Onion Services v3
- y descubrimiento automático en LAN.
-
-Package: ghostwhisperchat
 Version: 3.029
 Architecture: all
 Maintainer: Omar Saez <omarsaez@ghostwhisper.chat>
@@ -42,6 +25,23 @@ Size: 250540
 MD5sum: f401d83b2c6784581e8c00338fc2e55e
 SHA1: 78728b7859f3810d706c6dc10e81e2e6fc1b8e6f
 SHA256: 958adb4c3f538a75a9c79399a580b901492d183f3648bfce672e7e196c3fdc9f
+Section: net
+Priority: optional
+Description: GhostWhisperChat - Chat P2P Global Seguro (Edición WAN + LAN)
+ Sistema de chat descentralizado con cifrado E2E, transferencia de archivos,
+ soporte global sin servidores centrales mediante Tor Onion Services v3
+ y descubrimiento automático en LAN.
+
+Package: ghostwhisperchat
+Version: 3.031
+Architecture: all
+Maintainer: Omar Saez <omarsaez@ghostwhisper.chat>
+Depends: python3, python3-cryptography, libnotify-bin, portaudio19-dev, python3-pyaudio, vorbis-tools, zenity, xterm, pulseaudio-utils, tor, python3-stem
+Filename: pool/main/g/ghostwhisperchat/ghostwhisperchat_3.031_all.deb
+Size: 250682
+MD5sum: a64be701215ebb347eba38ae6e3c86ed
+SHA1: 19c35b4e3dadd2f581ad30cbf0ea84544899f08c
+SHA256: a909ce0489575a5d0eb9c4668d7fa563d59d51fe1b820765637f08c00f20e92a
 Section: net
 Priority: optional
 Description: GhostWhisperChat - Chat P2P Global Seguro (Edición WAN + LAN)
