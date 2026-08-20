@@ -166,6 +166,39 @@ class GestorInput:
         try:
             tty.setraw(sys.stdin.fileno())
             while self.running:
+                import select
+                rfds, _, _ = select.select([sys.stdin], [], [], 0.05)
+                
+                if getattr(self, 'pending_native_img', None):
+                    img_path = self.pending_native_img
+                    self.pending_native_img = None
+                    
+                    import shutil, subprocess
+                    if shutil.which("kitty"):
+                        try:
+                            self.print_incoming(f"{C.CYAN}[IMAGEN NATIVA]{C.RESET}")
+                            subprocess.run(["kitty", "+kitten", "icat", "--align", "left", img_path])
+                        except: pass
+                    else:
+                        try:
+                            self.print_incoming(f"{C.CYAN}[IMAGEN ASCII]{C.RESET}")
+                            from ghostwhisperchat.core import imagen_ascii
+                            res = imagen_ascii.render_ascii(img_path, 60)
+                            if not res.startswith("ERROR:"):
+                                print(res)
+                            else:
+                                self.print_incoming(f"{C.RED}[X] {res}{C.RESET}")
+                        except Exception as e:
+                            self.print_incoming(f"{C.RED}[X] Crash Rendering: {e}{C.RESET}")
+                
+                if getattr(self, 'pause_input', False):
+                    if rfds:
+                        sys.stdin.read(1) # discard kitty sequence
+                    continue
+                    
+                if not rfds:
+                    continue
+                    
                 ch = sys.stdin.read(1)
                 
                 # --- Typing Detection Logic ---
@@ -564,24 +597,7 @@ def modo_ui_chat(target_id, es_grupo):
                     # RECEIVE NATIVE IMG (v3.038)
                     if line.strip().startswith("__NATIVE_IMG__"):
                          img_path = line.strip().replace("__NATIVE_IMG__", "", 1).strip()
-                         import shutil, subprocess
-                         kitty_success = False
-                         if shutil.which("kitty"):
-                             try:
-                                 helper.print_incoming(f"{C.CYAN}[IMAGEN NATIVA]{C.RESET}")
-                                 subprocess.run(["kitty", "+kitten", "icat", "--align", "left", img_path])
-                                 kitty_success = True
-                             except: pass
-                         if not kitty_success:
-                             try:
-                                 helper.print_incoming(f"{C.CYAN}[IMAGEN ASCII]{C.RESET}")
-                                 res = imagen_ascii.render_ascii(img_path, 60)
-                                 if not res.startswith("ERROR:"):
-                                     print(res)
-                                 else:
-                                     helper.print_incoming(f"{C.RED}[X] {res}{C.RESET}")
-                             except Exception as e:
-                                 helper.print_incoming(f"{C.RED}[X] Crash Rendering: {e}{C.RESET}")
+                         helper.pending_native_img = img_path
                          continue
 
 
