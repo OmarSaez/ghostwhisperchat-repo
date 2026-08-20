@@ -79,7 +79,7 @@ class Colores:
     BLACK_TXT = "\033[38;5;0m"
 
 # Versionado - Estable - Global P2P WAN Global Edition
-APP_VER_NUM = "3.034"
+APP_VER_NUM = "3.035"
 APP_VER_TAG = "Global Edition - Global P2P WAN"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 

@@ -185,18 +185,32 @@ class MemoriaGlobal:
                 "nick": nick,
                 "sys_user": sys_user_final,
                 "status_msg": status_msg_final,
-                "last_seen": time.time()
+                "last_seen": time.time(),
+                "privacy_policy": remote_privacy
             }
             
             # Store private data in vault respetando la privacidad del otro
-            save_ip = ip if remote_privacy in ["AMBOS", "IP", "SOLO-LOCAL"] else None
-            save_onion = onion if remote_privacy in ["AMBOS", "TOR", "SOLO-GLOBAL"] else None
+            from ghostwhisperchat.core.cripto_vault import load_vault, save_vault, delete_vault_entry
+            vault = load_vault()
+            entry = vault.get(uid, {})
             
-            if save_ip or save_onion:
-                update_vault_entry(uid, ip=save_ip, onion=save_onion)
+            # Remove keys if the remote privacy forbids them
+            if remote_privacy not in ["AMBOS", "IP", "SOLO-LOCAL"] and "ip" in entry:
+                 del entry["ip"]
+            if remote_privacy not in ["AMBOS", "TOR", "SOLO-GLOBAL"] and "onion" in entry:
+                 del entry["onion"]
+                 
+            # Add keys if permitted and provided
+            if remote_privacy in ["AMBOS", "IP", "SOLO-LOCAL"] and ip:
+                 entry["ip"] = ip
+            if remote_privacy in ["AMBOS", "TOR", "SOLO-GLOBAL"] and onion:
+                 entry["onion"] = onion
+                 
+            if entry:
+                 vault[uid] = entry
+                 save_vault(vault)
             else:
-                from ghostwhisperchat.core.cripto_vault import delete_vault_entry
-                delete_vault_entry(uid)
+                 delete_vault_entry(uid)
 
         self.guardar_contactos()
         
@@ -277,7 +291,8 @@ class MemoriaGlobal:
                 "nick": nick,
                 "ip": ip,
                 "status": status,
-                "last_seen": time.time()
+                "last_seen": time.time(),
+                "privacy_policy": remote_privacy
             }
             if sys_user: update_data['sys_user'] = sys_user
             if status_msg is not None: update_data['status_msg'] = status_msg

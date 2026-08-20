@@ -551,7 +551,14 @@ class Motor:
                       ip_val = item.get('ip', '?.?.?.?')
                       onion_val = item.get('onion')
                       channel = item.get('channel')
-                      suffix = f" {Colores.GREY}[Tu]{Colores.RESET}" if ip_val == self.memoria.mi_ip else ""
+                      peer_privacy = item.get('privacy_policy', 'AMBOS')
+                      
+                      if peer_privacy not in ["AMBOS", "IP", "SOLO-LOCAL"]:
+                          ip_val = "Oculto"
+                      if peer_privacy not in ["AMBOS", "TOR", "SOLO-GLOBAL"]:
+                          onion_val = None
+                          
+                      suffix = f" {Colores.GREY}[Tu]{Colores.RESET}" if item.get('ip') == self.memoria.mi_ip else ""
                       
                       linea = f"[*] {Colores.BOLD}{nick}{Colores.RESET}"
                       if onion_val or channel == "Red Global":
@@ -913,8 +920,15 @@ class Motor:
                       # Get IP and Onion from Vault to show badges
                       from ghostwhisperchat.core.cripto_vault import get_vault_entry
                       v_data = get_vault_entry(uid)
-                      has_ip = bool(v_data.get('ip') or data.get('ip'))
-                      has_onion = bool(v_data.get('onion') or data.get('onion'))
+                      
+                      peer_privacy = data.get('privacy_policy', 'AMBOS')
+                      has_ip = False
+                      if peer_privacy in ["AMBOS", "IP", "SOLO-LOCAL"]:
+                          has_ip = bool(v_data.get('ip') or data.get('ip'))
+                          
+                      has_onion = False
+                      if peer_privacy in ["AMBOS", "TOR", "SOLO-GLOBAL"]:
+                          has_onion = bool(v_data.get('onion') or data.get('onion'))
                       
                       st_color = Colores.GREEN if st == 'ONLINE' else Colores.GREY
                       
@@ -1823,9 +1837,11 @@ class Motor:
             
             if ftype == "PEER":
                 peer_data = {
-                    "nick": origen['nick'],
+                    "nick": origen.get('nick', 'Desconocido'),
                     "ip": addr[0],
-                    "status": payload.get("status")
+                    "status": payload.get("status"),
+                    "onion": origen.get('onion'),
+                    "privacy_policy": origen.get('privacy_policy', 'AMBOS')
                 }
                 # Evitar duplicados en el buffer
                 if not any(x['ip'] == addr[0] for x in self.scan_buffer):
@@ -2590,7 +2606,8 @@ class Motor:
                     "onion": origen.get('onion'),
                     "channel": "Red Global" if origen.get('onion') else "LAN",
                     "status": payload.get("status", "ONLINE"),
-                    "uid": origen.get('uid')
+                    "uid": origen.get('uid'),
+                    "privacy_policy": origen.get('privacy_policy', 'AMBOS')
                 }
                 if not any(x.get('uid') == origen.get('uid') or (origen.get('onion') and x.get('onion') == origen.get('onion')) for x in self.scan_buffer):
                     self.scan_buffer.append(peer_data)
