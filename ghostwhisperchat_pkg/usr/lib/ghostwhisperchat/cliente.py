@@ -181,7 +181,9 @@ class GestorInput:
                         try:
                             self.print_incoming(f"{C.CYAN}[IMAGEN NATIVA]{C.RESET}")
                             self._limpiar_linea()
-                            subprocess.run(["kitty", "+kitten", "icat", "--align", "left", img_path])
+                            subprocess.run(["kitty", "+kitten", "icat", "--unicode-placeholder", "--align", "left", img_path])
+                            sys.stdout.write("\r\n")
+                            sys.stdout.flush()
                             self._pintar_linea()
                         except: pass
                     else:
@@ -361,7 +363,9 @@ class GestorInput:
                          # Render Native Kitty
                          self.print_incoming(f"{C.CYAN}[IMAGEN NATIVA] {os.path.basename(im_path)}{C.RESET}")
                          self._limpiar_linea()
-                         subprocess.run(["kitty", "+kitten", "icat", "--align", "left", im_path])
+                         subprocess.run(["kitty", "+kitten", "icat", "--unicode-placeholder", "--align", "left", im_path])
+                         sys.stdout.write("\r\n")
+                         sys.stdout.flush()
                          self._pintar_linea()
                          kitty_success = True
                      except: pass
