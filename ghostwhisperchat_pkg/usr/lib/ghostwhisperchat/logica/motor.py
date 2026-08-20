@@ -112,18 +112,18 @@ class Motor:
                     self.memoria.mi_onion = self.tor.onion_address
                     self.red.set_socks_proxy(self.tor.socks_host, self.tor.socks_port)
                     self.memoria.guardar_configuracion()
-                    print(f"[*] Tor Onion Activo: {self.tor.onion_address}", file=sys.stderr)
+                    print(f"[*] Red Global Activa: {self.tor.onion_address}", file=sys.stderr)
                     # Iniciar watchdog de salud Tor y keepalive de sesiones
                     threading.Thread(target=self._hilo_tor_watchdog, daemon=True).start()
                     threading.Thread(target=self._hilo_keepalive_chat, daemon=True).start()
                 else:
-                    print(f"[*] Tor no activo ({self.tor.status_message}). Modo LAN.", file=sys.stderr)
+                    print(f"[*] Red Global no activa ({self.tor.status_message}). Modo Local.", file=sys.stderr)
 
             threading.Thread(target=_iniciar_tor_async, daemon=True).start()
             # Hilo de timeout de ACK: opera independiente de Tor (también cubre LAN)
             threading.Thread(target=self._hilo_ack_timeout, daemon=True).start()
         except Exception as e:
-            print(f"[!] No se pudo cargar TorManager: {e}", file=sys.stderr)
+            print(f"[!] No se pudo cargar gestor de red Global: {e}", file=sys.stderr)
 
         self.iniciar_ipc()
         self.running = True
@@ -224,7 +224,7 @@ class Motor:
 
     def _resolver_host_objetivo(self, peer_o_origen):
         """
-        Determina de forma inteligente si la ruta hacia un contacto es directa por IP LAN o vía Tor Onion (WAN).
+        Determina de forma inteligente si la ruta hacia un contacto es directa por IP LAN o vía Global (WAN).
         Si dispone de ID Onion y la IP coincide con el pool local (ej: 192.168.1.x), realiza un test de socket ultrarrápido (150ms)
         para confirmar si el nodo está físicamente en la misma red LAN. Si no responde en LAN, conmuta automáticamente a Tor Onion.
         """
@@ -554,8 +554,8 @@ class Motor:
                       suffix = f" {Colores.GREY}[Tu]{Colores.RESET}" if ip_val == self.memoria.mi_ip else ""
                       
                       linea = f"[*] {Colores.BOLD}{nick}{Colores.RESET}"
-                      if onion_val or channel == "Tor Global":
-                          linea += f" {Colores.CYAN}[🌐 Tor Global]{Colores.RESET}"
+                      if onion_val or channel == "Red Global":
+                          linea += f" {Colores.CYAN}[🌐 Red Global]{Colores.RESET}"
                           if onion_val:
                               linea += f" ({Colores.GREY}{onion_val[:12]}...{Colores.RESET})"
                       else:
@@ -645,7 +645,7 @@ class Motor:
                     f"{Colores.GREEN}======================================================{Colores.RESET}\n"
                 )
             else:
-                msg = self.tor.status_message if hasattr(self, 'tor') and self.tor else "Tor no iniciado"
+                msg = self.tor.status_message if hasattr(self, 'tor') and self.tor else "Red Global no iniciada"
                 if "Conectando" in msg or "Iniciando" in msg or "bootstrap" in msg.lower():
                     return f"{Colores.YELLOW}[⏳] {msg} Por favor espera unos segundos y vuelve a consultar con: gwc --mi-id{Colores.RESET}"
                 return f"{Colores.YELLOW}[!] Identidad global no disponible ({msg}). Operando en Modo Solo LAN.{Colores.RESET}"
@@ -669,10 +669,10 @@ class Motor:
              # 1. Dirección Onion directa
              if str(target_nick).endswith(".onion"):
                  try:
-                     print(f"[GROUP] Invitando por WAN (Tor) a {target_nick}...", file=sys.stderr)
+                     print(f"[GROUP] Invitando por Global a {target_nick}...", file=sys.stderr)
                      ok = self.red.enviar_tcp_priv(target_nick, invite_pkg, port=44494)
                      if ok:
-                         return f"[*] Invitación WAN (Tor) enviada a {target_nick}."
+                         return f"[*] Invitación Global enviada a {target_nick}."
                      else:
                          return f"[X] No se pudo conectar con {target_nick} por Tor."
                  except Exception as e:
@@ -694,7 +694,7 @@ class Motor:
                      if isinstance(c, dict) and c.get('nick', '').lower() == target_nick.lower() and c.get('onion'):
                          try:
                              ok = self.red.enviar_tcp_priv(c['onion'], invite_pkg, port=44494)
-                             if ok: return f"[*] Invitación enviada vía Tor Onion a {target_nick}."
+                             if ok: return f"[*] Invitación enviada vía Global a {target_nick}."
                          except: pass
 
                  # Fuzzy / Offline Search
@@ -764,7 +764,7 @@ class Motor:
                                      "nick": c_info.get('nick', 'Desconocido'),
                                      "ip": "WAN",
                                      "onion": onion_addr,
-                                     "channel": "Tor Global",
+                                     "channel": "Red Global",
                                      "status": "ONLINE",
                                      "uid": uid_c
                                  })
@@ -822,8 +822,8 @@ class Motor:
                  
                  from ghostwhisperchat.datos.recursos import APP_VERSION
                  
-                 res += f"   • IP Local:  {Colores.GREEN}{m.mi_ip}{Colores.RESET}\n"
-                 onion_disp = f"{Colores.CYAN}{m.mi_onion}{Colores.RESET}" if m.mi_onion else f"{Colores.YELLOW}(Modo Solo LAN / Tor no activo){Colores.RESET}"
+                 res += f"   • Ruta Local:  {Colores.GREEN}{m.mi_ip}{Colores.RESET}\n"
+                 onion_disp = f"{Colores.CYAN}{m.mi_onion}{Colores.RESET}" if m.mi_onion else f"{Colores.YELLOW}(Modo Solo Local / Red Global no activa){Colores.RESET}"
                  res += f"   • GWC-ID:    {onion_disp}\n"
                  res += f"   • Versión:   {Colores.C_PINK_PASTEL}{APP_VERSION}{Colores.RESET}\n"
                  res += f"   • UID:       {Colores.CYAN}{str(m.mi_uid)[:12]}...{Colores.RESET}\n"
@@ -849,8 +849,18 @@ class Motor:
                          pci = ph % len(Colores.NICK_COLORS)
                          pcol = Colores.NICK_COLORS[pci]
                          
-                         pip = str(p.get('ip', '0.0.0.0'))
-                         res += f"   • {pcol}{pn:<15}{Colores.RESET} [{pip}]\n"
+                         pip = str(p.get('ip', ''))
+                         ponion = str(p.get('onion', ''))
+                         from ghostwhisperchat.core.cripto_vault import get_vault_entry
+                         v_data = get_vault_entry(p.get('uid'))
+                         has_ip = bool(v_data.get('ip') or pip)
+                         has_onion = bool(v_data.get('onion') or ponion)
+                         
+                         badges = ""
+                         if has_ip: badges += f" {Colores.GREEN}[Local]{Colores.RESET}"
+                         if has_onion: badges += f" {Colores.CYAN}[Global]{Colores.RESET}"
+                         
+                         res += f"   • {pcol}{pn:<15}{Colores.RESET}{badges}\n"
                  res += "\n"
 
                  # Groups
@@ -896,24 +906,24 @@ class Motor:
                           data['status'] = 'OFFLINE'
                           
                       nick = data.get('nick', 'Desconocido')
-                      ip_addr = data.get('ip', '?.?.?.?')
                       s_user = data.get('sys_user', '?')
                       st = data.get('status', 'OFFLINE')
                       msg = data.get('status_msg', '')
-                      onion = data.get('onion')
+                      
+                      # Get IP and Onion from Vault to show badges
+                      from ghostwhisperchat.core.cripto_vault import get_vault_entry
+                      v_data = get_vault_entry(uid)
+                      has_ip = bool(v_data.get('ip') or data.get('ip'))
+                      has_onion = bool(v_data.get('onion') or data.get('onion'))
                       
                       st_color = Colores.GREEN if st == 'ONLINE' else Colores.GREY
                       
-                      # Formato Rico
-                      linea = f"- {Colores.BOLD}{nick}{Colores.RESET} [{s_user}@{ip_addr}] [{st_color}{st}{Colores.RESET}"
-                      if msg: linea += f": \"{msg}\""
-                      linea += "]"
-                      
-                      # Badge Tor Global
-                      if onion:
-                          linea += f" {Colores.CYAN}[🌐 Tor Global]{Colores.RESET}"
-                          
-                      linea += f" ({Colores.GREY}{uid}{Colores.RESET})"
+                      # Formato Visual (Sin IPs ni Onions expuestas)
+                      # - <Nick> [<Nick_Original_PC>] [<En línea/Offline>] [<Estado>] [Local] [Global]
+                      linea = f"- {Colores.BOLD}{nick}{Colores.RESET} [{s_user}] [{st_color}{st}{Colores.RESET}]"
+                      if msg: linea += f" [{msg}]"
+                      if has_ip: linea += f" {Colores.GREEN}[Local]{Colores.RESET}"
+                      if has_onion: linea += f" {Colores.CYAN}[Global]{Colores.RESET}"
                       
                       res += linea + "\n"
              except Exception as e:
@@ -942,6 +952,10 @@ class Motor:
                 self.memoria.contactos.pop(uid_a_borrar, None)
                 # 2. Persistir a disco (contacts.json) mediante el helper de memoria
                 self.memoria.guardar_contactos()
+                # 3. Eliminar de bóveda encriptada
+                from ghostwhisperchat.core.cripto_vault import delete_vault_entry
+                delete_vault_entry(uid_a_borrar)
+                
                 return (f"{Colores.GREEN}[\u2714] Contacto '{nick_borrado}' eliminado de la agenda.{Colores.RESET}\n"
                         f"     {Colores.GREY}(Si estaba activo en la sesion actual, desaparecera al reconectarse.){Colores.RESET}")
             else:
@@ -957,8 +971,33 @@ class Motor:
             # Limpiar RAM y persistir a disco
             self.memoria.contactos.clear()
             self.memoria.guardar_contactos()
+            
+            # Limpiar boveda
+            from ghostwhisperchat.core.cripto_vault import clear_vault
+            clear_vault()
+            
             return (f"{Colores.GREEN}[\u2714] Se eliminaron {total} contacto(s) de la agenda.{Colores.RESET}\n"
                     f"     {Colores.GREY}La agenda quedo vacia. Quienes te contacten volveren a guardarse.{Colores.RESET}")
+                    
+        elif cmd == "PRIVACY_POLICY":
+            from ghostwhisperchat.datos.recursos import Colores
+            valid_policies = {"AMBOS": "AMBOS", "SOLO-LOCAL": "IP", "SOLO-GLOBAL": "TOR", "NADA": "NADA"}
+            if not args or args[0].upper() not in valid_policies:
+                 curr = self.memoria.privacy_policy
+                 curr_display = [k for k,v in valid_policies.items() if v == curr]
+                 curr_display = curr_display[0] if curr_display else "AMBOS"
+                 return (f"{Colores.YELLOW}[!] Politica de privacidad actual: {Colores.BOLD}{curr_display}{Colores.RESET}\n"
+                         f"Opciones validas: --privacidad [AMBOS | SOLO-LOCAL | SOLO-GLOBAL | NADA]\n"
+                         f"- AMBOS: Comparte ruta Local (IP local) y Global (ID Tor .onion).\n"
+                         f"- SOLO-LOCAL: Solo comparte ruta Local (IP local en LAN).\n"
+                         f"- SOLO-GLOBAL: Solo comparte ruta Global (ID Tor .onion).\n"
+                         f"- NADA: Modo fantasma. No guarda ni expone rutas, solo Nick y Estado.")
+            
+            sel = args[0].upper()
+            self.memoria.privacy_policy = valid_policies[sel]
+            self.memoria.guardar_configuracion()
+            self._propagar_actualizacion_perfil()
+            return f"{Colores.GREEN}[\u2714] Politica de privacidad actualizada a: {Colores.BOLD}{sel}{Colores.RESET}"
 
         elif cmd == "SHORTCUTS":
              res = "ABREVIACIONES:\n"
@@ -1036,18 +1075,18 @@ class Motor:
                   req = empaquetar("CHAT_REQ", {}, self.memoria.get_origen())
                   def _send_onion_chat():
                       try:
-                          print(f"[CHAT_WAN] Conectando vía Tor a {target}:44494...", file=sys.stderr)
+                          print(f"[CHAT_WAN] Conectando vía Global a {target}:44494...", file=sys.stderr)
                           ok = self.red.enviar_tcp_priv(target, req, port=44494, force_new=True)
                           if ok:
                               print(f"[CHAT_WAN] Solicitud entregada exitosamente a {target}.", file=sys.stderr)
                           else:
                               print(f"[CHAT_WAN] [X] No se pudo entregar solicitud a {target}.", file=sys.stderr)
-                              self.chat_requests_status[target] = ('REJECTED', target, 'No se pudo conectar vía Tor')
+                              self.chat_requests_status[target] = ('REJECTED', target, 'No se pudo conectar vía Global')
                       except Exception as e:
                           print(f"[CHAT_WAN] [!] Error entregando a {target}: {e}", file=sys.stderr)
                           self.chat_requests_status[target] = ('REJECTED', target, str(e))
                   threading.Thread(target=_send_onion_chat, daemon=True).start()
-                  return f"[*] Solicitud enviada a {target} vía Tor Onion. Esperando respuesta..."
+                  return f"[*] Solicitud enviada a {target} vía Global. Esperando respuesta..."
 
              # 2. IP Directa
              import re
@@ -1069,18 +1108,18 @@ class Motor:
                   if str(dest_host).endswith(".onion"):
                       def _send_onion_peer():
                           try:
-                              print(f"[CHAT_WAN] Conectando vía Tor a {target} ({dest_host}:{port_p})...", file=sys.stderr)
+                              print(f"[CHAT_WAN] Conectando vía Global a {target} ({dest_host}:{port_p})...", file=sys.stderr)
                               ok = self.red.enviar_tcp_priv(dest_host, req, port=port_p, force_new=True)
                               if ok:
                                   print(f"[CHAT_WAN] Solicitud entregada exitosamente a {target}.", file=sys.stderr)
                               else:
                                   print(f"[CHAT_WAN] [X] No se pudo entregar solicitud a {target}.", file=sys.stderr)
-                                  self.chat_requests_status[target] = ('REJECTED', target, 'No se pudo conectar vía Tor')
+                                  self.chat_requests_status[target] = ('REJECTED', target, 'No se pudo conectar vía Global')
                           except Exception as e:
                               print(f"[CHAT_WAN] [!] Error entregando a {target}: {e}", file=sys.stderr)
                               self.chat_requests_status[target] = ('REJECTED', target, str(e))
                       threading.Thread(target=_send_onion_peer, daemon=True).start()
-                      return f"[*] Solicitud enviada a '{target}' vía Tor Onion. Esperando respuesta..."
+                      return f"[*] Solicitud enviada a '{target}' vía Global. Esperando respuesta..."
                   else:
                       try:
                           print(f"[CHAT_CMD] Conectando a {target} ({dest_host}:{port_p})", file=sys.stderr)
@@ -1099,18 +1138,18 @@ class Motor:
                      if str(dest_host).endswith(".onion"):
                          def _send_onion_c(dh=dest_host, pp=port_p):
                              try:
-                                 print(f"[CHAT_WAN] Conectando vía Tor a contacto de agenda '{target}' ({dh}:{pp})...", file=sys.stderr)
+                                 print(f"[CHAT_WAN] Conectando vía Global a contacto de agenda '{target}' ({dh}:{pp})...", file=sys.stderr)
                                  ok = self.red.enviar_tcp_priv(dh, req, port=pp, force_new=True)
                                  if ok:
                                      print(f"[CHAT_WAN] Solicitud entregada exitosamente a {target}.", file=sys.stderr)
                                  else:
                                      print(f"[CHAT_WAN] [X] No se pudo entregar solicitud a {target}.", file=sys.stderr)
-                                     self.chat_requests_status[target] = ('REJECTED', target, 'No se pudo conectar vía Tor')
+                                     self.chat_requests_status[target] = ('REJECTED', target, 'No se pudo conectar vía Global')
                              except Exception as e:
                                  print(f"[CHAT_WAN] [!] Error entregando a {target}: {e}", file=sys.stderr)
                                  self.chat_requests_status[target] = ('REJECTED', target, str(e))
                          threading.Thread(target=_send_onion_c, daemon=True).start()
-                         return f"[*] Solicitud enviada a '{target}' vía Tor Onion (Agenda). Esperando respuesta..."
+                         return f"[*] Solicitud enviada a '{target}' vía Global (Agenda). Esperando respuesta..."
                      else:
                          try:
                              ok = self.red.enviar_tcp_priv(dest_host, req, port=port_p, force_new=True)
@@ -1166,6 +1205,9 @@ class Motor:
                          # Self Status Msg
                          status_msg = getattr(self.memoria, 'mi_estado_msg', None)
                          tag = " [Tu]"
+                         
+                         has_ip = True
+                         has_onion = bool(self.memoria.mi_onion)
                      else:
                          tag = ""
                          status_msg = mdata.get('status_msg')
@@ -1182,21 +1224,30 @@ class Motor:
                              if 'status_msg' in peer: 
                                  status_msg = peer.get('status_msg')
                          
+                         
+                         # Check IP/Onion presence for badges
+                         from ghostwhisperchat.core.cripto_vault import get_vault_entry
+                         v_data = get_vault_entry(uid)
+                         has_ip = bool(v_data.get('ip') or mdata.get('ip') or (peer and peer.get('ip')))
+                         has_onion = bool(v_data.get('onion') or mdata.get('onion') or (peer and peer.get('onion')))
+                         
                          # Update local group cache (Lazy Sync)
                          mdata['nick'] = nick
                          mdata['status'] = status
                          mdata['sys_user'] = sys_user
                          if status_msg: mdata['status_msg'] = status_msg
                      
-                     # FORMATO ELEGIDO: Option 3 (Extended Identity)
-                     # Nick [sys@ip] [STATUS: "Msg"]
-                     
+                     # FORMATO ELEGIDO: Option 3 (Extended Identity) - No IP/Onion shown
                      st_display = f"[{status}]"
                      
                      if status_msg:
                          st_display = f"[{status}: {Colores.C_GOLD}\"{status_msg}\"{Colores.RESET}]"
                      
-                     res += f" - {Colores.C_GREEN_NEON}{nick}{Colores.RESET} [{Colores.GREY}{sys_user}@{ip}{Colores.RESET}] {st_display}{tag}\n"
+                     badges = ""
+                     if has_ip: badges += f" {Colores.GREEN}[Local]{Colores.RESET}"
+                     if has_onion: badges += f" {Colores.CYAN}[Global]{Colores.RESET}"
+                     
+                     res += f" - {Colores.C_GREEN_NEON}{nick}{Colores.RESET} [{Colores.GREY}{sys_user}{Colores.RESET}] {st_display}{tag}{badges}\n"
                  return res
              return "Chat Privado."
 
@@ -2370,7 +2421,7 @@ class Motor:
             ip_origen = origen.get('ip')
 
             # Detectar si el paquete llegó por Tor o por LAN inspeccionando el socket entrante.
-            # Los paquetes que llegan vía Tor son relay desde 127.0.0.1 (SOCKS5 local).
+            # Los paquetes que llegan vía Global son relay desde 127.0.0.1 (SOCKS5 local).
             # Si es así, debemos responder obligatoriamente por Tor Onion.
             canal_entrada = "LAN"
             try:
@@ -2524,7 +2575,7 @@ class Motor:
                     "nick": origen.get('nick', 'Desconocido'),
                     "ip": origen.get('ip', 'WAN'),
                     "onion": origen.get('onion'),
-                    "channel": "Tor Global" if origen.get('onion') else "LAN",
+                    "channel": "Red Global" if origen.get('onion') else "LAN",
                     "status": payload.get("status", "ONLINE"),
                     "uid": origen.get('uid')
                 }

@@ -505,7 +505,7 @@ def modo_ui_chat(target_id, es_grupo):
         return
         
     # Header Limpio (Sin IDs)
-    print(f"{C.BOLD}[*] IP LOCAL: {mi_ip}{C.RESET}")
+    print(f"{C.BOLD}[*] RUTA LOCAL: {mi_ip}{C.RESET}")
     print(f"{C.GREY}(Escribe --ayuda para ver comandos disponibles. Ctrl+C para cerrar){C.RESET}\n")
     
     # Init Input Helper
@@ -672,7 +672,7 @@ def main():
             
             # Si es búsqueda de usuarios (no salas grupales)
             if args_raw[0] in COMMAND_MAP['SCAN']:
-                # Paso C: Consultar estado inicial + cuantos contactos Tor hay en agenda
+                # Paso C: Consultar estado inicial + cuantos contactos Globales hay en agenda
                 peek_raw = consultar_daemon_respuesta("--scan-peek")
                 has_tor = False
                 tor_total = 0
@@ -685,13 +685,13 @@ def main():
                 except Exception:
                     pass
                 
-                # Paso D: Si hay contactos Tor en agenda, SIEMPRE esperar fase Tor
+                # Paso D: Si hay contactos Globales en agenda, SIEMPRE esperar fase Global
                 # (independientemente de si ya hay resultados LAN — pueden llegar más respuestas)
                 if has_tor and tor_total > 0:
                     if lan_count == 0:
-                        sys.stdout.write(f"\n{Colores.YELLOW}[!] No se encontraron usuarios en la red local. Consultando contactos Tor...{Colores.RESET}\n")
+                        sys.stdout.write(f"\n{Colores.YELLOW}[!] No se encontraron usuarios en la red local. Consultando contactos Globales...{Colores.RESET}\n")
                     else:
-                        sys.stdout.write(f"\n{Colores.YELLOW}[!] Encontrados en LAN. Consultando también contactos Tor globales...{Colores.RESET}\n")
+                        sys.stdout.write(f"\n{Colores.YELLOW}[!] Encontrados en LAN. Consultando también contactos Globales...{Colores.RESET}\n")
                     sys.stdout.flush()
                     
                     gwc_badges = [
@@ -723,9 +723,9 @@ def main():
                         try:
                             pd = json.loads(p_check)
                             total_now = pd.get("count", 0)
-                            # Tor respondidos = total actual - LAN que habia al inicio
+                            # Globales respondidos = total actual - LAN que habia al inicio
                             tor_respondidos = max(0, total_now - lan_count)
-                            # Salir anticipado solo si TODOS los contactos Tor respondieron
+                            # Salir anticipado solo si TODOS los contactos Globales respondieron
                             if tor_total > 0 and tor_respondidos >= tor_total:
                                 break
                         except Exception:
@@ -758,7 +758,7 @@ def main():
                 dest_abbr = dest_target[:8] + "..." + dest_target[-6:] if len(dest_target) > 18 else dest_target
                 
                 # Detectar canal REAL según la respuesta del demonio.
-                # El motor dice "vía Tor Onion" cuando enruta por Tor, "en red local" cuando es LAN.
+                # El motor dice "vía Global Onion" cuando enruta por Tor, "en red local" cuando es LAN.
                 # Este es el único dato confiable: el demonio ya resolvió _resolver_host_objetivo.
                 is_onion = (
                     str(dest_target).endswith(".onion") or
@@ -767,7 +767,7 @@ def main():
                     "onion" in resp_daemon.lower()
                 )
                 
-                canal = "Tor Global" if is_onion else "LAN"
+                canal = "Red Global" if is_onion else "LAN"
                 # Timeout inteligente basado en el canal real detectado
                 # LAN: 40s (dar tiempo al usuario a ver la notificacion y aceptar)
                 # Tor: 120s (circuito puede tardar 20-40s de ida + 20-40s de vuelta)
@@ -794,7 +794,7 @@ def main():
                         badge = gwc_badges[frame_idx % len(gwc_badges)]
                         
                         if is_onion:
-                            # Cuenta regresiva visible para Tor (el usuario sabe que puede tardar)
+                            # Cuenta regresiva visible para Global (el usuario sabe que puede tardar)
                             countdown_color = Colores.GREEN if remaining > 60 else (Colores.YELLOW if remaining > 20 else Colores.RED)
                             countdown_str = f" {countdown_color}[{remaining:3d}s]{Colores.RESET}"
                             line_content = f"{Colores.YELLOW}[*] Esperando a {dest_abbr} ({canal}){d}{Colores.RESET} {badge}{countdown_str}"
@@ -806,7 +806,7 @@ def main():
                         time.sleep(0.35)
                         frame_idx += 1
                         
-                        # Consultar estado al demonio: cada 2 frames en Tor (~0.7s), cada 3 en LAN (~1s)
+                        # Consultar estado al demonio: cada 2 frames en Global (~0.7s), cada 3 en LAN (~1s)
                         poll_interval = 2 if is_onion else 3
                         if frame_idx % poll_interval == 0:
                             # dest_target puede ser nick (ej: "PC-CASA") o onion.
@@ -831,7 +831,7 @@ def main():
                                 elif raw_reason == "Timeout":
                                     motivo = "Sin respuesta (Tiempo agotado en destino)"
                                 elif "Tor" in raw_reason or "conectar" in raw_reason.lower():
-                                    motivo = "No se pudo establecer circuito Tor (reintenta en unos segundos)"
+                                    motivo = "No se pudo establecer circuito Global (reintenta en unos segundos)"
                                 else:
                                     motivo = raw_reason
                                     
@@ -841,7 +841,7 @@ def main():
                     
                     # Timeout local agotado
                     if is_onion:
-                        sys.stdout.write(f"\r\033[K{Colores.YELLOW}[!] Sin respuesta en 2 minutos. El circuito Tor puede estar lento, reintenta con{Colores.RESET} {Colores.CYAN}gwc dm {dest_target}{Colores.RESET}\n")
+                        sys.stdout.write(f"\r\033[K{Colores.YELLOW}[!] Sin respuesta en 2 minutos. El circuito Global puede estar lento, reintenta con{Colores.RESET} {Colores.CYAN}gwc dm {dest_target}{Colores.RESET}\n")
                     else:
                         sys.stdout.write(f"\r\033[K{Colores.YELLOW}[!] Tiempo de espera agotado sin respuesta.{Colores.RESET}\n")
                     sys.stdout.flush()

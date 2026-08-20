@@ -78,9 +78,9 @@ class Colores:
     # Texto High Contrast para fondos claros
     BLACK_TXT = "\033[38;5;0m"
 
-# Versionado - Estable - Tor Onion P2P WAN Global Edition
-APP_VER_NUM = "3.026"
-APP_VER_TAG = "Global Edition - Tor Onion P2P WAN"
+# Versionado - Estable - Global P2P WAN Global Edition
+APP_VER_NUM = "3.029"
+APP_VER_TAG = "Global Edition - Global P2P WAN"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
 BANNER = r"""
@@ -142,6 +142,9 @@ AYUDA = f"""
 
   {Colores.GREEN}--eliminar-todos{Colores.RESET} .............. Vaciar toda la agenda de contactos.
         {Colores.GREY}[Alias: -qt, --quitar-todos, --resetear-agenda, --vaciar-agenda]{Colores.RESET}
+
+  {Colores.GREEN}--privacidad <Nivel>{Colores.RESET} .......... Qué rutas (IP/Tor) compartir (AMBOS, SOLO-LOCAL, SOLO-GLOBAL, NADA).
+        {Colores.GREY}[Alias: --priv, --compartir]{Colores.RESET}
 
 {Colores.MAGENTA}{Colores.BOLD}>> UTILIDADES{Colores.RESET}
   {Colores.GREEN}--archivo <Ruta>{Colores.RESET} ............. Enviar archivo (Soporta Drag & Drop).
@@ -239,6 +242,10 @@ ABBREVIATIONS_DISPLAY = {
         "VISIBILIDAD EN RED": {
             'aliases': ['--invisible', '-v', '--fantasma', '--oculto', '--visibilidad'],
             'desc': "[Switch] Ocultarte o mostrarte en los escaneos de otros."
+        },
+        "POLITICA DE PRIVACIDAD": {
+            'aliases': ['--privacidad', '--priv', '--compartir'],
+            'desc': "Elegir qué datos de red compartir (AMBOS, SOLO-LOCAL, SOLO-GLOBAL, NADA)."
         }
     },
 
@@ -307,6 +314,7 @@ COMMAND_MAP = {
     'CONTACTS':         ['--contactos', '-c', '--amigos', '--agenda', '--historial', '--contacts'],
     'DEL_CONTACT':      ['--eliminar', '-q', '--quitar', '--quitar-contacto', '--eliminar-contacto', '--remover', '--del'],
     'DEL_ALL_CONTACTS': ['--eliminar-todos', '-qt', '--quitar-todos', '--resetear-agenda', '--vaciar-agenda'],
+    'PRIVACY_POLICY':   ['--privacidad', '--priv', '--compartir'],
     'VISIBILITY_TOGGLE':['--invisible', '-v', '--fantasma', '--oculto', '--visibilidad'],
     'FILE':         ['--archivo', '-f', '--enviar', '--mandar', '--adjuntar', '--file'],
     'IMAGE':        ['--imagen', '-i', '--foto', '--picture', '-P'],

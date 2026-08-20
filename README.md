@@ -74,6 +74,7 @@ sudo apt update
 | `--contactos` | | Ver el historial de usuarios (LAN y WAN) con los que hablaste. | `-c`, `--amigos`, `--agenda`, `--historial`, `--contacts` |
 | `--eliminar` | `<Nick>` | Eliminar un contacto específico de la agenda. | `-q`, `--quitar`, `--quitar-contacto`, `--eliminar-contacto`, `--remover`, `--del` |
 | `--eliminar-todos` | `[CONFIRMAR]` | Vaciar toda la agenda de contactos (solicita confirmación). | `-qt`, `--quitar-todos`, `--resetear-agenda`, `--vaciar-agenda` |
+| `--privacidad` | `<Nivel>` | Elegir qué rutas compartir (AMBOS, SOLO-LOCAL, SOLO-GLOBAL, NADA). | `--priv`, `--compartir` |
 | `--invisible` | | **[Switch]** Ocultarte de los escaneos de otros en la red. | `-v`, `--fantasma`, `--oculto`, `--visibilidad` |
 
 ### 📁 Utilidades y Archivos

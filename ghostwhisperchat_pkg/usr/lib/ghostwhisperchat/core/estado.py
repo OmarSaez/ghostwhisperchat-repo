@@ -33,6 +33,7 @@ class MemoriaGlobal:
         # Configuración Runtime
         self.no_molestar = False
         self.invisible = False
+        self.privacy_policy = "AMBOS" # "AMBOS", "IP", "TOR", "NADA"
         self.log_chat = False
         self.auto_download = False
         self.version = APP_VERSION
@@ -117,6 +118,7 @@ class MemoriaGlobal:
                      # Opcional: Cargar settings
                      self.no_molestar = data.get("no_molestar", False)
                      self.invisible = data.get("invisible", False)
+                     self.privacy_policy = data.get("privacy_policy", "AMBOS")
                      self.mi_estado_msg = data.get("estado_msg")
                  print(f"[ESTADO] Config cargada. Nick: {self.mi_nick}", file=sys.stderr)
              except Exception as e:
@@ -132,6 +134,7 @@ class MemoriaGlobal:
             "onion": self.mi_onion,
             "no_molestar": self.no_molestar,
             "invisible": self.invisible,
+            "privacy_policy": self.privacy_policy,
             "estado_msg": self.mi_estado_msg
         }
         try:
@@ -160,21 +163,28 @@ class MemoriaGlobal:
         except: pass
 
     def registrar_contacto(self, uid, nick, ip, onion=None, sys_user=None, status_msg=None):
-        """Registra un contacto persistente (historial de interaccion)"""
+        """Registra un contacto persistente (historial de interaccion) sin guardar IP/Onion en JSON"""
+        if self.privacy_policy == "NADA":
+            return # No guardar nada si la politica es NADA (efimero)
+
+        from ghostwhisperchat.core.cripto_vault import update_vault_entry
         with self._lock:
             contacto_previo = self.contactos.get(uid, {})
-            onion_final = onion if onion else contacto_previo.get("onion")
             sys_user_final = sys_user if sys_user else contacto_previo.get("sys_user", "?")
             status_msg_final = status_msg if status_msg is not None else contacto_previo.get("status_msg", "")
+            
+            # Update public metadata in contacts.json
             self.contactos[uid] = {
                 "uid": uid,
                 "nick": nick,
-                "ip": ip,
-                "onion": onion_final,
                 "sys_user": sys_user_final,
                 "status_msg": status_msg_final,
                 "last_seen": time.time()
             }
+            
+            # Store private data in vault
+            update_vault_entry(uid, ip=ip, onion=onion)
+
         self.guardar_contactos()
         
     def buscar_contacto_fuzzy(self, query):
@@ -320,17 +330,23 @@ class MemoriaGlobal:
         return candidates[0]
         
     def get_origen(self):
-        """Devuelve el dict estándar 'origen' para paquetes"""
-        return {
+        """Devuelve el dict estándar 'origen' para paquetes respetando la politica de privacidad"""
+        origen = {
             "nick": self.mi_nick,
             "uid": self.mi_uid,
             "sys_user": self.sys_user,
             "status_msg": self.mi_estado_msg,
-            "ip": self.mi_ip,
-            "onion": self.mi_onion,
             "port_priv": getattr(self, 'mi_port_priv', 44494),
             "port_group": getattr(self, 'mi_port_group', 44496)
         }
+        
+        # Compartir IP y/o Onion según la política de privacidad
+        if self.privacy_policy in ["AMBOS", "IP"]:
+            origen["ip"] = self.mi_ip
+        if self.privacy_policy in ["AMBOS", "TOR"]:
+            origen["onion"] = self.mi_onion
+            
+        return origen
 
     # Alias para compatibilidad
     limpiar_peers_inactivos = limpiar_peers_antiguos

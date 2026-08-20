@@ -1,13 +1,13 @@
 Package: ghostwhisperchat
-Version: 3.024
+Version: 3.027
 Architecture: all
 Maintainer: Omar Saez <omarsaez@ghostwhisper.chat>
 Depends: python3, python3-cryptography, libnotify-bin, portaudio19-dev, python3-pyaudio, vorbis-tools, zenity, xterm, pulseaudio-utils, tor, python3-stem
-Filename: pool/main/g/ghostwhisperchat/ghostwhisperchat_3.024_all.deb
-Size: 243174
-MD5sum: 536a2aa43ad94f1cf9c5be58016cb42e
-SHA1: e591d30c2636233d9f460e217cdd1b79296ccb20
-SHA256: c39a25ac5713d26cbeb746770840b0454eb43e1bd719bb377b00468e9e59dc06
+Filename: pool/main/g/ghostwhisperchat/ghostwhisperchat_3.027_all.deb
+Size: 249730
+MD5sum: cee7d69ca19c77ce5708a59783ae6184
+SHA1: 9e23ed5cb82b25d76dd0e29606cd861339ede6d3
+SHA256: 1ab71e44c4d2bf33dc82f918f9d4a3860e71452af393720f1d09d61f709fc523
 Section: net
 Priority: optional
 Description: GhostWhisperChat - Chat P2P Global Seguro (Edición WAN + LAN)
@@ -16,15 +16,15 @@ Description: GhostWhisperChat - Chat P2P Global Seguro (Edición WAN + LAN)
  y descubrimiento automático en LAN.
 
 Package: ghostwhisperchat
-Version: 3.025
+Version: 3.028
 Architecture: all
 Maintainer: Omar Saez <omarsaez@ghostwhisper.chat>
 Depends: python3, python3-cryptography, libnotify-bin, portaudio19-dev, python3-pyaudio, vorbis-tools, zenity, xterm, pulseaudio-utils, tor, python3-stem
-Filename: pool/main/g/ghostwhisperchat/ghostwhisperchat_3.025_all.deb
-Size: 245312
-MD5sum: 01733bb9afef2cae5e7bee25180cc912
-SHA1: 0d05703bbb25ad57285259094033de4d39b35600
-SHA256: e1772e4711413afdc21c53218a7a91442799849afa3f639b28635f1b3d8cbe97
+Filename: pool/main/g/ghostwhisperchat/ghostwhisperchat_3.028_all.deb
+Size: 250270
+MD5sum: 2efc37e9c49e20a744e5bab411a7e2c7
+SHA1: 6731fa14ad091042ed089c655ebed7db6db62bba
+SHA256: b654c270d22fa472249e611208645e93257c321bade5540d0b4a3ce9dd96ac02
 Section: net
 Priority: optional
 Description: GhostWhisperChat - Chat P2P Global Seguro (Edición WAN + LAN)
@@ -33,15 +33,15 @@ Description: GhostWhisperChat - Chat P2P Global Seguro (Edición WAN + LAN)
  y descubrimiento automático en LAN.
 
 Package: ghostwhisperchat
-Version: 3.026
+Version: 3.029
 Architecture: all
 Maintainer: Omar Saez <omarsaez@ghostwhisper.chat>
 Depends: python3, python3-cryptography, libnotify-bin, portaudio19-dev, python3-pyaudio, vorbis-tools, zenity, xterm, pulseaudio-utils, tor, python3-stem
-Filename: pool/main/g/ghostwhisperchat/ghostwhisperchat_3.026_all.deb
-Size: 245274
-MD5sum: 21a1fab5c47c660ce1a723c8e35beec9
-SHA1: 6b137b6b4e3d67147a77f82101d47277bd266fb1
-SHA256: ad8496af443c3f7e30af73092c6a7f23fa2d66915cb21d03d98c6be6c55661a0
+Filename: pool/main/g/ghostwhisperchat/ghostwhisperchat_3.029_all.deb
+Size: 250290
+MD5sum: 076b0b8bc4af991523f4cc5e50089ce7
+SHA1: 6dcc082931dc36f2d6b667d9e61bae488d5813b9
+SHA256: 1a313d8f0ec336ce3aa6dbd1a3aadf9e97fa4a415cf3b98d01f52049abc0f0a3
 Section: net
 Priority: optional
 Description: GhostWhisperChat - Chat P2P Global Seguro (Edición WAN + LAN)
