@@ -1,9 +1,8 @@
 import os
 import json
-import base64
-from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 VAULT_DIR = os.path.expanduser("~/.config/gwc")
 VAULT_FILE = os.path.join(VAULT_DIR, "vault.enc")
@@ -37,27 +36,40 @@ def _get_key():
         salt=salt,
         iterations=100000,
     )
-    key = base64.urlsafe_b64encode(kdf.derive(password))
-    return Fernet(key)
+    # Return AES-256-GCM key (32 bytes)
+    return kdf.derive(password)
 
 def load_vault():
     if not os.path.exists(VAULT_FILE):
         return {}
     try:
-        f = _get_key()
+        key = _get_key()
+        aesgcm = AESGCM(key)
+        
         with open(VAULT_FILE, "rb") as file:
-            encrypted_data = file.read()
-        decrypted_data = f.decrypt(encrypted_data)
+            encrypted_data_with_nonce = file.read()
+            
+        # Extract nonce (12 bytes) and ciphertext
+        nonce = encrypted_data_with_nonce[:12]
+        ciphertext = encrypted_data_with_nonce[12:]
+        
+        decrypted_data = aesgcm.decrypt(nonce, ciphertext, None)
         return json.loads(decrypted_data.decode('utf-8'))
     except Exception:
         return {}
 
 def save_vault(data):
     try:
-        f = _get_key()
-        encrypted_data = f.encrypt(json.dumps(data).encode('utf-8'))
+        key = _get_key()
+        aesgcm = AESGCM(key)
+        nonce = os.urandom(12) # 96-bit nonce for GCM
+        
+        plaintext = json.dumps(data).encode('utf-8')
+        ciphertext = aesgcm.encrypt(nonce, plaintext, None)
+        
         with open(VAULT_FILE, "wb") as file:
-            file.write(encrypted_data)
+            file.write(nonce + ciphertext)
+            
         os.chmod(VAULT_FILE, 0o600)
     except Exception as e:
         pass
