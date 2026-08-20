@@ -1,21 +1,4 @@
 Package: ghostwhisperchat
-Version: 3.035
-Architecture: all
-Maintainer: Omar Saez <omarsaez@ghostwhisper.chat>
-Depends: python3, python3-cryptography, libnotify-bin, portaudio19-dev, python3-pyaudio, vorbis-tools, zenity, xterm, pulseaudio-utils, tor, python3-stem
-Filename: pool/main/g/ghostwhisperchat/ghostwhisperchat_3.035_all.deb
-Size: 250978
-MD5sum: 7b8d5d33e5fe94a0392a474a0f6e0d4f
-SHA1: a108d513682666ed8d3c4253f4b15a16158d7730
-SHA256: edbebb198035b8b8d9dbda87a92c04aaabf3bd2ef6e13b3aac6992b913ea1cbe
-Section: net
-Priority: optional
-Description: GhostWhisperChat - Chat P2P Global Seguro (Edición WAN + LAN)
- Sistema de chat descentralizado con cifrado E2E, transferencia de archivos,
- soporte global sin servidores centrales mediante Tor Onion Services v3
- y descubrimiento automático en LAN.
-
-Package: ghostwhisperchat
 Version: 3.036
 Architecture: all
 Maintainer: Omar Saez <omarsaez@ghostwhisper.chat>
@@ -42,6 +25,23 @@ Size: 251026
 MD5sum: ba280456f8b9a17607835687db9d8e89
 SHA1: 9b95da2ab053a0dc46340342ad0fc16519437e3e
 SHA256: 093cf96f09a6880347d7be32de8c74f534a7fbc32db7d2c17c2b4eeaa2f3b771
+Section: net
+Priority: optional
+Description: GhostWhisperChat - Chat P2P Global Seguro (Edición WAN + LAN)
+ Sistema de chat descentralizado con cifrado E2E, transferencia de archivos,
+ soporte global sin servidores centrales mediante Tor Onion Services v3
+ y descubrimiento automático en LAN.
+
+Package: ghostwhisperchat
+Version: 3.038
+Architecture: all
+Maintainer: Omar Saez <omarsaez@ghostwhisper.chat>
+Depends: python3, python3-cryptography, libnotify-bin, portaudio19-dev, python3-pyaudio, vorbis-tools, zenity, xterm, pulseaudio-utils, tor, python3-stem, kitty
+Filename: pool/main/g/ghostwhisperchat/ghostwhisperchat_3.038_all.deb
+Size: 251042
+MD5sum: 99a626cb629d202daadd4f12d96988fe
+SHA1: eb8277261a6c0a638f0ad2380d6bb6cfd1ec2069
+SHA256: 33f8b75eb87ba7cdfa3af786259e83c2573aea9acff7e627507b13a1347435ca
 Section: net
 Priority: optional
 Description: GhostWhisperChat - Chat P2P Global Seguro (Edición WAN + LAN)

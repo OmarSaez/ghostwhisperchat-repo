@@ -87,8 +87,15 @@ def abrir_chat_ui(id_destino, nombre_legible=None, es_grupo=False, env_vars=None
                 # IMPORTANT: We use sh -c to execute the python string
                 # INJECT TITLE: printf "\033]0;TITLE\007" sets window title in xterm-compatible terms
                 safe_title = full_title.replace("'", "").replace('"', '') # Sanitation
-                wrapped_cmd = f"sh -c 'printf \"\\033]0;{safe_title}\\007\"; {cmd_inner_str}'"
-                args_term.append(wrapped_cmd)
+                
+                if term in ["kitty", "alacritty"]:
+                    # Kitty and Alacritty natively support --title
+                    # We inject it before the execution flag
+                    args_term = [term, "--title", full_title, flag]
+                    args_term.extend(inner_args)
+                else:
+                    wrapped_cmd = f'printf "\\033]0;{safe_title}\\007"; {cmd_inner_str}'
+                    args_term.extend(["sh", "-c", wrapped_cmd])
             else:
                 # Fallback
                 args_term.append(flag)

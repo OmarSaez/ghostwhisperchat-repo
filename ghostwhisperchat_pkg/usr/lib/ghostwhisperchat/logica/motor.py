@@ -1860,6 +1860,7 @@ class Motor:
             if ftype == "PEER":
                 peer_data = {
                     "nick": origen.get('nick', 'Desconocido'),
+                    "uid": origen.get('uid'),
                     "ip": addr[0],
                     "status": payload.get("status"),
                     "onion": origen.get('onion'),
