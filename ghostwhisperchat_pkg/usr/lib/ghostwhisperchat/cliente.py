@@ -312,33 +312,32 @@ class GestorInput:
                      user_val = int(parts[2])
                      im_width = max(10, min(user_val, 190))
                  
-                 # Renderizar (Puede tardar unos ms)
-                 self.print_incoming(f"{C.YELLOW}[*] Procesando imagen...{C.RESET}")
-                 try:
-                     res = imagen_ascii.render_ascii(im_path, im_width)
-                 except Exception as e:
-                     self.print_incoming(f"{C.RED}[X] Crash Rendering: {e}{C.RESET}")
-                     return
+                 # Renderizar Localmente (Sender)
+                 self.print_incoming(f"{C.YELLOW}[*] Procesando imagen localmente...{C.RESET}")
+                 import subprocess, shutil
+                 kitty_success = False
+                 if shutil.which("kitty"):
+                     try:
+                         # Render Native Kitty
+                         self.print_incoming(f"{C.CYAN}[IMAGEN NATIVA] {os.path.basename(im_path)}{C.RESET}")
+                         subprocess.run(["kitty", "+kitten", "icat", "--align", "left", im_path])
+                         kitty_success = True
+                     except: pass
+                     
+                 if not kitty_success:
+                     try:
+                         res = imagen_ascii.render_ascii(im_path, im_width)
+                         if res.startswith("ERROR:"):
+                             self.print_incoming(f"{C.RED}[X] {res}{C.RESET}")
+                             return
+                         self.print_incoming(f"{C.CYAN}[IMAGEN ASCII] {os.path.basename(im_path)}{C.RESET}")
+                         print(res)
+                     except Exception as e:
+                         self.print_incoming(f"{C.RED}[X] Crash Rendering: {e}{C.RESET}")
+                         return
                  
-                 if res.startswith("ERROR:"):
-                     self.print_incoming(f"{C.RED}[X] {res}{C.RESET}")
-                     return
-                 
-                 
-                 # Empaquetar con Protocolo Seguro Base64 (v2.150)
-                 import base64
-                 
-                 # Header SAFE (Usamos <<ASCII_NL>> en vez de \n real para que viaje en 1 linea)
-                 header_safe = f"{C.CYAN}[IMAGEN ASCII] {os.path.basename(im_path)}{C.RESET}<<ASCII_NL>>"
-                 
-                 # Payload B64
-                 full_content = res + C.RESET
-                 b64_data = base64.b64encode(full_content.encode('utf-8')).decode('ascii')
-                 
-                 # Mensaje final: [B64_IMG] + HeaderSafe + | + B64
-                 msg = f"[B64_IMG]{header_safe}|{b64_data}"
-                 
-                 # Actualizar cmd_raw
+                 # En lugar de enviar Base64 por red, enviamos un marcador y el daemon enviará el archivo.
+                 msg = f"📷 [Adjunto de Foto] {os.path.basename(im_path)}"
                  cmd_raw = "MSG_TEXT" 
 
              is_scan = cmd_raw in COMMAND_MAP['SCAN'] or cmd_raw in COMMAND_MAP['LIST_GROUPS']
@@ -560,6 +559,29 @@ def modo_ui_chat(target_id, es_grupo):
                              users = data.split(",")
                              for u in users:
                                  if u: helper.known_users.add(u.strip())
+                         continue
+                         
+                    # RECEIVE NATIVE IMG (v3.038)
+                    if line.strip().startswith("__NATIVE_IMG__"):
+                         img_path = line.strip().replace("__NATIVE_IMG__", "", 1).strip()
+                         import shutil, subprocess
+                         kitty_success = False
+                         if shutil.which("kitty"):
+                             try:
+                                 helper.print_incoming(f"{C.CYAN}[IMAGEN NATIVA]{C.RESET}")
+                                 subprocess.run(["kitty", "+kitten", "icat", "--align", "left", img_path])
+                                 kitty_success = True
+                             except: pass
+                         if not kitty_success:
+                             try:
+                                 helper.print_incoming(f"{C.CYAN}[IMAGEN ASCII]{C.RESET}")
+                                 res = imagen_ascii.render_ascii(img_path, 60)
+                                 if not res.startswith("ERROR:"):
+                                     print(res)
+                                 else:
+                                     helper.print_incoming(f"{C.RED}[X] {res}{C.RESET}")
+                             except Exception as e:
+                                 helper.print_incoming(f"{C.RED}[X] Crash Rendering: {e}{C.RESET}")
                          continue
 
 

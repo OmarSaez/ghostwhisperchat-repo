@@ -2397,7 +2397,8 @@ class Motor:
                          
                          safe_fname = os.path.basename(final_path)
                          if es_imagen:
-                             msg_alert = f"\n{Colores.C_GREEN_NEON}[SISTEMA] [!] Recepcion de foto real: {safe_fname}{Colores.RESET}\n"
+                             msg_alert = f"\n{Colores.C_GREEN_NEON}[SISTEMA] [!] Recepcion de foto finalizada: {safe_fname}{Colores.RESET}\n"
+                             msg_alert += f"__NATIVE_IMG__{final_path}\n"
                          else:
                              msg_alert = f"\n{Colores.YELLOW}[SISTEMA] [!] {origen['nick']} te ha enviado: {safe_fname}{Colores.RESET}\n"
                          
