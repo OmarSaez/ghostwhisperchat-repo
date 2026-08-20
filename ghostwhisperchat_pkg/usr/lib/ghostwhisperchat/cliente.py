@@ -167,7 +167,10 @@ class GestorInput:
             tty.setraw(sys.stdin.fileno())
             while self.running:
                 import select
-                rfds, _, _ = select.select([sys.stdin], [], [], 0.05)
+                try:
+                    rfds, _, _ = select.select([sys.stdin], [], [], 0.05)
+                except InterruptedError:
+                    continue
                 
                 if getattr(self, 'pending_native_img', None):
                     img_path = self.pending_native_img
@@ -177,7 +180,9 @@ class GestorInput:
                     if shutil.which("kitty"):
                         try:
                             self.print_incoming(f"{C.CYAN}[IMAGEN NATIVA]{C.RESET}")
+                            self._limpiar_linea()
                             subprocess.run(["kitty", "+kitten", "icat", "--align", "left", img_path])
+                            self._pintar_linea()
                         except: pass
                     else:
                         try:
@@ -185,7 +190,9 @@ class GestorInput:
                             from ghostwhisperchat.core import imagen_ascii
                             res = imagen_ascii.render_ascii(img_path, 60)
                             if not res.startswith("ERROR:"):
+                                self._limpiar_linea()
                                 print(res)
+                                self._pintar_linea()
                             else:
                                 self.print_incoming(f"{C.RED}[X] {res}{C.RESET}")
                         except Exception as e:
@@ -353,7 +360,9 @@ class GestorInput:
                      try:
                          # Render Native Kitty
                          self.print_incoming(f"{C.CYAN}[IMAGEN NATIVA] {os.path.basename(im_path)}{C.RESET}")
+                         self._limpiar_linea()
                          subprocess.run(["kitty", "+kitten", "icat", "--align", "left", im_path])
+                         self._pintar_linea()
                          kitty_success = True
                      except: pass
                      
@@ -364,7 +373,9 @@ class GestorInput:
                              self.print_incoming(f"{C.RED}[X] {res}{C.RESET}")
                              return
                          self.print_incoming(f"{C.CYAN}[IMAGEN ASCII] {os.path.basename(im_path)}{C.RESET}")
+                         self._limpiar_linea()
                          print(res)
+                         self._pintar_linea()
                      except Exception as e:
                          self.print_incoming(f"{C.RED}[X] Crash Rendering: {e}{C.RESET}")
                          return
