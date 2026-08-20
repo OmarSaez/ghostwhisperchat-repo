@@ -527,15 +527,18 @@ class Motor:
         elif cmd == "SCAN_PEEK":
             import json
             items = []
+            tor_responded_count = 0
             with self.memoria._lock:
                 for item in self.scan_buffer:
                     ip_val = item.get('ip', '')
                     if ip_val != self.memoria.mi_ip:
                         items.append(item)
+                    if item.get('channel') == "Red Global":
+                        tor_responded_count += 1
                 tor_contacts = [c for c in self.memoria.contactos.values() if isinstance(c, dict) and c.get('onion')]
                 tor_total = len(tor_contacts)
                 has_tor = bool(self.memoria.mi_onion and tor_total > 0)
-            return json.dumps({"count": len(items), "has_tor_contacts": has_tor, "tor_total": tor_total})
+            return json.dumps({"count": len(items), "has_tor_contacts": has_tor, "tor_total": tor_total, "tor_responded_count": tor_responded_count})
 
         elif cmd == "SCAN_RESULTS":
             from ghostwhisperchat.datos.recursos import Colores
@@ -548,27 +551,29 @@ class Motor:
                       res += f"{Colores.CYAN}[SALA]{Colores.RESET} {Colores.BOLD}{item['name']}{Colores.RESET} (Embajador: {item['ip']})\n"
                  else:
                       nick = item.get('nick', 'Desconocido')
-                      ip_val = item.get('ip', '?.?.?.?')
-                      onion_val = item.get('onion')
-                      channel = item.get('channel')
+                      channel = item.get('channel', 'LAN')
+                      ip_val = item.get('ip')
+                      
                       peer_privacy = item.get('privacy_policy', 'AMBOS')
                       
-                      if peer_privacy not in ["AMBOS", "IP", "SOLO-LOCAL"]:
-                          ip_val = "Oculto"
-                      if peer_privacy not in ["AMBOS", "TOR", "SOLO-GLOBAL"]:
-                          onion_val = None
+                      has_ip = False
+                      if peer_privacy in ["AMBOS", "IP", "SOLO-LOCAL"]:
+                          has_ip = (ip_val != "WAN" and ip_val is not None)
                           
-                      suffix = f" {Colores.GREY}[Tu]{Colores.RESET}" if item.get('ip') == self.memoria.mi_ip else ""
+                      has_onion = False
+                      if peer_privacy in ["AMBOS", "TOR", "SOLO-GLOBAL"]:
+                          has_onion = (item.get('onion') is not None or channel == "Red Global")
+                          
+                      badges = ""
+                      if has_ip: badges += f" {Colores.YELLOW}[Local]{Colores.RESET}"
+                      if has_onion: badges += f" {Colores.CYAN}[Global]{Colores.RESET}"
                       
-                      linea = f"[*] {Colores.BOLD}{nick}{Colores.RESET}"
-                      if onion_val or channel == "Red Global":
-                          linea += f" {Colores.CYAN}[🌐 Red Global]{Colores.RESET}"
-                          if onion_val:
-                              linea += f" ({Colores.GREY}{onion_val[:12]}...{Colores.RESET})"
-                      else:
-                          linea += f" ({ip_val})"
+                      uid_val = item.get('uid', '?')
+                      uid_str = f" ({Colores.GREY}{uid_val}{Colores.RESET})"
                       
-                      linea += f" [{Colores.GREEN}ONLINE{Colores.RESET}]{suffix}\n"
+                      suffix = f" {Colores.GREY}[Tu]{Colores.RESET}" if ip_val == self.memoria.mi_ip else ""
+                      
+                      linea = f"- {Colores.BOLD}{nick}{Colores.RESET} [{Colores.GREEN}ONLINE{Colores.RESET}]{badges}{uid_str}{suffix}\n"
                       res += linea
                       
             self.scan_buffer = [] # Clear after reading

@@ -657,84 +657,84 @@ def main():
             
         full_cmd = " ".join(args_raw)
         
-        # 2. Lógica Especial para Escaneo (UX en 2 fases: LAN rápido + Espera Inteligente Tor)
+        # 2. Lógica Especial para Escaneo (UX en 2 fases unificada)
         # Check all aliases for SCAN and LIST_GROUPS
         if args_raw[0] in COMMAND_MAP['SCAN'] or args_raw[0] in COMMAND_MAP['LIST_GROUPS']:
-            from ghostwhisperchat.datos.recursos import mostrar_animacion_espera, Colores
+            from ghostwhisperchat.datos.recursos import Colores
             import json
             
-            # Paso A: Disparar el Scan UDP y sondeo Tor asíncrono
-            enviar_comando_transitorio(full_cmd)
+            is_scan = args_raw[0] in COMMAND_MAP['SCAN']
             
-            # Paso B: Fase 1 - Escaneo rápido inicial (5.0s)
-            msg_anim = "Escaneando red local y nodos Tor" if args_raw[0] in COMMAND_MAP['SCAN'] else "Buscando salas grupales"
-            mostrar_animacion_espera(msg_anim, 5.0)
+            # Disparar el Scan UDP y sondeo Tor asíncrono
+            consultar_daemon_respuesta(full_cmd)
             
-            # Si es búsqueda de usuarios (no salas grupales)
-            if args_raw[0] in COMMAND_MAP['SCAN']:
-                # Paso C: Consultar estado inicial + cuantos contactos Globales hay en agenda
+            has_tor = False
+            tor_total = 0
+            if is_scan:
+                # Consultar estado inicial
                 peek_raw = consultar_daemon_respuesta("--scan-peek")
-                has_tor = False
-                tor_total = 0
-                lan_count = 0
                 try:
                     pdata = json.loads(peek_raw)
-                    lan_count = pdata.get("count", 0)
                     has_tor = pdata.get("has_tor_contacts", False)
                     tor_total = pdata.get("tor_total", 0)
                 except Exception:
                     pass
+            
+            # Setup de Animación Unificada
+            if is_scan and has_tor and tor_total > 0:
+                msg_anim = "Buscando en la red local y global"
+                wait_time = 30.0
+            elif is_scan:
+                msg_anim = "Buscando en la red personas en linea"
+                wait_time = 5.0
+            else:
+                msg_anim = "Buscando salas grupales"
+                wait_time = 5.0
                 
-                # Paso D: Si hay contactos Globales en agenda, SIEMPRE esperar fase Global
-                # (independientemente de si ya hay resultados LAN — pueden llegar más respuestas)
-                if has_tor and tor_total > 0:
-                    if lan_count == 0:
-                        sys.stdout.write(f"\n{Colores.YELLOW}[!] No se encontraron usuarios en la red local. Consultando contactos Globales...{Colores.RESET}\n")
-                    else:
-                        sys.stdout.write(f"\n{Colores.YELLOW}[!] Encontrados en LAN. Consultando también contactos Globales...{Colores.RESET}\n")
-                    sys.stdout.flush()
-                    
-                    gwc_badges = [
-                        f"{Colores.CYAN}[ {Colores.GREEN}g  {Colores.CYAN} ]{Colores.RESET}",
-                        f"{Colores.CYAN}[ {Colores.GREEN}gw {Colores.CYAN} ]{Colores.RESET}",
-                        f"{Colores.CYAN}[ {Colores.GREEN}gwc{Colores.CYAN} ]{Colores.RESET}",
-                        f"{Colores.CYAN}[ {Colores.BOLD}{Colores.GREEN}gwc{Colores.RESET}{Colores.CYAN} ]{Colores.RESET}",
-                        f"{Colores.CYAN}[ {Colores.GREEN} gw{Colores.CYAN} ]{Colores.RESET}",
-                        f"{Colores.CYAN}[ {Colores.GREEN}  g{Colores.CYAN} ]{Colores.RESET}",
-                    ]
-                    
-                    t_start = time.time()
-                    tor_wait_total = 28.0
-                    f_idx = 0
-                    tor_respondidos = 0
-                    
-                    while (time.time() - t_start) < tor_wait_total:
-                        elapsed = time.time() - t_start
-                        remaining = max(1, int(tor_wait_total - elapsed))
-                        badge = gwc_badges[f_idx % len(gwc_badges)]
-                        f_idx += 1
+            gwc_badges = [
+                f"{Colores.CYAN}[ {Colores.GREEN}g  {Colores.CYAN} ]{Colores.RESET}",
+                f"{Colores.CYAN}[ {Colores.GREEN}gw {Colores.CYAN} ]{Colores.RESET}",
+                f"{Colores.CYAN}[ {Colores.GREEN}gwc{Colores.CYAN} ]{Colores.RESET}",
+                f"{Colores.CYAN}[ {Colores.BOLD}{Colores.GREEN}gwc{Colores.RESET}{Colores.CYAN} ]{Colores.RESET}",
+                f"{Colores.CYAN}[ {Colores.GREEN} gw{Colores.CYAN} ]{Colores.RESET}",
+                f"{Colores.CYAN}[ {Colores.GREEN}  g{Colores.CYAN} ]{Colores.RESET}",
+            ]
+            
+            t_start = time.time()
+            f_idx = 0
+            
+            while (time.time() - t_start) < wait_time:
+                elapsed = time.time() - t_start
+                remaining = max(1, int(wait_time - elapsed))
+                badge = gwc_badges[f_idx % len(gwc_badges)]
+                f_idx += 1
+                
+                dots = "." * ((f_idx % 3) + 1)
+                dots = f"{dots:<3}"
+                
+                sys.stdout.write(f"\r\033[K{Colores.YELLOW}[*] {msg_anim} {dots} {badge}")
+                if wait_time > 5.0:
+                    sys.stdout.write(f" ({remaining}s restantes)")
+                sys.stdout.write(f"{Colores.RESET}")
+                sys.stdout.flush()
+                
+                time.sleep(0.5)
+                
+                # Chequear salida anticipada si estamos esperando a Tor
+                if is_scan and has_tor and tor_total > 0:
+                    p_check = consultar_daemon_respuesta("--scan-peek")
+                    try:
+                        pd = json.loads(p_check)
+                        tor_responded_count = pd.get("tor_responded_count", 0)
+                        if tor_responded_count >= tor_total:
+                            break
+                    except Exception:
+                        pass
                         
-                        sys.stdout.write(f"\r\033[K{Colores.YELLOW}[*] Esperando respuestas Tor... {badge} ({remaining}s restantes){Colores.RESET}")
-                        sys.stdout.flush()
-                        time.sleep(0.5)
-                        
-                        # Contar cuantos Tor han respondido (total - LAN base)
-                        p_check = consultar_daemon_respuesta("--scan-peek")
-                        try:
-                            pd = json.loads(p_check)
-                            total_now = pd.get("count", 0)
-                            # Globales respondidos = total actual - LAN que habia al inicio
-                            tor_respondidos = max(0, total_now - lan_count)
-                            # Salir anticipado solo si TODOS los contactos Globales respondieron
-                            if tor_total > 0 and tor_respondidos >= tor_total:
-                                break
-                        except Exception:
-                            pass
-                    
-                    sys.stdout.write(f"\r\033[K{Colores.YELLOW}[*] Esperando respuestas Tor... {Colores.GREEN}[ Done! ]{Colores.RESET}\n")
-                    sys.stdout.flush()
+            sys.stdout.write(f"\r\033[K{Colores.YELLOW}[*] {msg_anim}... {Colores.GREEN}[ Done! ]{Colores.RESET}\n")
+            sys.stdout.flush()
 
-            # Paso E: Pedir y mostrar resultados
+            # Pedir y mostrar resultados
             enviar_comando_transitorio("--scan-results")
             return
 

@@ -15,14 +15,14 @@ def log_launcher(msg):
 # Lista PRIORIZADA de terminales soportados
 # (binario, flag_ejecucion)
 TERMINALES = [
+    ("kitty", "-e"), # Modern / GPU (Best for reflow and images)
+    ("alacritty", "-e"), # Modern / Rust
     ("qterminal", "-e"), #Kali
     ("gnome-terminal", "--"), #Ubuntu
     ("mate-terminal", "--"), #Parrot
     ("xfce4-terminal", "--execute"), 
     ("konsole", "-e"),
     ("lxterminal", "-e"),
-    ("kitty", "-e"), # Modern / GPU
-    ("alacritty", "-e"), # Modern / Rust
     ("tilix", "-e"),
     ("terminator", "-x"),
     ("xterm", "-e"),
