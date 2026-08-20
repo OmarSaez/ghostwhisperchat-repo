@@ -815,8 +815,7 @@ def main():
                 # Este es el único dato confiable: el demonio ya resolvió _resolver_host_objetivo.
                 is_onion = (
                     str(dest_target).endswith(".onion") or
-                    "tor onion" in resp_daemon.lower() or
-                    "tor global" in resp_daemon.lower() or
+                    "global" in resp_daemon.lower() or
                     "onion" in resp_daemon.lower()
                 )
                 

@@ -736,7 +736,8 @@ class Motor:
              print(f"[GROUP] Invitando a {target_nick} ({dest_host}:{port_p or 'DEF'})...", file=sys.stderr)
              try:
                  self.red.enviar_tcp_priv(dest_host, invite_pkg, port=port_p)
-                 return f"[*] Invitación enviada a {target_nick}."
+                 canal_str = "vía Global" if str(dest_host).endswith(".onion") else "LAN"
+                 return f"[*] Invitación enviada a {target_nick} ({canal_str})."
              except Exception as e:
                  return f"[X] Error enviando invitación: {e}"
 
