@@ -177,6 +177,8 @@ class MemoriaGlobal:
         with self._lock:
             contacto_previo = self.contactos.get(uid, {})
             sys_user_final = sys_user if sys_user else contacto_previo.get("sys_user", "?")
+            if remote_privacy == "NADA":
+                sys_user_final = ""
             status_msg_final = status_msg if status_msg is not None else contacto_previo.get("status_msg", "")
             
             # Update public metadata in contacts.json
@@ -362,7 +364,7 @@ class MemoriaGlobal:
         origen = {
             "nick": self.mi_nick,
             "uid": self.mi_uid,
-            "sys_user": self.sys_user,
+            "sys_user": self.sys_user if getattr(self, 'privacy_policy', 'AMBOS') != "NADA" else "",
             "status_msg": self.mi_estado_msg,
             "port_priv": getattr(self, 'mi_port_priv', 44494),
             "port_group": getattr(self, 'mi_port_group', 44496),

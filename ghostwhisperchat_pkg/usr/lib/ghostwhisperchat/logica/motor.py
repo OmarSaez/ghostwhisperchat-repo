@@ -832,8 +832,9 @@ class Motor:
                  res += f"   • Ruta Local:  {Colores.GREEN}{m.mi_ip}{Colores.RESET}\n"
                  onion_disp = f"{Colores.CYAN}{m.mi_onion}{Colores.RESET}" if m.mi_onion else f"{Colores.YELLOW}(Modo Solo Local / Red Global no activa){Colores.RESET}"
                  res += f"   • GWC-ID:    {onion_disp}\n"
+                 res += f"   • Política:  {Colores.CYAN}{getattr(m, 'privacy_policy', 'AMBOS')}{Colores.RESET}\n"
                  res += f"   • Versión:   {Colores.C_PINK_PASTEL}{APP_VERSION}{Colores.RESET}\n"
-                 res += f"   • UID:       {Colores.CYAN}{str(m.mi_uid)[:12]}...{Colores.RESET}\n"
+                 res += f"   • UID:       {Colores.CYAN}{str(m.mi_uid)}{Colores.RESET}\n"
                  res += f"   • Puertos:   TCP={ident.get('port_priv')} / MESH={ident.get('port_group')}\n\n"
 
                  # Peers
@@ -860,8 +861,15 @@ class Motor:
                          ponion = str(p.get('onion', ''))
                          from ghostwhisperchat.core.cripto_vault import get_vault_entry
                          v_data = get_vault_entry(p.get('uid'))
-                         has_ip = bool(v_data.get('ip') or pip)
-                         has_onion = bool(v_data.get('onion') or ponion)
+                         
+                         peer_privacy = p.get('privacy_policy', 'AMBOS')
+                         has_ip = False
+                         if peer_privacy in ["AMBOS", "IP", "SOLO-LOCAL"]:
+                             has_ip = bool(v_data.get('ip') or pip)
+                         
+                         has_onion = False
+                         if peer_privacy in ["AMBOS", "TOR", "SOLO-GLOBAL"]:
+                             has_onion = bool(v_data.get('onion') or ponion)
                          
                          badges = ""
                          if has_ip: badges += f" {Colores.YELLOW}[Local]{Colores.RESET}"
@@ -934,7 +942,8 @@ class Motor:
                       
                       # Formato Visual (Sin IPs ni Onions expuestas)
                       # - <Nick> [<Nick_Original_PC>] [<En línea/Offline>] [<Estado>] [Local] [Global]
-                      linea = f"- {Colores.BOLD}{nick}{Colores.RESET} [{s_user}] [{st_color}{st}{Colores.RESET}]"
+                      sys_user_str = f" [{s_user}]" if s_user and s_user != "?" else ""
+                      linea = f"- {Colores.BOLD}{nick}{Colores.RESET}{sys_user_str} [{st_color}{st}{Colores.RESET}]"
                       if msg: linea += f" [{msg}]"
                       if has_ip: linea += f" {Colores.YELLOW}[Local]{Colores.RESET}"
                       if has_onion: linea += f" {Colores.CYAN}[Global]{Colores.RESET}"
@@ -1248,8 +1257,15 @@ class Motor:
                          # Check IP/Onion presence for badges
                          from ghostwhisperchat.core.cripto_vault import get_vault_entry
                          v_data = get_vault_entry(uid)
-                         has_ip = bool(v_data.get('ip') or mdata.get('ip') or (peer and peer.get('ip')))
-                         has_onion = bool(v_data.get('onion') or mdata.get('onion') or (peer and peer.get('onion')))
+                         
+                         peer_privacy = mdata.get('privacy_policy') or (peer and peer.get('privacy_policy')) or 'AMBOS'
+                         has_ip = False
+                         if peer_privacy in ["AMBOS", "IP", "SOLO-LOCAL"]:
+                             has_ip = bool(v_data.get('ip') or mdata.get('ip') or (peer and peer.get('ip')))
+                             
+                         has_onion = False
+                         if peer_privacy in ["AMBOS", "TOR", "SOLO-GLOBAL"]:
+                             has_onion = bool(v_data.get('onion') or mdata.get('onion') or (peer and peer.get('onion')))
                          
                          # Update local group cache (Lazy Sync)
                          mdata['nick'] = nick
@@ -1267,7 +1283,8 @@ class Motor:
                      if has_ip: badges += f" {Colores.YELLOW}[Local]{Colores.RESET}"
                      if has_onion: badges += f" {Colores.CYAN}[Global]{Colores.RESET}"
                      
-                     res += f" - {Colores.C_GREEN_NEON}{nick}{Colores.RESET} [{Colores.GREY}{sys_user}{Colores.RESET}] {st_display}{tag}{badges}\n"
+                     sys_user_str = f" [{Colores.GREY}{sys_user}{Colores.RESET}]" if sys_user and sys_user != "?" else ""
+                     res += f" - {Colores.C_GREEN_NEON}{nick}{Colores.RESET}{sys_user_str} {st_display}{tag}{badges}\n"
                  return res
              return "Chat Privado."
 
