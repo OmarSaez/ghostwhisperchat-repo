@@ -242,6 +242,10 @@ class Motor:
             from ghostwhisperchat.core.utilidades import get_local_ip
             mi_ip = get_local_ip()
             if mi_ip and mi_ip != '127.0.0.1' and ip != '127.0.0.1':
+                # Evitar auto-ping si DHCP nos asignó la antigua IP del contacto
+                if ip == mi_ip and port_priv == getattr(self.red, 'port_priv', 44494):
+                    return onion
+
                 sub_mi = '.'.join(mi_ip.split('.')[:3])
                 sub_peer = '.'.join(str(ip).split('.')[:3])
                 
@@ -757,7 +761,7 @@ class Motor:
                      try:
                          # Usar _conectar_socks5 del transporte (respeta socks_port dinámico de GWC)
                          print(f"[SCAN_TOR] Sondeando {c_info.get('nick', '?')} ({onion_addr}:{target_port}) via SOCKS {self.red.socks_host}:{self.red.socks_port}", file=sys.stderr)
-                         s = self.red._conectar_socks5(onion_addr, target_port, timeout=28.0)
+                         s = self.red._conectar_socks5(onion_addr, target_port, timeout=55.0)
                          
                          ping_pkg = empaquetar("DISCOVER", {"filter": "PEERS"}, self.memoria.get_origen())
                          s.sendall(ping_pkg + b'\n')

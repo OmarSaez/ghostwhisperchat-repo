@@ -1,21 +1,4 @@
 Package: ghostwhisperchat
-Version: 3.041
-Architecture: all
-Maintainer: Omar Saez <omarsaez@ghostwhisper.chat>
-Depends: python3, python3-cryptography, libnotify-bin, portaudio19-dev, python3-pyaudio, vorbis-tools, zenity, xterm, pulseaudio-utils, tor, python3-stem, kitty
-Filename: pool/main/g/ghostwhisperchat/ghostwhisperchat_3.041_all.deb
-Size: 251388
-MD5sum: c069cc240110313daceef7c6b3ab91b5
-SHA1: ddaf81645375e0287fe6063e4e5f4b3ec1e8384e
-SHA256: 48597e986cbc8a95d426329883ab3447d5a746d857174b8468b6013da95cc169
-Section: net
-Priority: optional
-Description: GhostWhisperChat - Chat P2P Global Seguro (Edición WAN + LAN)
- Sistema de chat descentralizado con cifrado E2E, transferencia de archivos,
- soporte global sin servidores centrales mediante Tor Onion Services v3
- y descubrimiento automático en LAN.
-
-Package: ghostwhisperchat
 Version: 3.042
 Architecture: all
 Maintainer: Omar Saez <omarsaez@ghostwhisper.chat>
@@ -42,6 +25,23 @@ Size: 251474
 MD5sum: ed448187769853dea37a5b9abaa1c585
 SHA1: a371f1671ccdf8e1b2645327abdf7bdb15477e48
 SHA256: 583fd2fd95a86e3a83c9608542c759b52cc93f89669b71206dffbc24d6f27210
+Section: net
+Priority: optional
+Description: GhostWhisperChat - Chat P2P Global Seguro (Edición WAN + LAN)
+ Sistema de chat descentralizado con cifrado E2E, transferencia de archivos,
+ soporte global sin servidores centrales mediante Tor Onion Services v3
+ y descubrimiento automático en LAN.
+
+Package: ghostwhisperchat
+Version: 3.044
+Architecture: all
+Maintainer: Omar Saez <omarsaez@ghostwhisper.chat>
+Depends: python3, python3-cryptography, libnotify-bin, portaudio19-dev, python3-pyaudio, vorbis-tools, zenity, xterm, pulseaudio-utils, tor, python3-stem, kitty
+Filename: pool/main/g/ghostwhisperchat/ghostwhisperchat_3.044_all.deb
+Size: 251468
+MD5sum: b8006a8d98a5fa617b03f1d7dfe9cbd6
+SHA1: 2b205c154e9feedc23bcb0d9bcc817b9785670ad
+SHA256: 33c1338859d31ccacd46bfbec6fe587a96c11474d498a3ad65c12dac729f0389
 Section: net
 Priority: optional
 Description: GhostWhisperChat - Chat P2P Global Seguro (Edición WAN + LAN)

@@ -736,7 +736,7 @@ def main():
             # Setup de Animación Unificada
             if is_scan and has_tor and tor_total > 0:
                 msg_anim = "Buscando en la red local y global"
-                wait_time = 30.0
+                wait_time = 55.0
             elif is_scan:
                 msg_anim = "Buscando en la red personas en linea"
                 wait_time = 5.0
