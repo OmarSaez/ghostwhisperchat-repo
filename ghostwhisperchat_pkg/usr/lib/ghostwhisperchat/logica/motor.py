@@ -761,7 +761,7 @@ class Motor:
                      try:
                          # Usar _conectar_socks5 del transporte (respeta socks_port dinámico de GWC)
                          print(f"[SCAN_TOR] Sondeando {c_info.get('nick', '?')} ({onion_addr}:{target_port}) via SOCKS {self.red.socks_host}:{self.red.socks_port}", file=sys.stderr)
-                         s = self.red._conectar_socks5(onion_addr, target_port, timeout=55.0)
+                         s = self.red._conectar_socks5(onion_addr, target_port, timeout=40.0)
                          
                          ping_pkg = empaquetar("DISCOVER", {"filter": "PEERS"}, self.memoria.get_origen())
                          s.sendall(ping_pkg + b'\n')

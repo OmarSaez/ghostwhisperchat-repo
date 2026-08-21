@@ -1,47 +1,47 @@
 Package: ghostwhisperchat
-Version: 3.042
-Architecture: all
-Maintainer: Omar Saez <omarsaez@ghostwhisper.chat>
-Depends: python3, python3-cryptography, libnotify-bin, portaudio19-dev, python3-pyaudio, vorbis-tools, zenity, xterm, pulseaudio-utils, tor, python3-stem, kitty
-Filename: pool/main/g/ghostwhisperchat/ghostwhisperchat_3.042_all.deb
-Size: 251414
-MD5sum: 70d9132eb2264fc6c10359b508a347b7
-SHA1: 6b5d2ff24cb70b972cd53ff3a76b1d13f31307e2
-SHA256: 4fbdd924cd48347f30e24ede539cd0dc679e0325e888a3636cd2885c31b58cc5
-Section: net
-Priority: optional
-Description: GhostWhisperChat - Chat P2P Global Seguro (Edición WAN + LAN)
- Sistema de chat descentralizado con cifrado E2E, transferencia de archivos,
- soporte global sin servidores centrales mediante Tor Onion Services v3
- y descubrimiento automático en LAN.
-
-Package: ghostwhisperchat
-Version: 3.043
-Architecture: all
-Maintainer: Omar Saez <omarsaez@ghostwhisper.chat>
-Depends: python3, python3-cryptography, libnotify-bin, portaudio19-dev, python3-pyaudio, vorbis-tools, zenity, xterm, pulseaudio-utils, tor, python3-stem, kitty
-Filename: pool/main/g/ghostwhisperchat/ghostwhisperchat_3.043_all.deb
-Size: 251474
-MD5sum: ed448187769853dea37a5b9abaa1c585
-SHA1: a371f1671ccdf8e1b2645327abdf7bdb15477e48
-SHA256: 583fd2fd95a86e3a83c9608542c759b52cc93f89669b71206dffbc24d6f27210
-Section: net
-Priority: optional
-Description: GhostWhisperChat - Chat P2P Global Seguro (Edición WAN + LAN)
- Sistema de chat descentralizado con cifrado E2E, transferencia de archivos,
- soporte global sin servidores centrales mediante Tor Onion Services v3
- y descubrimiento automático en LAN.
-
-Package: ghostwhisperchat
 Version: 3.044
 Architecture: all
 Maintainer: Omar Saez <omarsaez@ghostwhisper.chat>
 Depends: python3, python3-cryptography, libnotify-bin, portaudio19-dev, python3-pyaudio, vorbis-tools, zenity, xterm, pulseaudio-utils, tor, python3-stem, kitty
 Filename: pool/main/g/ghostwhisperchat/ghostwhisperchat_3.044_all.deb
 Size: 251468
-MD5sum: b8006a8d98a5fa617b03f1d7dfe9cbd6
-SHA1: 2b205c154e9feedc23bcb0d9bcc817b9785670ad
-SHA256: 33c1338859d31ccacd46bfbec6fe587a96c11474d498a3ad65c12dac729f0389
+MD5sum: 65dbc1ae15aa1101fb1cadad2bea7f79
+SHA1: 8cf8d0d4e19c6b28223255d966c3d82980e45ebb
+SHA256: a64b22834a613d16a1e5042d1ff3642c64ff621d0b1bc3464177e3bb9b187f37
+Section: net
+Priority: optional
+Description: GhostWhisperChat - Chat P2P Global Seguro (Edición WAN + LAN)
+ Sistema de chat descentralizado con cifrado E2E, transferencia de archivos,
+ soporte global sin servidores centrales mediante Tor Onion Services v3
+ y descubrimiento automático en LAN.
+
+Package: ghostwhisperchat
+Version: 3.045
+Architecture: all
+Maintainer: Omar Saez <omarsaez@ghostwhisper.chat>
+Depends: python3, python3-cryptography, libnotify-bin, portaudio19-dev, python3-pyaudio, vorbis-tools, zenity, xterm, pulseaudio-utils, tor, python3-stem, kitty
+Filename: pool/main/g/ghostwhisperchat/ghostwhisperchat_3.045_all.deb
+Size: 251428
+MD5sum: 17deaa8a7f15a5ef23f1e0ddcc5fcd32
+SHA1: 8196c5ff0d7314c5a86dea6c9f5563d7c38fab9c
+SHA256: efd96ccafd7a7ebf5db8650ccfd4e12adb8cd3f61e5c83a60883a7330d8c4ccd
+Section: net
+Priority: optional
+Description: GhostWhisperChat - Chat P2P Global Seguro (Edición WAN + LAN)
+ Sistema de chat descentralizado con cifrado E2E, transferencia de archivos,
+ soporte global sin servidores centrales mediante Tor Onion Services v3
+ y descubrimiento automático en LAN.
+
+Package: ghostwhisperchat
+Version: 3.046
+Architecture: all
+Maintainer: Omar Saez <omarsaez@ghostwhisper.chat>
+Depends: python3, python3-cryptography, libnotify-bin, portaudio19-dev, python3-pyaudio, vorbis-tools, zenity, xterm, pulseaudio-utils, tor, python3-stem, kitty
+Filename: pool/main/g/ghostwhisperchat/ghostwhisperchat_3.046_all.deb
+Size: 251576
+MD5sum: 0154ff10b60c0b6381324d8f0fcb7d36
+SHA1: d7a8e100c53b70a6e92d19c00ff96fb927364e97
+SHA256: d188b5f660ca7f1d1bbd20f08a55d71f288b6dc4547a24efe069dca4cbf22329
 Section: net
 Priority: optional
 Description: GhostWhisperChat - Chat P2P Global Seguro (Edición WAN + LAN)
