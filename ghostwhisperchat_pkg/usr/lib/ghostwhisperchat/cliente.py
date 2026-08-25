@@ -596,8 +596,9 @@ class GestorInput:
             if self.grabacion_detener: # Se cancelo
                 return
                 
-            out_wav = "/tmp/gwc_audio_tmp.wav"
-            out_ogg = "/tmp/gwc_audio_tmp.ogg"
+            timestamp_id = int(time.time())
+            out_wav = f"/tmp/gwc_audio_tmp_{timestamp_id}.wav"
+            out_ogg = f"/tmp/gwc_audio_tmp_{timestamp_id}.ogg"
             
             wf = wave.open(out_wav, 'wb')
             wf.setnchannels(canales)
@@ -614,6 +615,12 @@ class GestorInput:
                 cmd = f"__MSG__ --foto-bg {out_ogg}\n"
                 self.sock.sendall(cmd.encode('utf-8'))
                 
+                # Autoregistro local para poder reproducir la propia nota
+                audio_id_str = str(self.audio_id_counter)
+                self.audios_recibidos[audio_id_str] = out_ogg
+                self.audio_id_counter += 1
+                self.print_incoming(f"{C.CYAN}▶ Escribe '--play {audio_id_str}' para escuchar tu nota enviada.{C.RESET}")
+                
         except Exception as e:
             self.print_incoming(f"{C.RED}[X] Error grabando audio: {e}{C.RESET}")
             self.modo_grabando = False
@@ -622,13 +629,10 @@ class GestorInput:
         self.modo_grabando = False
         self.grabacion_detener = cancelar
         
-        self._limpiar_linea()
         if cancelar:
             self.print_incoming(f"{C.YELLOW}[*] Grabación descartada.{C.RESET}")
         else:
             self.print_incoming(f"{C.GREEN}[*] Enviando nota de voz...{C.RESET}")
-            
-        self._pintar_linea()
         
     def reproducir_audio(self, audio_id):
         if audio_id in self.audios_recibidos:
