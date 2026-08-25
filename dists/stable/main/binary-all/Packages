@@ -1,21 +1,4 @@
 Package: ghostwhisperchat
-Version: 3.044
-Architecture: all
-Maintainer: Omar Saez <omarsaez@ghostwhisper.chat>
-Depends: python3, python3-cryptography, libnotify-bin, portaudio19-dev, python3-pyaudio, vorbis-tools, zenity, xterm, pulseaudio-utils, tor, python3-stem, kitty
-Filename: pool/main/g/ghostwhisperchat/ghostwhisperchat_3.044_all.deb
-Size: 251468
-MD5sum: 65dbc1ae15aa1101fb1cadad2bea7f79
-SHA1: 8cf8d0d4e19c6b28223255d966c3d82980e45ebb
-SHA256: a64b22834a613d16a1e5042d1ff3642c64ff621d0b1bc3464177e3bb9b187f37
-Section: net
-Priority: optional
-Description: GhostWhisperChat - Chat P2P Global Seguro (Edición WAN + LAN)
- Sistema de chat descentralizado con cifrado E2E, transferencia de archivos,
- soporte global sin servidores centrales mediante Tor Onion Services v3
- y descubrimiento automático en LAN.
-
-Package: ghostwhisperchat
 Version: 3.050
 Architecture: all
 Maintainer: Omar Saez <omarsaez@ghostwhisper.chat>
@@ -25,6 +8,40 @@ Size: 251470
 MD5sum: b6672c84d7cd34ffb8dab6d45bb796a7
 SHA1: 0f203ae0fd76043985995e2b11ae8e90421b9487
 SHA256: 5ce459891631e49fa9bbae8c2a7e6cd485f97714f087d8c74bd82decfcc1ac21
+Section: net
+Priority: optional
+Description: GhostWhisperChat - Chat P2P Global Seguro (Edición WAN + LAN)
+ Sistema de chat descentralizado con cifrado E2E, transferencia de archivos,
+ soporte global sin servidores centrales mediante Tor Onion Services v3
+ y descubrimiento automático en LAN.
+
+Package: ghostwhisperchat
+Version: 3.051
+Architecture: all
+Maintainer: Omar Saez <omarsaez@ghostwhisper.chat>
+Depends: python3, python3-cryptography, libnotify-bin, portaudio19-dev, python3-pyaudio, vorbis-tools, zenity, xterm, pulseaudio-utils, tor, python3-stem, kitty
+Filename: pool/main/g/ghostwhisperchat/ghostwhisperchat_3.051_all.deb
+Size: 251466
+MD5sum: 5725563031f693ddfebe7baa16fe1f1d
+SHA1: dd15c7a224310042263c7cecea0bdf8bd66682dc
+SHA256: ca9387e37bcdff3c73a7a124fc1d8077c75c99f4464441619d363479762b47a3
+Section: net
+Priority: optional
+Description: GhostWhisperChat - Chat P2P Global Seguro (Edición WAN + LAN)
+ Sistema de chat descentralizado con cifrado E2E, transferencia de archivos,
+ soporte global sin servidores centrales mediante Tor Onion Services v3
+ y descubrimiento automático en LAN.
+
+Package: ghostwhisperchat
+Version: 3.052
+Architecture: all
+Maintainer: Omar Saez <omarsaez@ghostwhisper.chat>
+Depends: python3, python3-cryptography, libnotify-bin, portaudio19-dev, python3-pyaudio, vorbis-tools, zenity, xterm, pulseaudio-utils, tor, python3-stem, kitty
+Filename: pool/main/g/ghostwhisperchat/ghostwhisperchat_3.052_all.deb
+Size: 251502
+MD5sum: 2649b57343d3d12ec0bd7e8b4a1b1bf1
+SHA1: bf59ac4f421b3afee6cd4ec23ee872419a1b609a
+SHA256: 3aca48f47a5f2d846c54c789451cae0270be9b10faf3590a8ee4cd242e42b7d5
 Section: net
 Priority: optional
 Description: GhostWhisperChat - Chat P2P Global Seguro (Edición WAN + LAN)

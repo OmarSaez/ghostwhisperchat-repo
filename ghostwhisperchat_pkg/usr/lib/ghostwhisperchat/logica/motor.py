@@ -1313,7 +1313,7 @@ class Motor:
             chat_id = context_ui[1]
             if not args: return "[X] Uso: --archivo <Ruta>"
             
-            ruta = args[0].strip("'\"") # Remove quotes if shell didn't
+            ruta = " ".join(args).strip("'\"") # Reconstruir ruta por si tiene espacios sin comillas
             if not os.path.exists(ruta):
                 if is_silent: return None # Fail silently
                 return f"[X] Archivo no encontrado: {ruta}"
@@ -2355,7 +2355,7 @@ class Motor:
                      # FIX v2.165: Organizacion Automatica de Fotos
                      # Si es imagen, guardar en subcarpeta 'Fotos_Recibidas'
                      lower_name = filename.lower()
-                     es_imagen = lower_name.endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.tiff'))
+                     es_imagen = lower_name.endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.tiff', '.avif', '.svg', '.ico', '.heic', '.heif', '.jpe', '.jxl', '.apng'))
                      
                      if es_imagen:
                          target_subdir = os.path.join(dest_dir, "Fotos_Recibidas")

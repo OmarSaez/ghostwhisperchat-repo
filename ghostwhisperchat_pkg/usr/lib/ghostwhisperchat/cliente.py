@@ -340,19 +340,17 @@ class GestorInput:
                      self.print_incoming(f"{C.RED}[X] Uso: --imagen <ruta> [ancho]{C.RESET}")
                      return
                  
-                 im_path = parts[1] # shlex handles quotes
-                 file_to_send_bg = im_path # Marcamos para envio background
-                 
-                 # Lógica de Ancho v2.155:
-                 # 1. Default estricto: 60.
-                 # 2. Si usuario define ancho: Se usa ese valor (Clampeado 10-190).
-                 # Ya no hay auto-ajuste a la ventana local.
-                 
                  im_width = 60 # Default
-                 
-                 if len(parts) > 2 and parts[2].isdigit():
-                     user_val = int(parts[2])
+                 # Reconstruct path safely in case user didn't quote spaces
+                 if parts[-1].isdigit():
+                     user_val = int(parts[-1])
                      im_width = max(10, min(user_val, 190))
+                     im_path = " ".join(parts[1:-1])
+                 else:
+                     im_path = " ".join(parts[1:])
+                     
+                 im_path = im_path.strip("'\"")
+                 file_to_send_bg = im_path
                  
                  # Renderizar Localmente (Sender)
                  self.print_incoming(f"{C.YELLOW}[*] Procesando imagen localmente...{C.RESET}")
