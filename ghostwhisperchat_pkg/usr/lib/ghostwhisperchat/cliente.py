@@ -381,8 +381,11 @@ class GestorInput:
                  
              if cmd_raw in COMMAND_MAP['AUDIO_STOP'] and is_explicit_command:
                  import subprocess
-                 subprocess.run(['killall', 'paplay'], stderr=subprocess.DEVNULL)
-                 self.print_incoming(f"{C.YELLOW}[*] Reproducción de audio detenida.{C.RESET}")
+                 res = subprocess.run(['killall', 'paplay'], stderr=subprocess.DEVNULL)
+                 if res.returncode == 0:
+                     self.print_incoming(f"{C.YELLOW}[*] Reproducción de audio detenida.{C.RESET}")
+                 else:
+                     self.print_incoming(f"{C.YELLOW}[*] No hay ningún audio reproduciéndose en este instante.{C.RESET}")
                  return
 
              # --- INTERCEPCION IMAGEN ASCII ---

@@ -79,7 +79,7 @@ class Colores:
     BLACK_TXT = "\033[38;5;0m"
 
 # Versionado - Estable - Global P2P WAN Global Edition
-APP_VER_NUM = "3.057"
+APP_VER_NUM = "3.058"
 APP_VER_TAG = "Global Edition - Global P2P WAN"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
@@ -152,6 +152,15 @@ AYUDA = f"""
 
   {Colores.GREEN}--imagen <Ruta>{Colores.RESET} .............. Enviar imagen visual (ASCII) y original.
         {Colores.GREY}[Alias: -i, --foto, --pic]{Colores.RESET}
+
+  {Colores.GREEN}--audio{Colores.RESET} ........................ Grabar Nota de Voz (Walkie-Talkie).
+        {Colores.GREY}[Alias: -au, --voz]{Colores.RESET}
+
+  {Colores.GREEN}--play [ID]{Colores.RESET} .................... Reproducir Nota de Voz.
+        {Colores.GREY}[Alias: -pl, --escuchar]{Colores.RESET}
+
+  {Colores.GREEN}--stop{Colores.RESET} ......................... Detener audio actual.
+        {Colores.GREY}[Alias: -sp, --parar, --callate]{Colores.RESET}
 
   {Colores.GREEN}--cambiarnombre <Nuevo>{Colores.RESET} ....... Cambiar tu Nick actual.
         {Colores.GREY}[Alias: -n, --nick]{Colores.RESET}
@@ -267,7 +276,7 @@ ABBREVIATIONS_DISPLAY = {
             'desc': "Reproducir audio recibido. Uso: --play <opcional:ID>"
         },
         "DETENER AUDIO": {
-            'aliases': ['--stop', '--parar', '--callate'],
+            'aliases': ['--stop', '-sp', '--parar', '--callate'],
             'desc': "Detener reproducción actual de audio."
         },
         "CAMBIAR NOMBRE": {
@@ -340,7 +349,7 @@ COMMAND_MAP = {
     'DL_TOGGLE':    ['--descarga', '-b', '--bajar', '--autobajar', '--dl'],
     'AUDIO_RECORD': ['--audio', '--voz', '-au'],
     'AUDIO_PLAY':   ['--play', '--escuchar', '-pl'],
-    'AUDIO_STOP':   ['--stop', '--parar', '--callate'],
+    'AUDIO_STOP':   ['--stop', '-sp', '--parar', '--callate'],
     'PHOTO_BG':     ['--foto-bg'], # Comando interno silencioso
     'CHECK_CHAT_STATUS': ['--check-chat-status'], # Comando interno para polling de solicitudes
     'SCAN_PEEK':    ['--scan-peek'] # Comando interno para sondeo de radar
