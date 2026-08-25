@@ -2356,10 +2356,23 @@ class Motor:
                      # Si es imagen, guardar en subcarpeta 'Fotos_Recibidas'
                      lower_name = filename.lower()
                      es_imagen = lower_name.endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.tiff', '.avif', '.svg', '.ico', '.heic', '.heif', '.jpe', '.jxl', '.apng'))
+                     es_audio = lower_name.endswith(('.ogg', '.wav', '.mp3', '.m4a'))
                      
                      if es_imagen:
                          target_subdir = os.path.join(dest_dir, "Fotos_Recibidas")
                          os.makedirs(target_subdir, exist_ok=True)
+                         final_path = os.path.join(target_subdir, filename)
+                     elif es_audio:
+                         target_subdir = os.path.join(dest_dir, "Audios")
+                         os.makedirs(target_subdir, exist_ok=True)
+                         
+                         # Renombrado inteligente (Evitar colisiones)
+                         f_gid = payload.get("gid")
+                         chat_name = self.memoria.grupos_activos[f_gid]['nombre'] if f_gid and f_gid in self.memoria.grupos_activos else "Privado"
+                         safe_nick = origen['nick'].replace(" ", "_")
+                         chat_name = chat_name.replace(" ", "_")
+                         filename = f"{chat_name}_{safe_nick}_{int(time.time())}{os.path.splitext(filename)[1]}"
+                         
                          final_path = os.path.join(target_subdir, filename)
                      else:
                          final_path = os.path.join(dest_dir, filename)
@@ -2392,6 +2405,9 @@ class Motor:
                      if es_imagen:
                          noti_title = "Descarga de foto"
                          noti_body = f"{origen['nick']} te mando una foto"
+                     elif es_audio:
+                         noti_title = "Nota de voz"
+                         noti_body = f"{origen['nick']} te mandó una nota de voz"
                      
                      from ghostwhisperchat.core.utilidades import enviar_notificacion
                      enviar_notificacion(noti_title, noti_body)
@@ -2404,6 +2420,9 @@ class Motor:
                          if es_imagen:
                              msg_alert = f"\n{Colores.C_GREEN_NEON}[SISTEMA] [!] Recepcion de foto finalizada: {safe_fname}{Colores.RESET}\n"
                              msg_alert += f"__NATIVE_IMG__{final_path}\n"
+                         elif es_audio:
+                             msg_alert = f"\n{Colores.C_BLUE_ICE}[SISTEMA] 🎤 {origen['nick']} te ha enviado una Nota de Voz.{Colores.RESET}\n"
+                             msg_alert += f"__AUDIO_RECV__{final_path}\n"
                          else:
                              msg_alert = f"\n{Colores.YELLOW}[SISTEMA] [!] {origen['nick']} te ha enviado: {safe_fname}{Colores.RESET}\n"
                          

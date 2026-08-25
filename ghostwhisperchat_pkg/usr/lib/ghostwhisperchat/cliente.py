@@ -35,6 +35,13 @@ class GestorInput:
         # Typing Visual State
         self.typing_status_msg = ""
         
+        # Walkie-Talkie Audio State
+        self.modo_grabando = False
+        self.grabacion_hilo = None
+        self.grabacion_detener = False
+        self.audios_recibidos = {} # id_str -> ruta_absoluta
+        self.audio_id_counter = 1
+        
     def _limpiar_linea(self):
         # FIX v2.171: Soporte para Input Multilinea (Wrapping)
         # Si el input ocupa mas de 1 linea, hay que subir mas veces.
@@ -68,7 +75,11 @@ class GestorInput:
              sys.stdout.write(f"{C.ITALIC}{C.GREY}{self.typing_status_msg}{C.RESET}\r\n")
         
         # Pintar prompt + buffer actual
-        sys.stdout.write(f"{self.prompt}{''.join(self.buffer)}")
+        current_prompt = self.prompt
+        if self.modo_grabando:
+            current_prompt = f"{C.RED}[🔴 Grabando Voz... (Enter para enviar, '--cancelar' aborta)]{C.RESET} " + self.prompt
+            
+        sys.stdout.write(f"{current_prompt}{''.join(self.buffer)}")
         sys.stdout.flush()
 
     def update_typing_status(self, label):
@@ -322,18 +333,50 @@ class GestorInput:
         # Logica original de envio
         file_to_send_bg = None # Para auto-envio de fotos
         
+        # MANEJO DE MODO GRABACIÓN (Walkie-Talkie)
+        if getattr(self, 'modo_grabando', False):
+            if msg.strip() == "--cancelar":
+                self.detener_grabacion(cancelar=True)
+            else:
+                self.detener_grabacion(cancelar=False)
+            return
+
         try:
              # Check Scan
              from ghostwhisperchat.datos.recursos import COMMAND_MAP
+             
+             # Verificar si el mensaje tiene contenido antes de separar
+             if not msg.strip(): return
+             
              cmd_raw = msg.split()[0]
              if not cmd_raw.startswith("-"): cmd_raw = "--" + cmd_raw 
              
+             is_explicit_command = msg.strip().startswith("-")
+             
+             # --- AUDIO WALKIE-TALKIE ---
+             if cmd_raw in COMMAND_MAP['AUDIO_RECORD'] and is_explicit_command:
+                 self.iniciar_grabacion()
+                 return
+                 
+             if cmd_raw in COMMAND_MAP['AUDIO_PLAY'] and is_explicit_command:
+                 parts = msg.strip().split()
+                 if len(parts) > 1:
+                     audio_id = parts[1]
+                 else:
+                     audio_id = str(self.audio_id_counter - 1)
+                     
+                 self.reproducir_audio(audio_id)
+                 return
+                 
+             if cmd_raw in COMMAND_MAP['AUDIO_STOP'] and is_explicit_command:
+                 import subprocess
+                 subprocess.run(['killall', 'paplay'], stderr=subprocess.DEVNULL)
+                 self.print_incoming(f"{C.YELLOW}[*] Reproducción de audio detenida.{C.RESET}")
+                 return
+
              # --- INTERCEPCION IMAGEN ASCII ---
              # Alias: --imagen, --foto, --picture, -P, -i
              IMG_ALIASES = ["--imagen", "--foto", "--picture", "-P", "-i"]
-             
-             # FIX v2.167: 'foto' is a common word. Only trigger command if it starts with '-'
-             is_explicit_command = msg.strip().startswith("-")
              
              if cmd_raw in IMG_ALIASES and is_explicit_command:
                  import shlex
@@ -487,6 +530,91 @@ class GestorInput:
              sys.stdout.write(f"\r\n{C.CYAN} Sugerencias: {hint}{C.RESET}\r\n")
              self._pintar_linea()
 
+    def iniciar_grabacion(self):
+        self.modo_grabando = True
+        self.grabacion_detener = False
+        self._limpiar_linea()
+        self._pintar_linea()
+        
+        self.grabacion_hilo = threading.Thread(target=self._hilo_grabar, daemon=True)
+        self.grabacion_hilo.start()
+        
+    def _hilo_grabar(self):
+        import subprocess, time, os
+        try:
+            import pyaudio
+            import wave
+            
+            chunk = 1024
+            formato = pyaudio.paInt16
+            canales = 1
+            rate = 16000
+            
+            p = pyaudio.PyAudio()
+            stream = p.open(format=formato,
+                            channels=canales,
+                            rate=rate,
+                            input=True,
+                            frames_per_buffer=chunk)
+                            
+            frames = []
+            
+            # Grabar mientras modo_grabando sea True
+            while self.modo_grabando and not self.grabacion_detener:
+                data = stream.read(chunk, exception_on_overflow=False)
+                frames.append(data)
+                
+            stream.stop_stream()
+            stream.close()
+            p.terminate()
+            
+            if self.grabacion_detener: # Se cancelo
+                return
+                
+            out_wav = "/tmp/gwc_audio_tmp.wav"
+            out_ogg = "/tmp/gwc_audio_tmp.ogg"
+            
+            wf = wave.open(out_wav, 'wb')
+            wf.setnchannels(canales)
+            wf.setsampwidth(p.get_sample_size(formato))
+            wf.setframerate(rate)
+            wf.writeframes(b''.join(frames))
+            wf.close()
+            
+            # Convertir a OGG via oggenc (vorbis-tools) para maxima compresion y poco peso
+            subprocess.run(['oggenc', '-q', '3', out_wav, '-o', out_ogg], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+            
+            if os.path.exists(out_ogg):
+                # Mandarlo usando el envio de archivos silenciado de fondo (el mismo de las fotos)
+                cmd = f"__MSG__ --foto-bg {out_ogg}\n"
+                self.sock.sendall(cmd.encode('utf-8'))
+                
+        except Exception as e:
+            self.print_incoming(f"{C.RED}[X] Error grabando audio: {e}{C.RESET}")
+            self.modo_grabando = False
+
+    def detener_grabacion(self, cancelar=False):
+        self.modo_grabando = False
+        self.grabacion_detener = cancelar
+        
+        self._limpiar_linea()
+        if cancelar:
+            self.print_incoming(f"{C.YELLOW}[*] Grabación descartada.{C.RESET}")
+        else:
+            self.print_incoming(f"{C.GREEN}[*] Enviando nota de voz...{C.RESET}")
+            
+        self._pintar_linea()
+        
+    def reproducir_audio(self, audio_id):
+        if audio_id in self.audios_recibidos:
+            ruta = self.audios_recibidos[audio_id]
+            import subprocess
+            # Usar paplay (PulseAudio) en segundo plano
+            subprocess.Popen(['paplay', ruta], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+            self.print_incoming(f"{C.GREEN}[▶] Reproduciendo Audio {audio_id}...{C.RESET}")
+        else:
+            self.print_incoming(f"{C.RED}[X] Audio {audio_id} no encontrado en esta sesión.{C.RESET}")
+
 def enviar_comando_transitorio(cmd_str):
     """Envía un comando, espera respuesta inmediata y sale."""
     if not os.path.exists(IPC_SOCK_PATH):
@@ -623,6 +751,16 @@ def modo_ui_chat(target_id, es_grupo):
                     if line.strip().startswith("__NATIVE_IMG__"):
                          img_path = line.strip().replace("__NATIVE_IMG__", "", 1).strip()
                          helper.pending_native_img = img_path
+                         continue
+                         
+                    # RECEIVE NATIVE AUDIO (v3.054)
+                    if line.strip().startswith("__AUDIO_RECV__"):
+                         audio_path = line.strip().replace("__AUDIO_RECV__", "", 1).strip()
+                         audio_id_str = str(helper.audio_id_counter)
+                         helper.audios_recibidos[audio_id_str] = audio_path
+                         helper.audio_id_counter += 1
+                         
+                         helper.print_incoming(f"{C.CYAN}▶ Escribe '--play {audio_id_str}' para escuchar.{C.RESET}")
                          continue
 
 

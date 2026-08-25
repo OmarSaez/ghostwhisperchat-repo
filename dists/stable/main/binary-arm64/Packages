@@ -1,21 +1,4 @@
 Package: ghostwhisperchat
-Version: 3.051
-Architecture: all
-Maintainer: Omar Saez <omarsaez@ghostwhisper.chat>
-Depends: python3, python3-cryptography, libnotify-bin, portaudio19-dev, python3-pyaudio, vorbis-tools, zenity, xterm, pulseaudio-utils, tor, python3-stem, kitty
-Filename: pool/main/g/ghostwhisperchat/ghostwhisperchat_3.051_all.deb
-Size: 251466
-MD5sum: 5725563031f693ddfebe7baa16fe1f1d
-SHA1: dd15c7a224310042263c7cecea0bdf8bd66682dc
-SHA256: ca9387e37bcdff3c73a7a124fc1d8077c75c99f4464441619d363479762b47a3
-Section: net
-Priority: optional
-Description: GhostWhisperChat - Chat P2P Global Seguro (Edición WAN + LAN)
- Sistema de chat descentralizado con cifrado E2E, transferencia de archivos,
- soporte global sin servidores centrales mediante Tor Onion Services v3
- y descubrimiento automático en LAN.
-
-Package: ghostwhisperchat
 Version: 3.052
 Architecture: all
 Maintainer: Omar Saez <omarsaez@ghostwhisper.chat>
@@ -42,6 +25,23 @@ Size: 251502
 MD5sum: db29e0d2776640d92ba7f4b830010f5c
 SHA1: 4418e00eda27f067c3ccc252501646ebb04b5374
 SHA256: e063ea4b75ffbd8130c9af394c0f65ebaeb9756ea82c6c9053d6ea8f7f9ec39c
+Section: net
+Priority: optional
+Description: GhostWhisperChat - Chat P2P Global Seguro (Edición WAN + LAN)
+ Sistema de chat descentralizado con cifrado E2E, transferencia de archivos,
+ soporte global sin servidores centrales mediante Tor Onion Services v3
+ y descubrimiento automático en LAN.
+
+Package: ghostwhisperchat
+Version: 3.054
+Architecture: all
+Maintainer: Omar Saez <omarsaez@ghostwhisper.chat>
+Depends: python3, python3-cryptography, libnotify-bin, portaudio19-dev, python3-pyaudio, vorbis-tools, zenity, xterm, pulseaudio-utils, tor, python3-stem, kitty, imagemagick
+Filename: pool/main/g/ghostwhisperchat/ghostwhisperchat_3.054_all.deb
+Size: 252908
+MD5sum: 8174509c9403388e6c37d0c4c35e06c2
+SHA1: 9b4c7d6c242f36ed10ffdba39101df66f2b3092c
+SHA256: a7c19c6c5a208173768bb3cc2a0fcca2c26ba84784139ccd9b6e6880c7ab8de2
 Section: net
 Priority: optional
 Description: GhostWhisperChat - Chat P2P Global Seguro (Edición WAN + LAN)
