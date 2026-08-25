@@ -76,8 +76,12 @@ class GestorInput:
         
         # Pintar prompt + buffer actual
         current_prompt = self.prompt
-        if self.modo_grabando:
-            current_prompt = f"{C.RED}[🔴 Grabando Voz... (Enter para enviar, '--cancelar' aborta)]{C.RESET} " + self.prompt
+        if getattr(self, 'modo_grabando', False):
+            segundos = getattr(self, 'grabacion_segundos', 0)
+            mins = segundos // 60
+            secs = segundos % 60
+            time_str = f"{mins:02d}:{secs:02d}"
+            current_prompt = f"{C.RED}[🔴 Grabando {time_str} (Enter envia, '--cancelar' aborta)]{C.RESET} " + self.prompt
             
         sys.stdout.write(f"{current_prompt}{''.join(self.buffer)}")
         sys.stdout.flush()
@@ -224,6 +228,12 @@ class GestorInput:
                     continue
                     
                 if not rfds:
+                    if getattr(self, 'modo_grabando', False):
+                        curr_time = int(time.time() - getattr(self, 'inicio_grabacion', time.time()))
+                        if curr_time != getattr(self, 'grabacion_segundos', -1):
+                            self.grabacion_segundos = curr_time
+                            self._limpiar_linea()
+                            self._pintar_linea()
                     continue
                     
                 ch = sys.stdin.read(1)
@@ -533,6 +543,9 @@ class GestorInput:
     def iniciar_grabacion(self):
         self.modo_grabando = True
         self.grabacion_detener = False
+        import time
+        self.inicio_grabacion = time.time()
+        self.grabacion_segundos = 0
         self._limpiar_linea()
         self._pintar_linea()
         
