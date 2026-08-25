@@ -3,6 +3,14 @@
 
 GhostWhisperChat (GWC) es un sistema de mensajería y transferencia descentralizado P2P, transferencia de archivos. Funciona tanto en **red local (LAN)** mediante descubrimiento automático como de forma **global (WAN)** a través de **Tor Onion Services v3** sin depender de servidores centrales.
 
+## DEPENDENCIAS
+
+Para que GhostWhisperChat funcione con todas sus características (incluyendo renderizado multimedia nativo, audio y cifrado), requiere los siguientes paquetes en tu sistema. Si usas el instalador `apt` a continuación, todos ellos **se instalarán automáticamente** si no los tienes:
+
+```text
+python3, python3-cryptography, libnotify-bin, portaudio19-dev, python3-pyaudio, vorbis-tools, zenity, xterm, pulseaudio-utils, tor, python3-stem, kitty, imagemagick
+```
+
 ## INSTALADOR
 
 ```bash

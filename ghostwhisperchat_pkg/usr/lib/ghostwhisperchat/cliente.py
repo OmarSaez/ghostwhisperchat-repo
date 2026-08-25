@@ -177,16 +177,23 @@ class GestorInput:
                     self.pending_native_img = None
                     
                     import shutil, subprocess
+                    kitty_success = False
                     if shutil.which("kitty"):
                         try:
                             self.print_incoming(f"{C.CYAN}[IMAGEN NATIVA]{C.RESET}")
                             self._limpiar_linea()
-                            subprocess.run(["kitty", "+kitten", "icat", "--unicode-placeholder", "--align", "left", img_path])
-                            sys.stdout.write("\r\n")
-                            sys.stdout.flush()
-                            self._pintar_linea()
+                            res_cat = subprocess.run(
+                                ["kitty", "+kitten", "icat", "--unicode-placeholder", "--align", "left", img_path],
+                                stderr=subprocess.DEVNULL
+                            )
+                            if res_cat.returncode == 0:
+                                sys.stdout.write("\r\n")
+                                sys.stdout.flush()
+                                self._pintar_linea()
+                                kitty_success = True
                         except: pass
-                    else:
+                    
+                    if not kitty_success:
                         try:
                             self.print_incoming(f"{C.CYAN}[IMAGEN ASCII]{C.RESET}")
                             from ghostwhisperchat.core import imagen_ascii
@@ -361,11 +368,16 @@ class GestorInput:
                          # Render Native Kitty
                          self.print_incoming(f"{C.CYAN}[IMAGEN NATIVA] {os.path.basename(im_path)}{C.RESET}")
                          self._limpiar_linea()
-                         subprocess.run(["kitty", "+kitten", "icat", "--unicode-placeholder", "--align", "left", im_path])
-                         sys.stdout.write("\r\n")
-                         sys.stdout.flush()
-                         self._pintar_linea()
-                         kitty_success = True
+                         # Redirigir stderr a null para que si falla no ensucie la UI
+                         res_cat = subprocess.run(
+                             ["kitty", "+kitten", "icat", "--unicode-placeholder", "--align", "left", im_path],
+                             stderr=subprocess.DEVNULL
+                         )
+                         if res_cat.returncode == 0:
+                             sys.stdout.write("\r\n")
+                             sys.stdout.flush()
+                             self._pintar_linea()
+                             kitty_success = True
                      except: pass
                      
                  if not kitty_success:

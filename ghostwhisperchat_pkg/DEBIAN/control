@@ -1,9 +1,9 @@
 Package: ghostwhisperchat
-Version: 3.052
+Version: 3.053
 Section: net
 Priority: optional
 Architecture: all
-Depends: python3, python3-cryptography, libnotify-bin, portaudio19-dev, python3-pyaudio, vorbis-tools, zenity, xterm, pulseaudio-utils, tor, python3-stem, kitty
+Depends: python3, python3-cryptography, libnotify-bin, portaudio19-dev, python3-pyaudio, vorbis-tools, zenity, xterm, pulseaudio-utils, tor, python3-stem, kitty, imagemagick
 Maintainer: Omar Saez <omarsaez@ghostwhisper.chat>
 Description: GhostWhisperChat - Chat P2P Global Seguro (Edición WAN + LAN)
  Sistema de chat descentralizado con cifrado E2E, transferencia de archivos,
