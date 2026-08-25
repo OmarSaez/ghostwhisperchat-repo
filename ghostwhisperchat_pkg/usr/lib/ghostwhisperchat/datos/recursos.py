@@ -79,7 +79,7 @@ class Colores:
     BLACK_TXT = "\033[38;5;0m"
 
 # Versionado - Estable - Global P2P WAN Global Edition
-APP_VER_NUM = "3.055"
+APP_VER_NUM = "3.056"
 APP_VER_TAG = "Global Edition - Global P2P WAN"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
@@ -254,9 +254,21 @@ ABBREVIATIONS_DISPLAY = {
             'aliases': ['--archivo', '-f', '--enviar', '--mandar', '--adjuntar'],
             'desc': "Enviar un archivo a la sala actual (puedes arrastrarlo al chat para la ruta)."
         },
-        "ENVIAR IMAGEN ASCII": {
+        "ENVIAR IMAGEN": {
             'aliases': ['--imagen', '-P', '--foto', '--picture', '-i'],
-            'desc': "Mandar foto como Arte ASCII. Uso: --imagen <ruta> <opcional:ancho>"
+            'desc': "Mandar foto (nativa o Arte ASCII). Uso: --imagen <ruta> <opcional:ancho>"
+        },
+        "GRABAR NOTA DE VOZ": {
+            'aliases': ['--audio', '--voz', '-au'],
+            'desc': "Grabar audio Walkie-Talkie. Usa la tecla Enter para enviarlo."
+        },
+        "REPRODUCIR AUDIO": {
+            'aliases': ['--play', '--escuchar', '-pl'],
+            'desc': "Reproducir audio recibido. Uso: --play <opcional:ID>"
+        },
+        "DETENER AUDIO": {
+            'aliases': ['--stop', '--parar', '--callate'],
+            'desc': "Detener reproducción actual de audio."
         },
         "CAMBIAR NOMBRE": {
             'aliases': ['--cambiarnombre', '-n', '--nick', '--apodo', '--nombre'],

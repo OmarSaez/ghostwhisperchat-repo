@@ -89,7 +89,10 @@ sudo apt update
 | Comando Principal | Parámetros | Descripción | Alias Disponibles |
 | :--- | :--- | :--- | :--- |
 | `--archivo` | `<Ruta>` | Enviar un archivo (Soporta arrastrar y soltar). | `-f`, `--enviar`, `--mandar`, `--adjuntar`, `--file` |
-| `--imagen` | `<Ruta> [ancho]` | Mandar foto como Arte ASCII y original (Soporta arrastrar y soltar). | `-i`, `-P`, `--foto`, `--picture` |
+| `--imagen` | `<Ruta> [ancho]` | Mandar foto (nativa o Arte ASCII, soporta arrastrar y soltar). | `-i`, `-P`, `--foto`, `--picture` |
+| `--audio` | | Grabar una Nota de Voz (Walkie-Talkie). Usa Enter para enviar. | `-au`, `--voz` |
+| `--play` | `[ID]` | Reproducir una Nota de Voz recibida. | `-pl`, `--escuchar` |
+| `--stop` | | Detener la reproducción de la Nota de Voz actual. | `--parar`, `--callate` |
 | `--estado` | `<Texto>` | Publicar un mensaje de estado personal. | `-e`, `--situacion`, `--mood`, `--st` |
 | `--info` | | Ver estado del sistema, tu IP, ID Onion global, versión y logs. | `--estados-globales`, `-i`, `--config`, `--todo` |
 | `--limpiar` | | Limpiar el texto de la consola. | `-k`, `--borrar`, `--cls`, `--vaciar`, `--clear` |

@@ -292,9 +292,10 @@ class GestorInput:
                             self._pintar_linea() # Queda "Tu: " vacio esperando eco o siguiente msg
                             
                             # Procesar comando (sin bloquear el lock mucho tiempo)
-                            if linea.strip():
-                                 self.history.append(linea)
-                                 self.history_index = len(self.history)
+                            if linea.strip() or getattr(self, 'modo_grabando', False):
+                                 if linea.strip():
+                                     self.history.append(linea)
+                                     self.history_index = len(self.history)
                                  self._enviar_mensaje(linea)
                              
                     elif ch == '\x7f' or ch == '\x08': # Backspace
@@ -563,7 +564,18 @@ class GestorInput:
             canales = 1
             rate = 16000
             
+            # Suprimir spam de ALSA/Jack en stderr al iniciar PyAudio
+            import sys
+            devnull = os.open(os.devnull, os.O_WRONLY)
+            old_stderr = os.dup(2)
+            sys.stderr.flush()
+            os.dup2(devnull, 2)
+            
             p = pyaudio.PyAudio()
+            
+            os.dup2(old_stderr, 2)
+            os.close(old_stderr)
+            os.close(devnull)
             stream = p.open(format=formato,
                             channels=canales,
                             rate=rate,
