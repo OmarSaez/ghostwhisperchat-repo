@@ -79,7 +79,7 @@ class Colores:
     BLACK_TXT = "\033[38;5;0m"
 
 # Versionado - Estable - Global P2P WAN Global Edition
-APP_VER_NUM = "3.058"
+APP_VER_NUM = "3.060"
 APP_VER_TAG = "Global Edition - Global P2P WAN"
 APP_VERSION = f"v{APP_VER_NUM} ({APP_VER_TAG})"
 
@@ -153,7 +153,7 @@ AYUDA = f"""
   {Colores.GREEN}--imagen <Ruta>{Colores.RESET} .............. Enviar imagen visual (ASCII) y original.
         {Colores.GREY}[Alias: -i, --foto, --pic]{Colores.RESET}
 
-  {Colores.GREEN}--audio{Colores.RESET} ........................ Grabar Nota de Voz (Walkie-Talkie).
+  {Colores.GREEN}--audio{Colores.RESET} ........................ Grabar Nota de Voz.
         {Colores.GREY}[Alias: -au, --voz]{Colores.RESET}
 
   {Colores.GREEN}--play [ID]{Colores.RESET} .................... Reproducir Nota de Voz.

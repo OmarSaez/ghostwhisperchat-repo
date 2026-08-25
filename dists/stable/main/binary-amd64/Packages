@@ -1,21 +1,4 @@
 Package: ghostwhisperchat
-Version: 3.056
-Architecture: all
-Maintainer: Omar Saez <omarsaez@ghostwhisper.chat>
-Depends: python3, python3-cryptography, libnotify-bin, portaudio19-dev, python3-pyaudio, vorbis-tools, zenity, xterm, pulseaudio-utils, tor, python3-stem, kitty, imagemagick
-Filename: pool/main/g/ghostwhisperchat/ghostwhisperchat_3.056_all.deb
-Size: 253392
-MD5sum: 06213e9ddce8b8787d2557496e7c9087
-SHA1: de582b5b29f8816425d8ef63ef9eb342c9a59700
-SHA256: f846eabdf4a2280df9cb59601d7640f35e41836a6bc1b82fd1abf64cd027413f
-Section: net
-Priority: optional
-Description: GhostWhisperChat - Chat P2P Global Seguro (Edición WAN + LAN)
- Sistema de chat descentralizado con cifrado E2E, transferencia de archivos,
- soporte global sin servidores centrales mediante Tor Onion Services v3
- y descubrimiento automático en LAN.
-
-Package: ghostwhisperchat
 Version: 3.057
 Architecture: all
 Maintainer: Omar Saez <omarsaez@ghostwhisper.chat>
@@ -42,6 +25,23 @@ Size: 253606
 MD5sum: 3b8b85d7eac76e0d2ee9b6047e8c989b
 SHA1: 824e968af02a5fcfe6f2534d48cc65b103cd66bb
 SHA256: 9c171c0eb1b5dd81d6a549d84311716220b89a37fab86620e2d97c6acd215ac4
+Section: net
+Priority: optional
+Description: GhostWhisperChat - Chat P2P Global Seguro (Edición WAN + LAN)
+ Sistema de chat descentralizado con cifrado E2E, transferencia de archivos,
+ soporte global sin servidores centrales mediante Tor Onion Services v3
+ y descubrimiento automático en LAN.
+
+Package: ghostwhisperchat
+Version: 3.060
+Architecture: all
+Maintainer: Omar Saez <omarsaez@ghostwhisper.chat>
+Depends: python3, python3-cryptography, libnotify-bin, portaudio19-dev, python3-pyaudio, vorbis-tools, zenity, xterm, pulseaudio-utils, tor, python3-stem, kitty, imagemagick
+Filename: pool/main/g/ghostwhisperchat/ghostwhisperchat_3.060_all.deb
+Size: 253596
+MD5sum: 555de0bda70edabf4ba4417ffeade54d
+SHA1: cab1f7a4e952503baec66d55812362f589c036dd
+SHA256: bbeb072f768757ae542e930a570dd796a677877ae0298e5a510eb74567e9deba
 Section: net
 Priority: optional
 Description: GhostWhisperChat - Chat P2P Global Seguro (Edición WAN + LAN)
