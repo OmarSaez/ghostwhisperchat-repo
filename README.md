@@ -5,7 +5,7 @@ GhostWhisperChat (GWC) es un sistema de mensajería y transferencia descentraliz
 
 ## DEPENDENCIAS
 
-Para que GhostWhisperChat funcione con todas sus características (incluyendo renderizado multimedia nativo y cifrado), requiere los siguientes paquetes en tu sistema. Si usas el instalador `apt` a continuación, todos ellos **se instalarán automáticamente** si no los tienes:
+Para que GhostWhisperChat funcione con todas sus características (incluyendo renderizado multimedia nativo, audio y cifrado), requiere los siguientes paquetes en tu sistema. Si usas el instalador `apt` a continuación, todos ellos **se instalarán automáticamente** si no los tienes:
 
 ```text
 python3, python3-cryptography, libnotify-bin, portaudio19-dev, python3-pyaudio, vorbis-tools, zenity, xterm, pulseaudio-utils, tor, python3-stem, kitty, imagemagick

@@ -39,9 +39,9 @@ Maintainer: Omar Saez <omarsaez@ghostwhisper.chat>
 Depends: python3, python3-cryptography, libnotify-bin, portaudio19-dev, python3-pyaudio, vorbis-tools, zenity, xterm, pulseaudio-utils, tor, python3-stem, kitty, imagemagick
 Filename: pool/main/g/ghostwhisperchat/ghostwhisperchat_3.058_all.deb
 Size: 253606
-MD5sum: 546eb454905171ce06f51c0238901688
-SHA1: ee475e825f218ea7a03803b1c3f5209f7cb9503b
-SHA256: e5c401d4f877d63c6f5c5d804dc0aeafa7fc02097ae1eea6de91f8e091acfda3
+MD5sum: 3b8b85d7eac76e0d2ee9b6047e8c989b
+SHA1: 824e968af02a5fcfe6f2534d48cc65b103cd66bb
+SHA256: 9c171c0eb1b5dd81d6a549d84311716220b89a37fab86620e2d97c6acd215ac4
 Section: net
 Priority: optional
 Description: GhostWhisperChat - Chat P2P Global Seguro (Edición WAN + LAN)
